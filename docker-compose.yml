@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - ./.postgres:/var/lib/postgresql/data
+      - ./hack/initdb.sh:/docker-entrypoint-initdb.d/initdb.sh
+    environment:
+      POSTGRES_USER: '${POSTGRES_USER:?required}'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:?required}'
+      POSTGRES_DB: '${POSTGRES_DB:?required}'
+      POSTGRES_SCHEMA: '${POSTGRES_SCHEMA:?required}'
+    deploy:
+      resources:
+        limits:
+          cpus: '4000m'
+          memory: 500M
+        reservations:
+          cpus: '1000m'
+          memory: 200M
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    volumes:
+      - ./.redis/data:/data
+    ports:
+      - 127.0.0.1:6379:6379
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
