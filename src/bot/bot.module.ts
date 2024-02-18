@@ -1,13 +1,18 @@
-import { Module } from '@nestjs/common';
 import { IntentsBitField } from 'discord.js';
 import { NecordModule } from 'necord';
+import { DataSource } from 'typeorm';
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { Config, ConfigModule, ConfigService } from 'src/config';
-import { DatabaseModule } from 'src/database';
+import { QueryRunnerFactoryProvider } from 'src/constants';
+import { QueryRunnerCallback } from 'src/types';
+import { Project } from './models/project.entity';
+import { Dashboard } from './models/dashboard.entity';
+import { CreateDashboardCommand } from './commands/dashboard/create.command';
 
 @Module({
   imports: [
     ConfigModule,
-    DatabaseModule,
     NecordModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -17,6 +22,24 @@ import { DatabaseModule } from 'src/database';
         intents: [IntentsBitField.Flags.Guilds],
       }),
     }),
+    TypeOrmModule.forFeature([Project, Dashboard]),
   ],
+  providers: [
+    {
+      provide: QueryRunnerFactoryProvider,
+      useFactory: (dataSource: DataSource) => {
+        return async <T>(fn: QueryRunnerCallback<T>): Promise<T> => {
+          const queryRunner = dataSource.createQueryRunner();
+          await queryRunner.connect();
+          const result = await fn(queryRunner);
+          await queryRunner.release();
+          return result;
+        };
+      },
+      inject: [DataSource],
+    },
+    CreateDashboardCommand,
+  ],
+  exports: [TypeOrmModule],
 })
 export class BotModule {}

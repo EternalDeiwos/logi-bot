@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Config, ConfigModule, ConfigService } from 'src/config';
-import { BotModule } from 'src/bot';
+import { BotModule } from 'src/bot/bot.module';
 import { AppController } from './app.controller';
 import { PermissionsService } from './permissions.service';
 import { EventEmitterModule } from '@nestjs/event-emitter';
