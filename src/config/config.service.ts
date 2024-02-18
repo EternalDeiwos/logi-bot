@@ -11,7 +11,12 @@ const config = {
   POSTGRES_PASSWORD: undefined,
   POSTGRES_DB: 'bot',
   POSTGRES_SCHEMA: 'app',
+
+  // Bot config
   DISCORD_BOT_TOKEN: undefined,
+  DISCORD_BOT_CLIENT_ID: undefined,
+  DISCORD_BOT_PERMISSIONS: '395137027136',
+  DISCORD_BOT_SCOPE: 'bot applications.commands',
 
   // Application config
   APP_PORT: 8080,

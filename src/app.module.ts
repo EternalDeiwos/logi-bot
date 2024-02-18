@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from 'src/config';
+import { DatabaseModule } from 'src/database';
+import { BotModule } from 'src/bot';
 import { AppController } from './app.controller';
-import { ConfigModule } from './config/config.module';
-import { DatabaseModule } from './database/database.module';
-import { BotModule } from './bot/bot.module';
+import { PermissionsService } from './permissions.service';
 
 @Module({
   imports: [ConfigModule, DatabaseModule, BotModule],
   controllers: [AppController],
-  providers: [],
+  providers: [PermissionsService],
 })
 export class AppModule {}
