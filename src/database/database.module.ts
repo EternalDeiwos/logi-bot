@@ -4,7 +4,7 @@ import { databaseProviders } from '.';
 
 @Module({
   imports: [ConfigModule],
-  providers: [...databaseProviders],
-  exports: [...databaseProviders],
+  providers: databaseProviders,
+  exports: databaseProviders,
 })
 export class DatabaseModule {}
