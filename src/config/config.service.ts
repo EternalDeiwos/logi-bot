@@ -3,13 +3,19 @@ import { ConfigService as NestConfigService } from '@nestjs/config';
 
 const config = {
   NODE_ENV: undefined,
+
+  // Services config
   POSTGRES_HOST: 'localhost',
   POSTGRES_PORT: 5432,
   POSTGRES_USER: undefined,
   POSTGRES_PASSWORD: undefined,
   POSTGRES_DB: 'bot',
   POSTGRES_SCHEMA: 'app',
+  DISCORD_BOT_TOKEN: undefined,
+
+  // Application config
   APP_PORT: 8080,
+  APP_GUILD_ID: undefined,
 };
 
 export type ConfigKey = keyof typeof config;
