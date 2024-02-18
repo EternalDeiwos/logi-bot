@@ -20,14 +20,3 @@ services:
         reservations:
           cpus: '1000m'
           memory: 200M
-  redis:
-    image: redis:7
-    restart: unless-stopped
-    volumes:
-      - ./.redis/data:/data
-    ports:
-      - 127.0.0.1:6379:6379
-    command:
-      - redis-server
-      - --appendonly
-      - 'yes'
