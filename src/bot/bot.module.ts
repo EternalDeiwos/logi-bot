@@ -2,10 +2,12 @@ import { Module } from '@nestjs/common';
 import { IntentsBitField } from 'discord.js';
 import { NecordModule } from 'necord';
 import { Config, ConfigModule, ConfigService } from 'src/config';
+import { DatabaseModule } from 'src/database';
 
 @Module({
   imports: [
     ConfigModule,
+    DatabaseModule,
     NecordModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
