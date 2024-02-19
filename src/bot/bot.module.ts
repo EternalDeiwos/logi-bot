@@ -3,8 +3,12 @@ import { NecordModule } from 'necord';
 import { DataSource } from 'typeorm';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bullmq';
 import { Config, ConfigModule, ConfigService } from 'src/config';
-import { QueryRunnerFactoryProvider } from 'src/constants';
+import {
+  DashboardUpdateQueue,
+  QueryRunnerFactoryProvider,
+} from 'src/constants';
 import { QueryRunnerCallback } from 'src/types';
 import { Project } from './models/project.entity';
 import { Dashboard } from './models/dashboard.entity';
@@ -23,6 +27,9 @@ import { CreateDashboardCommand } from './commands/dashboard/create.command';
       }),
     }),
     TypeOrmModule.forFeature([Project, Dashboard]),
+    BullModule.registerQueue({
+      name: DashboardUpdateQueue,
+    }),
   ],
   providers: [
     {

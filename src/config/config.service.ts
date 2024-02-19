@@ -11,6 +11,9 @@ const config = {
   POSTGRES_PASSWORD: undefined,
   POSTGRES_DB: 'bot',
   POSTGRES_SCHEMA: 'app',
+  REDIS_HOST: 'localhost',
+  REDIS_PORT: 6379,
+  REDIS_QUEUE_DB: 0,
 
   // Bot config
   DISCORD_BOT_TOKEN: undefined,

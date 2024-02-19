@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { BullModule } from '@nestjs/bullmq';
 import { Config, ConfigModule, ConfigService } from 'src/config';
-import { BotModule } from 'src/bot/bot.module';
+import { BotModule } from 'src/bot';
 import { AppController } from './app.controller';
 import { PermissionsService } from './permissions.service';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -28,6 +29,19 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         synchronize:
           configService.getOrThrow<string>(Config.NODE_ENV) !== 'production',
       }),
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        return {
+          connection: {
+            host: configService.getOrThrow<string>(Config.REDIS_HOST),
+            port: configService.getOrThrow<number>(Config.REDIS_PORT),
+            db: configService.getOrThrow<number>(Config.REDIS_QUEUE_DB),
+          },
+        };
+      },
     }),
     BotModule,
   ],
