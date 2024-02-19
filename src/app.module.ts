@@ -26,8 +26,7 @@ import { PermissionsService } from './permissions.service';
         database: configService.getOrThrow<string>(Config.POSTGRES_DB),
         schema: configService.getOrThrow<string>(Config.POSTGRES_SCHEMA),
         autoLoadEntities: true,
-        synchronize:
-          configService.getOrThrow<string>(Config.NODE_ENV) !== 'production',
+        synchronize: configService.getOrThrow<string>(Config.NODE_ENV) !== 'production',
       }),
     }),
     BullModule.forRootAsync({
