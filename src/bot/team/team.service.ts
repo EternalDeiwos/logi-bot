@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { GuildChannel, GuildMember, Role, User, channelLink, userMention } from 'discord.js';
+import { GuildChannel, GuildChannelResolvable, GuildMember, Role, User } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
 import { Team } from './team.entity';
@@ -15,6 +15,19 @@ export class TeamService {
     @InjectRepository(Team) private readonly teamRepo: Repository<Team>,
   ) {}
 
+  async getTeam(categoryRef: GuildChannelResolvable) {
+    return this.teamRepo.findOne({
+      where: { category: typeof categoryRef === 'string' ? categoryRef : categoryRef.id },
+    });
+  }
+
+  async searchTeam(query: string) {
+    return this.teamRepo
+      .createQueryBuilder('team')
+      .where(`name ILIKE :query`, { query: `%${query}%` })
+      .getMany();
+  }
+
   async registerTeam(
     forum: GuildChannel,
     role: GuildMember | Role | User,
@@ -25,11 +38,11 @@ export class TeamService {
     }
 
     if (!forum.isThreadOnly()) {
-      return { success: false, message: `${channelLink(forum.id)} is not a valid forum` };
+      return { success: false, message: `${forum} is not a valid forum` };
     }
 
     if ('roles' in role || 'username' in role) {
-      return { success: false, message: `${userMention(role.id)} is not a valid role` };
+      return { success: false, message: `${role} is not a valid role` };
     }
 
     const category = await forum.parent.fetch();

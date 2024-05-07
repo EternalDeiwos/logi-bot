@@ -10,6 +10,7 @@ export class Team {
   category: Snowflake;
 
   @Column()
+  @Index({ fulltext: true })
   name: string;
 
   @Column({ type: 'bigint', name: 'guild_sf' })
