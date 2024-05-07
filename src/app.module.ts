@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
 import { Config, ConfigModule, ConfigService } from 'src/config';
 import { BotModule } from 'src/bot';
@@ -10,10 +9,6 @@ import { PermissionsService } from './permissions.service';
 @Module({
   imports: [
     ConfigModule,
-    EventEmitterModule.forRoot({
-      wildcard: true,
-      verboseMemoryLeak: true,
-    }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
