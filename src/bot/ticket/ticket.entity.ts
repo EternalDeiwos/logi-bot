@@ -11,7 +11,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Team } from 'src/bot/team/team.entity';
 import { Crew } from 'src/bot/crew/crew.entity';
 
 @Entity({ name: 'ticket' })
@@ -34,18 +33,6 @@ export class Ticket {
     referencedColumnName: 'channel',
   })
   crew: Crew;
-
-  @Column({ type: 'bigint', name: 'forum_channel_sf' })
-  @Index()
-  @RelationId((ticket: Ticket) => ticket.team)
-  forum: Snowflake;
-
-  @ManyToOne(() => Team, (team) => team.tickets)
-  @JoinColumn({
-    name: 'forum_channel_sf',
-    referencedColumnName: 'forum',
-  })
-  team: Team;
 
   @Column()
   name: string;
