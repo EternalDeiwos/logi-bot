@@ -7,8 +7,8 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { ForumTag } from '../tag/tag.entity';
-import { Ticket } from '../ticket/ticket.entity';
+import { ForumTag } from 'src/bot/tag/tag.entity';
+import { Crew } from 'src/bot/crew/crew.entity';
 
 @Entity({ name: 'team' })
 export class Team {
@@ -40,8 +40,8 @@ export class Team {
   @OneToMany(() => ForumTag, (tag) => tag.team)
   tags: Promise<ForumTag[]>;
 
-  @OneToMany(() => Ticket, (ticket) => ticket.team)
-  tickets: Promise<Ticket[]>;
+  @OneToMany(() => Crew, (crew) => crew.team)
+  crews: Promise<Crew[]>;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;

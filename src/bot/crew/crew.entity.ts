@@ -6,11 +6,15 @@ import {
   CreateDateColumn,
   PrimaryColumn,
   OneToMany,
+  RelationId,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
+import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
+import { Ticket } from 'src/bot/ticket/ticket.entity';
+import { Team } from 'src/bot/team/team.entity';
 import { CrewMember } from './crew-member.entity';
-import { ForumTagTemplate } from '../tag/tag-template.entity';
-import { Ticket } from '../ticket/ticket.entity';
 
 @Entity({ name: 'crew' })
 export class Crew {
@@ -33,6 +37,18 @@ export class Crew {
   @Column({ type: 'bigint', name: 'role_sf' })
   @Index()
   role: Snowflake;
+
+  @Column({ type: 'bigint', name: 'forum_channel_sf' })
+  @RelationId((crew: Crew) => crew.team)
+  @Index()
+  forum: Snowflake;
+
+  @ManyToOne(() => Team, (team) => team.crews, { onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'forum_channel_sf',
+    referencedColumnName: 'forum',
+  })
+  team: Promise<Team>;
 
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: Promise<CrewMember[]>;
