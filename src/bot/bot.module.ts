@@ -1,32 +1,22 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { IntentsBitField } from 'discord.js';
 import { NecordModule } from 'necord';
-import { DataSource } from 'typeorm';
-import { Module, Provider } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bullmq';
 import { Config, ConfigModule, ConfigService } from 'src/config';
-import { DashboardUpdateQueue, QueryRunnerFactoryProvider } from 'src/constants';
-import { QueryRunnerCallback } from 'src/types';
-import { Project } from './models/project.entity';
-import { Dashboard } from './models/dashboard.entity';
-import { CreateDashboardCommand } from './commands/dashboard/create.command';
-import { DashboardService } from './commands/dashboard/dashboard.service';
-
-const providers: Provider[] = [
-  {
-    provide: QueryRunnerFactoryProvider,
-    useFactory: (dataSource: DataSource) => {
-      return async <T>(fn: QueryRunnerCallback<T>): Promise<T> => {
-        const queryRunner = dataSource.createQueryRunner();
-        await queryRunner.connect();
-        const result = await fn(queryRunner);
-        await queryRunner.release();
-        return result;
-      };
-    },
-    inject: [DataSource],
-  },
-];
+import { Team } from './team/team.entity';
+import { Crew } from './crew/crew.entity';
+import { CrewMember } from './crew/crew-member.entity';
+import { ForumTag } from './tag/tag.entity';
+import { ForumTagTemplate } from './tag/tag-template.entity';
+import { Ticket } from './ticket/ticket.entity';
+import { TeamService } from './team/team.service';
+import { TeamCommand } from './team/team.command';
+import { CrewService } from './crew/crew.service';
+import { CrewCommand } from './crew/crew.command';
+import { TagService } from './tag/tag.service';
+import { TagCommand } from './tag/tag.command';
+import { TicketService } from './ticket/ticket.service';
+import { TicketCommand } from './ticket/ticket.command';
 
 @Module({
   imports: [
@@ -36,16 +26,22 @@ const providers: Provider[] = [
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         token: configService.getOrThrow<string>(Config.DISCORD_BOT_TOKEN),
-        development: [configService.getOrThrow<string>(Config.APP_GUILD_ID)],
-        intents: [IntentsBitField.Flags.Guilds],
+        development: [configService.getOrThrow<string>(Config.APP_GUILD_ID), '1236389163276959888'],
+        intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMembers],
       }),
     }),
-    TypeOrmModule.forFeature([Project, Dashboard]),
-    BullModule.registerQueue({
-      name: DashboardUpdateQueue,
-    }),
+    TypeOrmModule.forFeature([Team, Crew, CrewMember, ForumTag, ForumTagTemplate, Ticket]),
   ],
-  providers: [...providers, CreateDashboardCommand],
+  providers: [
+    TeamService,
+    TeamCommand,
+    CrewService,
+    CrewCommand,
+    TagService,
+    TagCommand,
+    TicketService,
+    TicketCommand,
+  ],
   exports: [TypeOrmModule],
 })
 export class BotModule {}
