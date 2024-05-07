@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Equal, Repository } from 'typeorm';
-import { ChannelType, GuildChannelResolvable, GuildMember, roleMention } from 'discord.js';
+import { ChannelType, Guild, GuildChannelResolvable, GuildMember, roleMention } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
 import { TeamService } from 'src/bot/team/team.service';
@@ -24,6 +24,10 @@ export class CrewService {
     return this.crewRepo.findOne({
       where: { channel: typeof channelRef === 'string' ? channelRef : channelRef.id },
     });
+  }
+
+  async getCrews(guild: Guild) {
+    return this.crewRepo.find({ where: { guild: guild.id } });
   }
 
   async searchCrew(query: string) {

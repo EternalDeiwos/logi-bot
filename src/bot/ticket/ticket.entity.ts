@@ -27,6 +27,10 @@ export class Ticket {
   @RelationId((ticket: Ticket) => ticket.crew)
   discussion: Snowflake;
 
+  @Column({ name: 'content', type: 'text' })
+  @Index({ fulltext: true })
+  content: string;
+
   @ManyToOne(() => Crew, (crew) => crew.tickets)
   @JoinColumn({
     name: 'crew_channel_sf',

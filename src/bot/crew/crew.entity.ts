@@ -43,12 +43,12 @@ export class Crew {
   @Index()
   forum: Snowflake;
 
-  @ManyToOne(() => Team, (team) => team.crews, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Team, (team) => team.crews, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'forum_channel_sf',
     referencedColumnName: 'forum',
   })
-  team: Promise<Team>;
+  team: Team;
 
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: Promise<CrewMember[]>;
