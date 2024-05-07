@@ -7,7 +7,6 @@ import {
   JoinColumn,
   RelationId,
   CreateDateColumn,
-  Unique,
 } from 'typeorm';
 import { Crew } from './crew.entity';
 import { Snowflake } from 'discord.js';
@@ -20,7 +19,6 @@ export enum CrewMemberAccess {
 }
 
 @Entity({ name: 'crew_member' })
-@Unique('unique_crew_member', ['channel', 'member'])
 export class CrewMember {
   @PrimaryColumn({ type: 'bigint', name: 'member_sf' })
   member: Snowflake;
@@ -42,7 +40,7 @@ export class CrewMember {
   })
   access: CrewMemberAccess;
 
-  @Column({ type: 'bigint', name: 'crew_channel_sf' })
+  @PrimaryColumn({ type: 'bigint', name: 'crew_channel_sf' })
   @RelationId((member: CrewMember) => member.crew)
   channel: Snowflake;
 

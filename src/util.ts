@@ -1,3 +1,5 @@
+import { GuildMember, User } from 'discord.js';
+
 // https://gist.github.com/codeguy/6684588
 export function toSlug(input: string, separator = '-') {
   return input
