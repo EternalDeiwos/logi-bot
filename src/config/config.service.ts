@@ -18,7 +18,7 @@ const config = {
   // Bot config
   DISCORD_BOT_TOKEN: undefined,
   DISCORD_BOT_CLIENT_ID: undefined,
-  DISCORD_BOT_PERMISSIONS: '395137027136',
+  DISCORD_BOT_PERMISSIONS: '19097840626768',
   DISCORD_BOT_SCOPE: 'bot applications.commands',
 
   // Application config
@@ -28,9 +28,10 @@ const config = {
 
 export type ConfigKey = keyof typeof config;
 
-export const Config = Object.fromEntries(
-  Object.keys(config).map((key) => [key, key]),
-) as Record<ConfigKey, ConfigKey>;
+export const Config = Object.fromEntries(Object.keys(config).map((key) => [key, key])) as Record<
+  ConfigKey,
+  ConfigKey
+>;
 
 @Injectable()
 export class ConfigService {
