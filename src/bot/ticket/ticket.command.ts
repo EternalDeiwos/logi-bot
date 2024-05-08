@@ -1,19 +1,24 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
 import {
+  Button,
+  ComponentParam,
   Context,
   Modal,
   ModalContext,
   ModalParam,
+  Options,
   SelectedStrings,
   SlashCommandContext,
-  StringOption,
   StringSelect,
   Subcommand,
   UserSelectContext,
 } from 'necord';
 import {
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   EmbedBuilder,
+  GuildChannelResolvable,
   ModalBuilder,
   Snowflake,
   StringSelectMenuBuilder,
@@ -23,17 +28,10 @@ import {
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
 import { CrewService } from 'src/bot/crew/crew.service';
+import { SelectCrewCommandParams } from 'src/bot/crew/crew.command';
+import { CrewSelectAutocompleteInterceptor } from 'src/bot/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
 import { ticketPromptDescription } from './ticket.messages';
-
-export class CreateCrewCommandParams {
-  @StringOption({
-    name: 'name',
-    description: 'Tag name',
-    required: true,
-  })
-  name: string;
-}
 
 @Injectable()
 @EchoCommand({
@@ -49,34 +47,67 @@ export class TicketCommand {
     private readonly ticketService: TicketService,
   ) {}
 
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
   @Subcommand({
     name: 'prompt',
     description: 'Create a form to start the ticket wizard',
     dmPermission: false,
   })
-  async onPrompt(@Context() [interaction]: SlashCommandContext) {
-    const crews = await this.crewService.getCrews(interaction.guild);
-    this.logger.debug(JSON.stringify(crews));
-
-    const select = new StringSelectMenuBuilder()
-      .setCustomId('ticket/start')
-      .setPlaceholder('Select a crew')
-      .setOptions(
-        crews.map((crew) => ({ label: `${crew.team.name}: ${crew.name}`, value: crew.channel })),
-      );
-
-    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-
+  async onPrompt(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
     const prompt = new EmbedBuilder()
       .setColor(0x333333)
       .setTitle('Create a Ticket')
       .setDescription(ticketPromptDescription());
 
-    await interaction.channel.send({
-      components: [row],
-      embeds: [prompt],
-    });
-    await interaction.reply({ content: 'Done', ephemeral: true });
+    if (data.crew) {
+      const crew = await this.crewService.getCrew(data.crew);
+
+      if (!crew) {
+        return interaction.reply({ content: 'Invalid crew', ephemeral: true });
+      }
+
+      const create = new ButtonBuilder()
+        .setCustomId(`ticket/start/${data.crew}`)
+        .setLabel('Create Ticket')
+        .setStyle(ButtonStyle.Primary);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(create);
+
+      await interaction.channel.send({
+        components: [row],
+        embeds: [prompt],
+      });
+    } else {
+      const crews = await this.crewService.getCrews(interaction.guild);
+
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('ticket/start')
+        .setPlaceholder('Select a crew')
+        .setOptions(
+          crews.map((crew) => ({ label: `${crew.team.name}: ${crew.name}`, value: crew.channel })),
+        );
+
+      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+
+      await interaction.channel.send({
+        components: [row],
+        embeds: [prompt],
+      });
+    }
+
+    return interaction.reply({ content: 'Done', ephemeral: true });
+  }
+
+  @Button('ticket/start/:crew')
+  async onCrewTicketStart(
+    @Context() [interaction]: UserSelectContext,
+    @ComponentParam('crew') channelRef: Snowflake,
+  ) {
+    const modal = this.buildTicketModal(channelRef);
+    interaction.showModal(modal);
   }
 
   @StringSelect('ticket/start')
@@ -84,6 +115,11 @@ export class TicketCommand {
     @Context() [interaction]: UserSelectContext,
     @SelectedStrings() [selected]: string[],
   ) {
+    const modal = this.buildTicketModal(selected);
+    interaction.showModal(modal);
+  }
+
+  buildTicketModal(channelRef: GuildChannelResolvable) {
     const titleInput = new TextInputBuilder()
       .setCustomId('ticket/form/title')
       .setLabel('Title')
@@ -109,16 +145,14 @@ export class TicketCommand {
       .setLabel('When do you need it?')
       .setStyle(TextInputStyle.Short);
 
-    const modal = new ModalBuilder()
-      .setCustomId(`ticket/create/${selected}`)
+    return new ModalBuilder()
+      .setCustomId(`ticket/create/${channelRef}`)
       .setTitle('Create a Ticket')
       .addComponents(
         [titleInput, whoInput, whatInput, whereInput, whenInput].map((input) =>
           new ActionRowBuilder<TextInputBuilder>().addComponents(input),
         ),
       );
-
-    interaction.showModal(modal);
   }
 
   @Modal('ticket/create/:crew')
