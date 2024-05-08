@@ -31,7 +31,7 @@ export class Ticket {
   @Index({ fulltext: true })
   content: string;
 
-  @ManyToOne(() => Crew, (crew) => crew.tickets)
+  @ManyToOne(() => Crew, (crew) => crew.tickets, { eager: true })
   @JoinColumn({
     name: 'crew_channel_sf',
     referencedColumnName: 'channel',

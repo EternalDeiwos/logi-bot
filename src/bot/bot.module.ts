@@ -17,6 +17,7 @@ import { TagService } from './tag/tag.service';
 import { TagCommand } from './tag/tag.command';
 import { TicketService } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
+import { TicketCreateListener } from './ticket/ticket-create.listener';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { TicketCommand } from './ticket/ticket.command';
     TagCommand,
     TicketService,
     TicketCommand,
+    TicketCreateListener,
   ],
   exports: [TypeOrmModule],
 })

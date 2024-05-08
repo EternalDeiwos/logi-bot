@@ -1,6 +1,7 @@
 import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
 import {
   Button,
+  ButtonContext,
   ComponentParam,
   Context,
   Modal,
@@ -10,8 +11,8 @@ import {
   SelectedStrings,
   SlashCommandContext,
   StringSelect,
+  StringSelectContext,
   Subcommand,
-  UserSelectContext,
 } from 'necord';
 import {
   ActionRowBuilder,
@@ -103,7 +104,7 @@ export class TicketCommand {
 
   @Button('ticket/start/:crew')
   async onCrewTicketStart(
-    @Context() [interaction]: UserSelectContext,
+    @Context() [interaction]: ButtonContext,
     @ComponentParam('crew') channelRef: Snowflake,
   ) {
     const modal = this.buildTicketModal(channelRef);
@@ -112,7 +113,7 @@ export class TicketCommand {
 
   @StringSelect('ticket/start')
   async onTicketStart(
-    @Context() [interaction]: UserSelectContext,
+    @Context() [interaction]: StringSelectContext,
     @SelectedStrings() [selected]: string[],
   ) {
     const modal = this.buildTicketModal(selected);
@@ -153,6 +154,17 @@ export class TicketCommand {
           new ActionRowBuilder<TextInputBuilder>().addComponents(input),
         ),
       );
+  }
+
+  @StringSelect('ticket/move/:thread')
+  async onTicketMove(
+    @Context() [interaction]: StringSelectContext,
+    @ComponentParam('thread') threadRef: Snowflake,
+    @SelectedStrings() [selected]: string[],
+  ) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    const result = await this.ticketService.moveTicket(threadRef, selected, member);
+    return interaction.reply({ content: result.message, ephemeral: true });
   }
 
   @Modal('ticket/create/:crew')

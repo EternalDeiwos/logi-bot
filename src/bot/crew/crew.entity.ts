@@ -38,6 +38,9 @@ export class Crew {
   @Index()
   role: Snowflake;
 
+  @Column({ type: 'boolean', name: 'enable_move_prompt', default: false })
+  movePrompt: boolean;
+
   @Column({ type: 'bigint', name: 'forum_channel_sf' })
   @RelationId((crew: Crew) => crew.team)
   @Index()

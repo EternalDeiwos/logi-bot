@@ -52,6 +52,7 @@ export class CrewService {
     member: GuildMember,
     name?: string,
     shortName?: string,
+    movePrompt = false,
   ): Promise<OperationStatus> {
     const guild = member.guild;
     const category = await guild.channels.cache.get(
@@ -93,6 +94,7 @@ export class CrewService {
       name,
       shortName,
       slug,
+      movePrompt,
       role: role.id,
       forum: team.forum,
       createdBy: member.id,

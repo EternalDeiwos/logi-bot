@@ -1,5 +1,6 @@
 import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
 import {
+  BooleanOption,
   Context,
   MemberOption,
   Options,
@@ -37,6 +38,13 @@ export class CreateCrewCommandParams {
     required: false,
   })
   shortName?: string;
+
+  @BooleanOption({
+    name: 'move_prompt',
+    description: 'Should the ticket move prompt appear on every ticket?',
+    required: false,
+  })
+  movePrompt: boolean;
 }
 
 export class SelectCrewCommandParams {
@@ -95,6 +103,7 @@ export class CrewCommand {
       member,
       data.name,
       data.shortName,
+      data.movePrompt,
     );
     await interaction.reply({ content: result.message, ephemeral: true });
   }

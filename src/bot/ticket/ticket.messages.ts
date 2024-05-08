@@ -13,3 +13,9 @@ Welcome to the WLL ticket system ${userMention(member)}. Could you please make s
 
 The ${roleMention(role)} team will triage this request. You will be notified of any changes.
 `;
+
+export const newTicketMessage = (body: string, member: Snowflake, role: Snowflake) => `
+${roleMention(role)} here is a new ticket from ${userMention(member)}. Please see details below.
+
+${body}
+`;
