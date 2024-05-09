@@ -110,8 +110,6 @@ export class TeamService {
   ): Promise<OperationStatus> {
     const tags = await team.tags;
     const filteredTemplates = templates.filter((template) => {
-      this.logger.debug(`TEMPLATE ${team.name}: ${JSON.stringify(template)}`);
-
       return (
         // Crew tags only appear on their team's forum
         (!template.channel || template.crew?.forum === team.forum) &&

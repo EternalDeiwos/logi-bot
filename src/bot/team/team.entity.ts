@@ -1,6 +1,7 @@
 import { Entity, Column, Index, OneToMany, CreateDateColumn, PrimaryColumn } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { ForumTag } from 'src/bot/tag/tag.entity';
+import { TicketTag } from 'src/bot/tag/tag.service';
 import { Crew } from 'src/bot/crew/crew.entity';
 
 @Entity({ name: 'team' })
@@ -33,4 +34,9 @@ export class Team {
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
+
+  async findTag(tag: TicketTag): Promise<Snowflake> {
+    const tags = await this.tags;
+    return tags.find((t) => t.name === tag)?.tag;
+  }
 }

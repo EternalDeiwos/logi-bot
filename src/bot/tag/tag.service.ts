@@ -12,6 +12,7 @@ import { ForumTagTemplate } from './tag-template.entity';
 export enum TicketTag {
   TRIAGE = 'Triage',
   ACCEPTED = 'Accepted',
+  DECLINED = 'Declined',
   REPEATABLE = 'Repeatable',
   IN_PROGRESS = 'In Progress',
   DONE = 'Done',
@@ -57,6 +58,13 @@ export class TagService {
       createdBy: member.id,
     };
 
+    const declined = {
+      name: TicketTag.TRIAGE,
+      guild: guild.id,
+      moderated: true,
+      createdBy: member.id,
+    };
+
     const unmoderated = [
       TicketTag.ABANDONED,
       TicketTag.DONE,
@@ -68,7 +76,7 @@ export class TagService {
       moderated: false,
       createdBy: member.id,
     }));
-    const tags = [triage, accepted].concat(unmoderated);
+    const tags = [triage, accepted, declined].concat(unmoderated);
 
     try {
       await this.templateRepo.insert(tags);

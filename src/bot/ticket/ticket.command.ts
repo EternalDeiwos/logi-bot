@@ -196,4 +196,48 @@ export class TicketCommand {
 
     return interaction.reply({ content: result.message, ephemeral: true });
   }
+
+  @Button('ticket/accept/:thread')
+  async onTicketAccept(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('thread') threadRef: Snowflake,
+  ) {
+    const guild = interaction.guild;
+    const member = await guild.members.fetch(interaction.user);
+    const result = await this.ticketService.acceptTicket(threadRef, member);
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  buildDeclineModal(threadRef: GuildChannelResolvable) {
+    const reason = new TextInputBuilder()
+      .setCustomId('ticket/decline/reason')
+      .setLabel('Reason')
+      .setStyle(TextInputStyle.Paragraph);
+
+    return new ModalBuilder()
+      .setCustomId(`ticket/decline/${threadRef}`)
+      .setTitle('Decline Ticket')
+      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(reason));
+  }
+
+  @Button('ticket/reqdecline/:thread')
+  async onTicketRequestDecline(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('thread') threadRef: Snowflake,
+  ) {
+    const modal = this.buildDeclineModal(threadRef);
+    interaction.showModal(modal);
+  }
+
+  @Modal('ticket/decline/:thread')
+  async onTicketDecline(
+    @Context() [interaction]: ModalContext,
+    @ModalParam('thread') threadRef: Snowflake,
+  ) {
+    const guild = interaction.guild;
+    const member = await guild.members.fetch(interaction.user);
+    const reason = interaction.fields.getTextInputValue('ticket/decline/reason');
+    const result = await this.ticketService.declineTicket(threadRef, reason, member);
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
 }

@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import {
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   EmbedBuilder,
   Guild,
   GuildBasedChannel,
@@ -11,10 +13,13 @@ import {
   StringSelectMenuBuilder,
   ThreadChannel,
   ThreadChannelResolvable,
+  channelMention,
   roleMention,
+  userMention,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
+import { TicketTag } from 'src/bot/tag/tag.service';
 import { CrewService } from 'src/bot/crew/crew.service';
 import { Ticket } from './ticket.entity';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
@@ -75,6 +80,7 @@ export class TicketService {
         embeds: [prompt],
         allowedMentions: { users: [member.id], roles: [crew.role] },
       },
+      appliedTags: [await crew.team.findTag(TicketTag.TRIAGE)],
     });
 
     await this.ticketRepo.insert({
@@ -150,6 +156,38 @@ export class TicketService {
     return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
   }
 
+  async addTriageControlToThread(guild: Guild, threadRef: ThreadChannel | ThreadChannelResolvable) {
+    const thread = await guild.channels.cache.get(
+      typeof threadRef === 'string' ? threadRef : threadRef.id,
+    );
+
+    if (!thread.isThread()) {
+      this.logger.warn(
+        `Failed to add triage controls to ticket: ${thread.name} (${thread.id}) is not a thread.`,
+      );
+      return;
+    }
+
+    const message = await thread.fetchStarterMessage();
+    await message.edit({
+      components: [...message.components, await this.createTriageControl(thread)],
+    });
+  }
+
+  async createTriageControl(thread: ThreadChannel) {
+    const accept = new ButtonBuilder()
+      .setCustomId(`ticket/accept/${thread.id}`)
+      .setLabel('Accept')
+      .setStyle(ButtonStyle.Success);
+
+    const decline = new ButtonBuilder()
+      .setCustomId(`ticket/reqdecline/${thread.id}`)
+      .setLabel('Decline')
+      .setStyle(ButtonStyle.Danger);
+
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(accept, decline);
+  }
+
   async moveTicket(
     threadRef: ThreadChannelResolvable,
     channelRef: GuildChannelResolvable,
@@ -210,6 +248,120 @@ export class TicketService {
     const now = new Date();
 
     await thread.delete(reason);
+    await this.ticketRepo.update(
+      { thread: thread.id },
+      {
+        deletedAt: now,
+        updatedBy: member.id,
+        updatedAt: now,
+      },
+    );
+
+    return { success: true, message: 'Done' };
+  }
+
+  async acceptTicket(
+    threadRef: ThreadChannelResolvable,
+    member: GuildMember,
+  ): Promise<OperationStatus> {
+    const guild = member.guild;
+    const thread = await guild.channels.cache.get(
+      typeof threadRef === 'string' ? threadRef : threadRef.id,
+    );
+
+    if (!thread || !thread.isThread()) {
+      return { success: false, message: 'Invalid ticket' };
+    }
+
+    const ticket = await this.getTicket(thread);
+
+    if (!ticket) {
+      return { success: false, message: `${thread} is not a ticket` };
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('Ticket Accepted')
+      .setColor(0x22fa22)
+      .setDescription(`Your ticket ${channelMention(thread.id)} was accepted by ${member}`)
+      .setThumbnail(guild.iconURL({ extension: 'png', forceStatic: true }));
+
+    const tags = await ticket.crew.team.tags;
+    const triageTag = tags.find((tag) => tag.name === TicketTag.TRIAGE);
+    const acceptedTag = tags.find((tag) => tag.name === TicketTag.ACCEPTED);
+    await thread.setAppliedTags([
+      ...thread.appliedTags.filter((tag) => tag !== triageTag?.tag),
+      acceptedTag?.tag,
+    ]);
+
+    await thread.send({
+      content: userMention(ticket.createdBy),
+      allowedMentions: { users: [ticket.createdBy] },
+      embeds: [embed],
+    });
+
+    const message = await thread.fetchStarterMessage();
+    await message.edit({ components: [] });
+
+    const now = new Date();
+    await this.ticketRepo.update(
+      { thread: thread.id },
+      {
+        updatedBy: member.id,
+        updatedAt: now,
+      },
+    );
+
+    return { success: true, message: 'Done' };
+  }
+
+  async declineTicket(
+    threadRef: ThreadChannelResolvable,
+    reason: string,
+    member: GuildMember,
+  ): Promise<OperationStatus> {
+    const guild = member.guild;
+    const thread = await guild.channels.cache.get(
+      typeof threadRef === 'string' ? threadRef : threadRef.id,
+    );
+
+    if (!thread || !thread.isThread()) {
+      return { success: false, message: 'Invalid ticket' };
+    }
+
+    const ticket = await this.getTicket(thread);
+
+    if (!ticket) {
+      return { success: false, message: `${thread} is not a ticket` };
+    }
+
+    const message = reason
+      .split('\n')
+      .map((r) => `> ${r}`)
+      .join('\n');
+    const embed = new EmbedBuilder()
+      .setTitle('Ticket Declined')
+      .setColor(0xfa2222)
+      .setDescription(
+        `Your ticket ${channelMention(thread.id)} was declined by ${member} for the following reason:\n\n${message}`,
+      )
+      .setThumbnail(guild.iconURL());
+
+    const tags = await ticket.crew.team.tags;
+    const triageTag = tags.find((tag) => tag.name === TicketTag.TRIAGE);
+    const declinedTag = tags.find((tag) => tag.name === TicketTag.DECLINED);
+    await thread.setAppliedTags([
+      ...thread.appliedTags.filter((tag) => tag !== triageTag?.tag),
+      declinedTag?.tag,
+    ]);
+
+    await thread.send({
+      content: userMention(ticket.createdBy),
+      allowedMentions: { users: [ticket.createdBy] },
+      embeds: [embed],
+    });
+
+    const now = new Date();
+    await thread.setArchived(true, reason);
     await this.ticketRepo.update(
       { thread: thread.id },
       {

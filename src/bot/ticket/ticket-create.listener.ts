@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Context, ContextOf, On } from 'necord';
 import { ConfigService } from 'src/config';
+import { TicketTag } from 'src/bot/tag/tag.service';
 import { TicketService } from './ticket.service';
 
 @Injectable()
@@ -17,6 +18,10 @@ export class TicketCreateListener {
     // This is a hack to delay the event to ensure the Ticket record is written to the database before proceeding.
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const ticket = await this.ticketService.getTicket(thread);
+
+    if (thread.appliedTags.includes(await ticket.crew.team.findTag(TicketTag.TRIAGE))) {
+      await this.ticketService.addTriageControlToThread(thread.guild, thread);
+    }
 
     if (ticket.crew.movePrompt) {
       await this.ticketService.addMovePromptToThread(thread.guild, thread, ticket.crew.channel);
