@@ -1,7 +1,6 @@
 import {
   Entity,
   Column,
-  DeleteDateColumn,
   Index,
   CreateDateColumn,
   PrimaryColumn,
@@ -9,6 +8,7 @@ import {
   RelationId,
   ManyToOne,
   JoinColumn,
+  Unique,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
@@ -17,6 +17,7 @@ import { Team } from 'src/bot/team/team.entity';
 import { CrewMember } from './crew-member.entity';
 
 @Entity({ name: 'crew' })
+@Unique('unique_short_name', ['guild', 'shortName'])
 export class Crew {
   @PrimaryColumn({ type: 'bigint', name: 'crew_channel_sf' })
   channel: Snowflake;
@@ -67,7 +68,4 @@ export class Crew {
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
-
-  @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
-  deletedAt: Date;
 }

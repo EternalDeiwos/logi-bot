@@ -25,7 +25,7 @@ export class Team {
   @Index({ unique: true })
   forum: Snowflake;
 
-  @OneToMany(() => ForumTag, (tag) => tag.team)
+  @OneToMany(() => ForumTag, (tag) => tag.team, { eager: true })
   tags: Promise<ForumTag[]>;
 
   @OneToMany(() => Crew, (crew) => crew.team)

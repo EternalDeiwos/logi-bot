@@ -11,6 +11,7 @@ import {
 import { GuildChannelResolvable, GuildMember } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
+import { TeamService } from 'src/bot/team/team.service';
 import { TeamSelectAutocompleteInterceptor } from 'src/bot/team/team-select.interceptor';
 import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
 import { CrewMemberAccess } from './crew-member.entity';
@@ -44,7 +45,7 @@ export class CreateCrewCommandParams {
     description: 'Should the ticket move prompt appear on every ticket?',
     required: false,
   })
-  movePrompt: boolean;
+  movePrompt: boolean = false;
 }
 
 export class SelectCrewCommandParams {
@@ -84,6 +85,7 @@ export class CrewCommand {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly teamService: TeamService,
     private readonly crewService: CrewService,
   ) {}
 
@@ -98,14 +100,20 @@ export class CrewCommand {
     @Options() data: CreateCrewCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.crewService.registerCrew(
+    const crewResult = await this.crewService.registerCrew(
       data.team,
       member,
       data.name,
       data.shortName,
       data.movePrompt,
     );
-    await interaction.reply({ content: result.message, ephemeral: true });
+
+    if (!crewResult.success) {
+      return interaction.reply({ content: crewResult.message, ephemeral: true });
+    }
+
+    const result = await this.teamService.reconcileGuildForumTags(member.guild);
+    return interaction.reply({ content: result.message, ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)

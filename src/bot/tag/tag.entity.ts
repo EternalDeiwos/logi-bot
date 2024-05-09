@@ -7,12 +7,14 @@ import {
   ManyToOne,
   JoinColumn,
   RelationId,
+  Unique,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Team } from '../team/team.entity';
+import { Team } from 'src/bot/team/team.entity';
 import { ForumTagTemplate } from './tag-template.entity';
 
 @Entity({ name: 'tag' })
+@Unique('unique_forum_tag_template', ['templateId', 'forum'])
 export class ForumTag {
   @PrimaryColumn({ type: 'bigint', name: 'tag_sf' })
   tag: Snowflake;
@@ -23,9 +25,6 @@ export class ForumTag {
   @Column({ type: 'bigint', name: 'guild_sf' })
   @Index()
   guild: Snowflake;
-
-  @Column({ default: false })
-  default: boolean;
 
   @Column({ type: 'bigint', name: 'forum_channel_sf' })
   @RelationId((tag: ForumTag) => tag.team)

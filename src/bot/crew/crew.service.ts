@@ -1,13 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Equal, Repository } from 'typeorm';
-import { ChannelType, Guild, GuildChannelResolvable, GuildMember, roleMention } from 'discord.js';
+import {
+  ChannelType,
+  Guild,
+  GuildChannelResolvable,
+  GuildMember,
+  inlineCode,
+  roleMention,
+} from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
-import { TeamService } from 'src/bot/team/team.service';
-import { Crew } from './crew.entity';
-import { CrewMember, CrewMemberAccess } from './crew-member.entity';
 import { toSlug } from 'src/util';
+import { TeamService } from 'src/bot/team/team.service';
+import { TagService } from 'src/bot/tag/tag.service';
+import { CrewMember, CrewMemberAccess } from './crew-member.entity';
+import { Crew } from './crew.entity';
 
 @Injectable()
 export class CrewService {
@@ -16,6 +24,7 @@ export class CrewService {
   constructor(
     private readonly configService: ConfigService,
     private readonly teamService: TeamService,
+    private readonly tagService: TagService,
     @InjectRepository(Crew) private readonly crewRepo: Repository<Crew>,
     @InjectRepository(CrewMember) private readonly memberRepo: Repository<CrewMember>,
   ) {}
@@ -77,6 +86,13 @@ export class CrewService {
     shortName = shortName || name;
     const slug = toSlug(name);
 
+    if (await this.tagService.existsTemplate(guild, shortName)) {
+      return {
+        success: false,
+        message: `Tag named ${shortName} already exists for this guild. Please choose a different ${inlineCode('name')} or a unique ${inlineCode('short_name')}.`,
+      };
+    }
+
     const role = await member.guild.roles.create({
       name,
       mentionable: true,
@@ -87,6 +103,10 @@ export class CrewService {
       parent: category.id,
       type: ChannelType.GuildText,
     });
+
+    if (!movePrompt && movePrompt !== false) {
+      movePrompt = false;
+    }
 
     await this.crewRepo.insert({
       channel: channel.id,
@@ -99,6 +119,13 @@ export class CrewService {
       forum: team.forum,
       createdBy: member.id,
     });
+
+    const crew = await this.getCrew(channel.id);
+    const result = await this.tagService.createTagForCrew(crew);
+
+    if (!result.success) {
+      return result;
+    }
 
     return await this.registerCrewMember(channel, member, CrewMemberAccess.OWNER);
   }
@@ -254,7 +281,7 @@ export class CrewService {
     const discussion = await guild.channels.fetch(crew.channel);
 
     await Promise.all([discussion.delete(reason), role.delete(reason)]);
-    await this.crewRepo.softDelete({ channel: channel.id });
+    await this.crewRepo.delete({ channel: channel.id });
 
     this.logger.log(
       `${member.displayName} archived crew ${crew.name} (${crew.channel}) in ${guild.name} (${guild.id})`,
