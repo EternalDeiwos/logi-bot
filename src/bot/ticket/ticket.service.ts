@@ -68,12 +68,23 @@ export class TicketService {
       return { success: false, message: `${roleMention(crew.role)} does not have a forum` };
     }
 
+    const triageTag = await crew.team.findTag(TicketTag.TRIAGE);
+    const crewTag = await crew.getCrewTag();
+    const appliedTags: string[] = [];
+
+    if (triageTag) {
+      appliedTags.push(triageTag);
+    }
+
+    if (crewTag) {
+      appliedTags.push(crewTag.tag);
+    }
+
     const prompt = new EmbedBuilder()
       .setColor(0x333333)
       .setTitle('New Ticket')
       .setDescription(ticketTriageMessage(member.id, crew.role));
 
-    const triageTag = await crew.team.findTag(TicketTag.TRIAGE);
     const thread = await forum.threads.create({
       name: title,
       message: {
@@ -81,7 +92,7 @@ export class TicketService {
         embeds: [prompt],
         allowedMentions: { users: [member.id], roles: [crew.role] },
       },
-      appliedTags: triageTag ? [triageTag] : [],
+      appliedTags,
     });
 
     await this.ticketRepo.insert({

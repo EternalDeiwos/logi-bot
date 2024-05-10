@@ -68,4 +68,9 @@ export class Crew {
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
+
+  async getCrewTag() {
+    const tags = await this.team.tags;
+    return tags.find((tag) => tag.name === this.shortName);
+  }
 }
