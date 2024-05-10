@@ -27,7 +27,10 @@ import { TicketCreateListener } from './ticket/ticket-create.listener';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         token: configService.getOrThrow<string>(Config.DISCORD_BOT_TOKEN),
-        development: [configService.getOrThrow<string>(Config.APP_GUILD_ID), '1236389163276959888'],
+        development:
+          configService.getOrThrow<string>(Config.NODE_ENV) === 'production'
+            ? []
+            : [configService.getOrThrow<string>(Config.APP_GUILD_ID)],
         intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMembers],
       }),
     }),

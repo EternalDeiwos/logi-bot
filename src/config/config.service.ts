@@ -24,6 +24,7 @@ const config = {
   // Application config
   APP_PORT: 8080,
   APP_GUILD_ID: undefined,
+  APP_RUN_MIGRATIONS: undefined,
 };
 
 export type ConfigKey = keyof typeof config;
