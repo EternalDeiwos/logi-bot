@@ -220,10 +220,10 @@ export class TicketService {
       return { success: false, message: `${thread} is not a ticket` };
     }
 
-    if (!member.roles.cache.has(ticket.crew.team.role)) {
+    if (!member.roles.cache.has(ticket.crew.role)) {
       return {
         success: false,
-        message: `You do not have the ${roleMention(ticket.crew.team.role)} role.`,
+        message: `You do not have the ${roleMention(ticket.crew.role)} role.`,
       };
     }
 
@@ -254,6 +254,13 @@ export class TicketService {
 
     if (!ticket) {
       return { success: false, message: `${thread} is not a ticket` };
+    }
+
+    if (!member.roles.cache.has(ticket.crew.role)) {
+      return {
+        success: false,
+        message: `You do not have the ${roleMention(ticket.crew.role)} role.`,
+      };
     }
 
     const reason = `${member} has triaged this ticket`;
@@ -289,6 +296,13 @@ export class TicketService {
 
     if (!ticket) {
       return { success: false, message: `${thread} is not a ticket` };
+    }
+
+    if (!member.roles.cache.has(ticket.crew.role)) {
+      return {
+        success: false,
+        message: `You do not have the ${roleMention(ticket.crew.role)} role.`,
+      };
     }
 
     const embed = new EmbedBuilder()
@@ -344,6 +358,13 @@ export class TicketService {
 
     if (!ticket) {
       return { success: false, message: `${thread} is not a ticket` };
+    }
+
+    if (!member.roles.cache.has(ticket.crew.role)) {
+      return {
+        success: false,
+        message: `You do not have the ${roleMention(ticket.crew.role)} role.`,
+      };
     }
 
     const message = reason
