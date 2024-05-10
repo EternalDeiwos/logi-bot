@@ -1,12 +1,13 @@
-# Forum Kanban for Discord
+# Ticket Bot
 
 > TODO Banner
 
 [![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
-> A simple project management tool for Discord guilds
+> A simple ticket management tool for Discord guilds
 
-This application is WIP. If you need assistance please open an issue but be aware this might not be under active development.
+> [!CAUTION]
+> This application is WIP. If you need assistance please open an issue but be aware that at any point this might not be under active development.
 
 ## Table of Contents
 
@@ -26,7 +27,7 @@ This application is WIP. If you need assistance please open an issue but be awar
 To install project dependencies run:
 
 ```bash
-yarn install
+yarn
 ```
 
 ## Usage
@@ -40,13 +41,13 @@ Configuration options for both Docker Compose and the application are set by edi
 If you want to start the containers run:
 
 ```bash
-docker-compose up -d
+yarn docker-compose up -d
 ```
 
 If you want to stop those containers and recover their resources run:
 
 ```bash
-docker-compose down
+yarn docker-compose down
 ```
 
 #### Running in Development
@@ -83,7 +84,7 @@ yarn test:e2e
 
 ## Maintainers
 
-[Greg Linklater](https://github.com/EternalDeiwos)
+[EternalDeiwos](https://github.com/EternalDeiwos)
 
 ## Contributing
 
