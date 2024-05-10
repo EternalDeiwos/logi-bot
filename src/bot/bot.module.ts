@@ -8,6 +8,7 @@ import { Crew } from './crew/crew.entity';
 import { CrewMember } from './crew/crew-member.entity';
 import { ForumTag } from './tag/tag.entity';
 import { ForumTagTemplate } from './tag/tag-template.entity';
+import { TagSetupListener } from './tag/tag-setup.listener';
 import { Ticket } from './ticket/ticket.entity';
 import { TeamService } from './team/team.service';
 import { TeamCommand } from './team/team.command';
@@ -40,6 +41,7 @@ import { TicketCreateListener } from './ticket/ticket-create.listener';
     CrewCommand,
     TagService,
     TagCommand,
+    TagSetupListener,
     TicketService,
     TicketCommand,
     TicketCreateListener,
