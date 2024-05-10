@@ -73,6 +73,7 @@ export class TicketService {
       .setTitle('New Ticket')
       .setDescription(ticketTriageMessage(member.id, crew.role));
 
+    const triageTag = await crew.team.findTag(TicketTag.TRIAGE);
     const thread = await forum.threads.create({
       name: title,
       message: {
@@ -80,7 +81,7 @@ export class TicketService {
         embeds: [prompt],
         allowedMentions: { users: [member.id], roles: [crew.role] },
       },
-      appliedTags: [await crew.team.findTag(TicketTag.TRIAGE)],
+      appliedTags: triageTag ? [triageTag] : [],
     });
 
     await this.ticketRepo.insert({
@@ -361,7 +362,6 @@ export class TicketService {
     });
 
     const now = new Date();
-    await thread.setArchived(true, reason);
     await this.ticketRepo.update(
       { thread: thread.id },
       {

@@ -238,6 +238,11 @@ export class TicketCommand {
     const member = await guild.members.fetch(interaction.user);
     const reason = interaction.fields.getTextInputValue('ticket/decline/reason');
     const result = await this.ticketService.declineTicket(threadRef, reason, member);
-    return interaction.reply({ content: result.message, ephemeral: true });
+    await interaction.reply({ content: result.message, ephemeral: true });
+
+    if (interaction.channel.isThread()) {
+      await interaction.channel.setLocked(true, reason);
+      await interaction.channel.setArchived(true, reason);
+    }
   }
 }
