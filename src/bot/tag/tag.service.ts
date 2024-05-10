@@ -52,14 +52,14 @@ export class TagService {
     };
 
     const accepted = {
-      name: TicketTag.TRIAGE,
+      name: TicketTag.ACCEPTED,
       guild: guild.id,
       moderated: true,
       createdBy: member.id,
     };
 
     const declined = {
-      name: TicketTag.TRIAGE,
+      name: TicketTag.DECLINED,
       guild: guild.id,
       moderated: true,
       createdBy: member.id,
