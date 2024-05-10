@@ -13,7 +13,7 @@ import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
 import { toSlug } from 'src/util';
 import { TeamService } from 'src/bot/team/team.service';
-import { TagService } from 'src/bot/tag/tag.service';
+import { TagService, TicketTag } from 'src/bot/tag/tag.service';
 import { CrewMember, CrewMemberAccess } from './crew-member.entity';
 import { Crew } from './crew.entity';
 
@@ -85,6 +85,14 @@ export class CrewService {
     name = name || category.name;
     shortName = shortName || name;
     const slug = toSlug(name);
+
+    const knownTags = Object.values(TicketTag).map((t) => t.toLowerCase());
+    if (knownTags.includes(name.toLowerCase()) || knownTags.includes(shortName.toLowerCase())) {
+      return {
+        success: false,
+        message: `${shortName} is a reserved name. Please choose something else`,
+      };
+    }
 
     if (await this.tagService.existsTemplate(guild, shortName)) {
       return {
