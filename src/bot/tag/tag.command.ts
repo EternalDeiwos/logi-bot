@@ -1,9 +1,20 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
+import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
+import {
+  Button,
+  ButtonContext,
+  ComponentParam,
+  Context,
+  Options,
+  SlashCommandContext,
+  StringOption,
+  Subcommand,
+} from 'necord';
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
 import { TeamService } from 'src/bot/team/team.service';
 import { TagService } from './tag.service';
+import { TagSelectAutocompleteInterceptor } from './tag-select.interceptor';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 export class CreateTagCommandParams {
   @StringOption({
@@ -12,6 +23,16 @@ export class CreateTagCommandParams {
     required: true,
   })
   name: string;
+}
+
+export class SelectTagCommandParams {
+  @StringOption({
+    name: 'tag',
+    description: 'Select a tag',
+    autocomplete: true,
+    required: false,
+  })
+  tag: string;
 }
 
 @Injectable()
@@ -72,6 +93,57 @@ export class TagCommand {
   })
   async onRefreshTags(@Context() [interaction]: SlashCommandContext) {
     const result = await this.teamService.reconcileGuildForumTags(interaction.guild);
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @UseInterceptors(TagSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'delete',
+    description: 'Remove a tag',
+    dmPermission: false,
+  })
+  async onTagDelete(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectTagCommandParams,
+  ) {
+    if (!data.tag) {
+      const confirm = new ButtonBuilder()
+        .setCustomId('tags/destroy/all')
+        .setLabel('Confirm')
+        .setStyle(ButtonStyle.Danger);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(confirm);
+
+      return interaction.reply({
+        content: 'Are you sure you want to delete all forum tags? This action cannot be reversed.',
+        components: [row],
+        ephemeral: true,
+      });
+    }
+
+    const member = await interaction.guild.members.fetch(interaction.user);
+    let result = await this.tagService.deleteTags(member, data.tag && [data.tag]);
+
+    if (!result.success) {
+      return interaction.reply({ content: result.message, ephemeral: true });
+    }
+
+    result = await this.tagService.deleteTagTemplates(member, data.tag && [data.tag]);
+
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @Button('tags/destroy/all')
+  async onTagsDeleteConfirm(@Context() [interaction]: ButtonContext) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    let result = await this.tagService.deleteTags(member);
+
+    if (!result.success) {
+      return interaction.reply({ content: result.message, ephemeral: true });
+    }
+
+    result = await this.tagService.deleteTagTemplates(member);
+
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 }

@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Guild, GuildMember, GuildForumTag } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
+import { collectResults } from 'src/util';
 import { Crew } from 'src/bot/crew/crew.entity';
 import { Team } from 'src/bot/team/team.entity';
 import { ForumTag } from './tag.entity';
@@ -31,6 +32,13 @@ export class TagService {
 
   async getTemplates(guild: Guild) {
     return this.templateRepo.find({ where: { guild: guild.id } });
+  }
+
+  async searchTemplates(query: string) {
+    return this.templateRepo
+      .createQueryBuilder('template')
+      .where(`name ILIKE :query`, { query: `%${query}%` })
+      .getMany();
   }
 
   async existsTemplate(guild: Guild, name: string) {
@@ -176,6 +184,91 @@ export class TagService {
         message: `Unable to set forum tags for ${forum}. Please remove existing tags and try again.`,
       };
     }
+
+    return { success: true, message: 'Done' };
+  }
+
+  async deleteTags(
+    member: GuildMember,
+    templates?: (ForumTagTemplate | string)[],
+  ): Promise<OperationStatus> {
+    if (!member.permissions.has('Administrator')) {
+      return { success: false, message: 'Only guild administrators can perform this action' };
+    }
+
+    const guild = member.guild;
+
+    if (!templates || !Array.isArray(templates)) {
+      templates = await this.templateRepo.find({
+        where: { guild: guild.id },
+      });
+    }
+
+    const result = await this.templateRepo
+      .createQueryBuilder('template')
+      .distinctOn(['tag.forum'])
+      .select('tag.forum', 'forum')
+      .addSelect('jsonb_object_agg(tag.name, tag.tag_sf::varchar)', 'tags')
+      .leftJoin('template.tags', 'tag')
+      .where('tag.template IN (:...ids)', {
+        ids: templates.map((template) => (typeof template === 'string' ? template : template.id)),
+      })
+      .groupBy('tag.forum')
+      .getRawMany<{
+        forum: string;
+        tags: Record<string, string>;
+      }>();
+
+    const results = await Promise.all(
+      result.map(async ({ forum: forumRef, tags }) => {
+        const forum = await guild.channels.fetch(forumRef);
+
+        if (!forum.isThreadOnly()) {
+          return { success: false, message: `${forum} is not a forum` };
+        }
+
+        try {
+          const remaining = forum.availableTags.filter((t) => !Object.values(tags).includes(t.id));
+          await forum.setAvailableTags(remaining);
+
+          await this.tagRepo.delete({
+            templateId: In(
+              templates.map((template) => (typeof template === 'string' ? template : template.id)),
+            ),
+          });
+        } catch (err) {
+          return {
+            success: false,
+            message: `Failed to remove forum ${forum} tags ${Object.keys(tags).join(', ')}`,
+          };
+        }
+
+        return { success: true, message: 'Done' };
+      }),
+    );
+
+    return collectResults(results);
+  }
+
+  async deleteTagTemplates(
+    member: GuildMember,
+    templates?: (ForumTagTemplate | string)[],
+  ): Promise<OperationStatus> {
+    if (!member.permissions.has('Administrator')) {
+      return { success: false, message: 'Only guild administrators can perform this action' };
+    }
+
+    const guild = member.guild;
+
+    if (!templates || !Array.isArray(templates)) {
+      templates = await this.templateRepo.find({
+        where: { guild: guild.id },
+      });
+    }
+
+    await this.templateRepo.delete(
+      templates.map((template) => (typeof template === 'string' ? template : template.id)),
+    );
 
     return { success: true, message: 'Done' };
   }
