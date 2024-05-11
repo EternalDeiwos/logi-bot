@@ -1,4 +1,4 @@
-import { Snowflake, roleMention, userMention } from 'discord.js';
+import { Snowflake, messageLink, roleMention, userMention } from 'discord.js';
 
 export const ticketPromptDescription = () =>
   `Select a crew that will receive your ticket. If you are unsure then ask for help in any channel.`;
@@ -19,3 +19,22 @@ ${roleMention(role)} here is a new ticket from ${userMention(member)}. Please se
 
 ${body}
 `;
+
+export const proxyTicketMessage = (
+  body: string,
+  member: Snowflake,
+  author: Snowflake,
+  channel: Snowflake,
+  message: Snowflake,
+) =>
+  `
+This ticket was created by ${userMention(member)} on behalf of ${userMention(author)} from this message: ${messageLink(channel, message)}.
+
+${
+  body &&
+  body
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n')
+}
+`.trim();

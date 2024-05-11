@@ -35,6 +35,12 @@ export class CrewService {
     });
   }
 
+  async getFirstCrew(guild: Guild) {
+    return this.crewRepo.findOne({
+      where: { guild: guild.id, movePrompt: true },
+    });
+  }
+
   async getCrews(guild: Guild) {
     return this.crewRepo.find({ where: { guild: guild.id } });
   }

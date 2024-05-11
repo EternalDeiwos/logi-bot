@@ -56,10 +56,14 @@ export class TicketService {
       return { success: false, message: 'Invalid channel' };
     }
 
-    const crew = await this.crewService.getCrew(channel);
+    let crew = await this.crewService.getCrew(channel);
 
     if (!crew) {
-      return { success: false, message: `${channel} does not belong to a crew` };
+      crew = await this.crewService.getFirstCrew(guild);
+
+      if (!crew) {
+        return { success: false, message: `${channel} does not belong to a crew` };
+      }
     }
 
     const forum = guild.channels.cache.get(crew.team.forum);
@@ -107,7 +111,7 @@ export class TicketService {
     });
 
     if (crew.movePrompt) {
-      await this.addMovePromptToThread(guild, thread, channel);
+      await this.addMovePromptToThread(guild, thread, crew.channel);
     }
 
     return { success: true, message: 'Done' };

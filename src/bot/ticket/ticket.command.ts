@@ -4,6 +4,8 @@ import {
   ButtonContext,
   ComponentParam,
   Context,
+  MessageCommand,
+  MessageCommandContext,
   Modal,
   ModalContext,
   ModalParam,
@@ -13,6 +15,7 @@ import {
   StringSelect,
   StringSelectContext,
   Subcommand,
+  TargetMessage,
 } from 'necord';
 import {
   ActionRowBuilder,
@@ -20,11 +23,13 @@ import {
   ButtonStyle,
   EmbedBuilder,
   GuildChannelResolvable,
+  Message,
   ModalBuilder,
   Snowflake,
   StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
+  ThreadChannel,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
@@ -32,7 +37,7 @@ import { CrewService } from 'src/bot/crew/crew.service';
 import { SelectCrewCommandParams } from 'src/bot/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/bot/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
-import { ticketPromptDescription } from './ticket.messages';
+import { proxyTicketMessage, ticketPromptDescription } from './ticket.messages';
 
 @Injectable()
 @EchoCommand({
@@ -120,30 +125,68 @@ export class TicketCommand {
     interaction.showModal(modal);
   }
 
-  buildTicketModal(channelRef: GuildChannelResolvable) {
+  @MessageCommand({
+    name: 'Create Ticket',
+    dmPermission: false,
+  })
+  async onTicketStartForMessage(
+    @Context() [interaction]: MessageCommandContext,
+    @TargetMessage() message: Message,
+  ) {
+    const guild = message.guild;
+    const submitter = await guild.members.fetch(interaction.user);
+    const author = await guild.members.fetch(message.author);
+    const modal = this.buildTicketModal(message.channel.id, {
+      who: author.toString(),
+      what: proxyTicketMessage(
+        message.content,
+        submitter.id,
+        author.id,
+        message.channelId,
+        message.id,
+      ),
+    });
+    interaction.showModal(modal);
+  }
+
+  buildTicketModal(
+    channelRef: GuildChannelResolvable,
+    values: {
+      title?: string;
+      who?: string;
+      what?: string;
+      where?: string;
+      when?: string;
+    } = {},
+  ) {
     const titleInput = new TextInputBuilder()
       .setCustomId('ticket/form/title')
       .setLabel('Title')
+      .setValue(values.title || '')
       .setStyle(TextInputStyle.Short);
 
     const whoInput = new TextInputBuilder()
       .setCustomId('ticket/form/who')
       .setLabel('Who is it for?')
+      .setValue(values.who || '')
       .setStyle(TextInputStyle.Short);
 
     const whatInput = new TextInputBuilder()
       .setCustomId('ticket/form/what')
       .setLabel('What do you need?')
+      .setValue(values.what || '')
       .setStyle(TextInputStyle.Paragraph);
 
     const whereInput = new TextInputBuilder()
       .setCustomId('ticket/form/where')
       .setLabel('Where do you need it?')
+      .setValue(values.where || '')
       .setStyle(TextInputStyle.Paragraph);
 
     const whenInput = new TextInputBuilder()
       .setCustomId('ticket/form/when')
       .setLabel('When do you need it?')
+      .setValue(values.when || '')
       .setStyle(TextInputStyle.Short);
 
     return new ModalBuilder()
@@ -244,5 +287,25 @@ export class TicketCommand {
       await interaction.channel.setLocked(true, reason);
       await interaction.channel.setArchived(true, reason);
     }
+  }
+
+  @Subcommand({
+    name: 'move',
+    description: 'Move this ticket to another crew',
+    dmPermission: false,
+  })
+  async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
+    const { channel } = interaction;
+
+    if (!channel.isThread) {
+      return interaction.reply({
+        content: 'This command can only be used in a ticket',
+        ephemeral: true,
+      });
+    }
+
+    const row = await this.ticketService.createMovePrompt(channel as ThreadChannel, channel.parent);
+
+    return interaction.reply({ content: 'Select destination', components: [row], ephemeral: true });
   }
 }
