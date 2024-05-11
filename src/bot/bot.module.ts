@@ -8,8 +8,8 @@ import { Crew } from './crew/crew.entity';
 import { CrewMember } from './crew/crew-member.entity';
 import { ForumTag } from './tag/tag.entity';
 import { ForumTagTemplate } from './tag/tag-template.entity';
-import { TagSetupListener } from './tag/tag-setup.listener';
 import { Ticket } from './ticket/ticket.entity';
+import { BotEventListener } from './bot.listener';
 import { TeamService } from './team/team.service';
 import { TeamCommand } from './team/team.command';
 import { CrewService } from './crew/crew.service';
@@ -35,13 +35,13 @@ import { TicketCreateListener } from './ticket/ticket-create.listener';
     TypeOrmModule.forFeature([Team, Crew, CrewMember, ForumTag, ForumTagTemplate, Ticket]),
   ],
   providers: [
+    BotEventListener,
     TeamService,
     TeamCommand,
     CrewService,
     CrewCommand,
     TagService,
     TagCommand,
-    TagSetupListener,
     TicketService,
     TicketCommand,
     TicketCreateListener,

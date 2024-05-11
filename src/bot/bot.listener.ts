@@ -4,8 +4,8 @@ import { ConfigService } from 'src/config';
 import { TagService } from 'src/bot/tag/tag.service';
 
 @Injectable()
-export class TagSetupListener {
-  private readonly logger = new Logger(TagSetupListener.name);
+export class BotEventListener {
+  private readonly logger = new Logger(BotEventListener.name);
 
   constructor(
     private readonly configService: ConfigService,
@@ -21,6 +21,16 @@ export class TagSetupListener {
       this.logger.log('Creating guild tags');
     } else {
       this.logger.warn(`Failed to create guild tags: ${result.message}`);
+    }
+  }
+
+  @On('guildDelete')
+  async onGuildDelete(@Context() [guild]: ContextOf<'guildDelete'>) {
+    const member = await guild.members.fetchMe();
+    const result = await this.tagService.deleteTagTemplates(member);
+
+    if (!result.success) {
+      return this.logger.warn(`Failed to delete guild tags: ${result.message}`);
     }
   }
 }
