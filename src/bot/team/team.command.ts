@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
 import {
   ChannelOption,
   Context,
@@ -6,12 +6,14 @@ import {
   Options,
   SlashCommandContext,
   SlashCommandMeta,
+  StringOption,
   Subcommand,
 } from 'necord';
+import { ChannelType, GuildChannel, GuildMember, Role, Snowflake, User } from 'discord.js';
 import { EchoCommand } from 'src/bot/echo.command-group';
 import { ConfigService } from 'src/config';
+import { TeamSelectAutocompleteInterceptor } from './team-select.interceptor';
 import { TeamService } from './team.service';
-import { ChannelType, GuildChannel, GuildMember, Role, User } from 'discord.js';
 
 export class CreateTeamCommandParams {
   @ChannelOption({
@@ -28,6 +30,14 @@ export class CreateTeamCommandParams {
     required: true,
   })
   role: GuildMember | Role | User;
+
+  @ChannelOption({
+    name: 'audit',
+    description: 'A channel where crew control messages will be displayed.',
+    channel_types: [ChannelType.GuildText],
+    required: false,
+  })
+  audit: GuildChannel;
 }
 
 export class SelectTeamCommandParams {
@@ -38,6 +48,24 @@ export class SelectTeamCommandParams {
     required: true,
   })
   category: GuildChannel;
+}
+
+export class SetAuditTeamCommandParams {
+  @StringOption({
+    name: 'team',
+    description: 'Select a team',
+    autocomplete: true,
+    required: true,
+  })
+  team: Snowflake;
+
+  @ChannelOption({
+    name: 'audit',
+    description: 'A channel where crew control messages will be displayed.',
+    channel_types: [ChannelType.GuildText],
+    required: true,
+  })
+  audit: GuildChannel;
 }
 
 @Injectable()
@@ -79,6 +107,21 @@ export class TeamCommand {
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
     const result = await this.teamService.deleteTeam(data.category, member);
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @UseInterceptors(TeamSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'set_audit',
+    description: 'Set the audit channel for this team',
+    dmPermission: false,
+  })
+  async onTeamSetAuditChannel(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SetAuditTeamCommandParams,
+  ) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    const result = await this.teamService.updateTeam(data.team, member, data.audit);
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 }

@@ -85,6 +85,29 @@ export class TeamService {
     return { success: true, message: 'Done' };
   }
 
+  async updateTeam(
+    categoryRef: GuildChannelResolvable,
+    member: GuildMember,
+    audit: GuildChannel,
+  ): Promise<OperationStatus> {
+    if (!member.permissions.has('Administrator')) {
+      return { success: false, message: 'Only guild administrators can perform this action' };
+    }
+
+    const guild = member.guild;
+    const category = await guild.channels.cache.get(
+      typeof categoryRef === 'string' ? categoryRef : categoryRef.id,
+    );
+
+    if (!category) {
+      return { success: false, message: 'Invalid channel' };
+    }
+
+    await this.teamRepo.update({ category: category.id }, { audit: audit.id });
+
+    return { success: true, message: 'Done' };
+  }
+
   async reconcileGuildForumTags(guild: Guild): Promise<OperationStatus> {
     const templates = await this.tagService.getTemplates(guild);
     const teams = await this.getTeams(guild);

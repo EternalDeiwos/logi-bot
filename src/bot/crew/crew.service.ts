@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Equal, Repository } from 'typeorm';
 import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ChannelType,
+  EmbedBuilder,
   Guild,
   GuildChannelResolvable,
   GuildMember,
@@ -141,6 +145,32 @@ export class CrewService {
       return result;
     }
 
+    // Create audit prompt
+    if (crew?.team?.audit) {
+      const audit = await guild.channels.fetch(crew.team.audit);
+
+      if (audit.isTextBased()) {
+        const embed = new EmbedBuilder()
+          .setTitle(
+            `New Crew: ${crew.name}` + (crew.name !== crew.shortName ? ` (${crew.shortName})` : ''),
+          )
+          .setDescription(
+            `A new crew called **${crew.name}** was created in ${roleMention(crew.team.role)} by ${member}. This prompt can be used to remove the team if there is something wrong.`,
+          )
+          .setTimestamp()
+          .setColor('DarkGold');
+
+        const deleteButton = new ButtonBuilder()
+          .setCustomId(`crew/reqdelete/${crew.channel}`)
+          .setLabel('Delete')
+          .setStyle(ButtonStyle.Danger);
+
+        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteButton);
+
+        await audit.send({ embeds: [embed], components: [row] });
+      }
+    }
+
     return await this.registerCrewMember(channel, member, CrewMemberAccess.OWNER);
   }
 
@@ -263,7 +293,7 @@ export class CrewService {
   public async deregisterCrew(
     channelRef: GuildChannelResolvable,
     member: GuildMember,
-  ): Promise<OperationStatus> {
+  ): Promise<OperationStatus<string>> {
     const guild = member.guild;
     const channel = await guild.channels.cache.get(
       typeof channelRef === 'string' ? channelRef : channelRef.id,
@@ -291,6 +321,11 @@ export class CrewService {
       return { success: false, message: 'Only an administrator can perform this action' };
     }
 
+    const tagTemplate = await this.tagService.getTemplateForCrew(crew.channel);
+    const botMember = await guild.members.fetchMe();
+    await this.tagService.deleteTags(botMember, [tagTemplate]);
+    await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
+
     const reason = `Team archived by ${member.displayName}`;
     const discussion = await guild.channels.fetch(crew.channel);
 
@@ -301,7 +336,7 @@ export class CrewService {
       `${member.displayName} archived crew ${crew.name} (${crew.channel}) in ${guild.name} (${guild.id})`,
     );
 
-    return { success: true, message: 'Done' };
+    return { success: true, message: 'Done', data: crew.name };
   }
 
   public async updateCrew(

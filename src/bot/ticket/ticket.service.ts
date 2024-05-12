@@ -377,7 +377,7 @@ export class TicketService {
       .join('\n');
     const embed = new EmbedBuilder()
       .setTitle('Ticket Declined')
-      .setColor(0xfa2222)
+      .setColor('DarkRed')
       .setDescription(
         `Your ticket ${channelMention(thread.id)} was declined by ${member} for the following reason:\n\n${message}`,
       )

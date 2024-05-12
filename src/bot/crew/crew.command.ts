@@ -1,14 +1,30 @@
 import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
 import {
   BooleanOption,
+  Button,
+  ButtonContext,
+  ComponentParam,
   Context,
   MemberOption,
+  Modal,
+  ModalContext,
+  ModalParam,
   Options,
   SlashCommandContext,
   StringOption,
   Subcommand,
 } from 'necord';
-import { GuildChannelResolvable, GuildMember } from 'discord.js';
+import {
+  ActionRowBuilder,
+  EmbedBuilder,
+  GuildChannelResolvable,
+  GuildMember,
+  ModalBuilder,
+  Snowflake,
+  TextInputBuilder,
+  TextInputStyle,
+  channelMention,
+} from 'discord.js';
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
 import { TeamService } from 'src/bot/team/team.service';
@@ -392,5 +408,57 @@ export class CrewCommand {
     const result = await this.crewService.deregisterCrew(channel, member);
 
     return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @Button('crew/reqdelete/:crew')
+  async onTicketRequestDecline(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('crew') crewRef: Snowflake,
+  ) {
+    const modal = this.buildDeclineModal(crewRef);
+    interaction.showModal(modal);
+  }
+
+  buildDeclineModal(crewRef: GuildChannelResolvable) {
+    const reason = new TextInputBuilder()
+      .setCustomId('crew/delete/reason')
+      .setLabel('Reason')
+      .setStyle(TextInputStyle.Paragraph);
+
+    return new ModalBuilder()
+      .setCustomId(`crew/delete/${crewRef}`)
+      .setTitle('Delete Crew')
+      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(reason));
+  }
+
+  @Modal('crew/delete/:crew')
+  async onTicketDecline(
+    @Context() [interaction]: ModalContext,
+    @ModalParam('crew') crewRef: Snowflake,
+  ) {
+    const guild = interaction.guild;
+    const member = await guild.members.fetch(interaction.user);
+    const reason = interaction.fields.getTextInputValue('crew/delete/reason');
+    const result = await this.crewService.deregisterCrew(crewRef, member);
+    await interaction.reply({ content: result.message, ephemeral: true });
+
+    if (result.success) {
+      const message = reason
+        .split('\n')
+        .map((r) => `> ${r}`)
+        .join('\n');
+
+      const embed = new EmbedBuilder()
+        .setTitle('Crew Removed')
+        .setColor('DarkRed')
+        .setDescription(
+          `Crew **${result.data}** was removed by ${member} for the following reason:\n\n${message}`,
+        )
+        .setThumbnail(member.avatarURL() ?? member.user.avatarURL());
+
+      await interaction.channel.send({
+        embeds: [embed],
+      });
+    }
   }
 }

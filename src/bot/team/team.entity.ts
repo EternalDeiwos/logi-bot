@@ -26,6 +26,10 @@ export class Team {
   @Index({ unique: true })
   forum: Snowflake;
 
+  @Column({ type: 'bigint', name: 'audit_channel_sf', nullable: true })
+  @Index()
+  audit: Snowflake;
+
   @OneToMany(() => ForumTag, (tag) => tag.team, { eager: true })
   tags: Promise<ForumTag[]>;
 

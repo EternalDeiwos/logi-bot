@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Guild, GuildMember, GuildForumTag } from 'discord.js';
+import { Guild, GuildMember, GuildForumTag, Snowflake } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
 import { collectResults } from 'src/util';
@@ -39,6 +39,10 @@ export class TagService {
       .createQueryBuilder('template')
       .where(`name ILIKE :query`, { query: `%${query}%` })
       .getMany();
+  }
+
+  async getTemplateForCrew(channel: Snowflake) {
+    return this.templateRepo.findOne({ where: { channel } });
   }
 
   async existsTemplate(guild: Guild, name: string) {
@@ -211,7 +215,7 @@ export class TagService {
       .addSelect('jsonb_object_agg(tag.name, tag.tag_sf::varchar)', 'tags')
       .leftJoin('template.tags', 'tag')
       .where('tag.template IN (:...ids)', {
-        ids: templates.map((template) => (typeof template === 'string' ? template : template.id)),
+        ids: templates.map((template) => (typeof template === 'string' ? template : template?.id)),
       })
       .groupBy('tag.forum')
       .getRawMany<{
@@ -233,7 +237,7 @@ export class TagService {
 
           await this.tagRepo.delete({
             templateId: In(
-              templates.map((template) => (typeof template === 'string' ? template : template.id)),
+              templates.map((template) => (typeof template === 'string' ? template : template?.id)),
             ),
           });
         } catch (err) {
@@ -267,7 +271,7 @@ export class TagService {
     }
 
     await this.templateRepo.delete(
-      templates.map((template) => (typeof template === 'string' ? template : template.id)),
+      templates.map((template) => (typeof template === 'string' ? template : template?.id)),
     );
 
     return { success: true, message: 'Done' };
