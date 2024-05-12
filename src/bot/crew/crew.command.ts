@@ -58,6 +58,23 @@ export class SelectCrewCommandParams {
   crew: string;
 }
 
+export class SetTriageCommandParams {
+  @BooleanOption({
+    name: 'enable_triage',
+    description: 'Set triage prompt enabled or disabled for this crew',
+    required: true,
+  })
+  value: boolean;
+
+  @StringOption({
+    name: 'crew',
+    description: 'Select a crew',
+    autocomplete: true,
+    required: false,
+  })
+  crew: string;
+}
+
 export class SelectCrewMemberCommandParams {
   @MemberOption({
     name: 'member',
@@ -113,6 +130,28 @@ export class CrewCommand {
     }
 
     const result = await this.teamService.reconcileGuildForumTags(member.guild);
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'enable_move',
+    description: 'Enable or disable the movement interface',
+    dmPermission: false,
+  })
+  async onSetMovePrompt(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SetTriageCommandParams,
+  ) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    let channel: GuildChannelResolvable = interaction.channel;
+
+    if (data.crew) {
+      channel = interaction.guild.channels.cache.get(data.crew);
+    }
+
+    const result = await this.crewService.updateCrew(channel, member, data.value);
+
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 

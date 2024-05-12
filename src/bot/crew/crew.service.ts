@@ -303,4 +303,41 @@ export class CrewService {
 
     return { success: true, message: 'Done' };
   }
+
+  public async updateCrew(
+    channelRef: GuildChannelResolvable,
+    member: GuildMember,
+    movePrompt: boolean,
+  ) {
+    const guild = member.guild;
+    const channel = await guild.channels.cache.get(
+      typeof channelRef === 'string' ? channelRef : channelRef.id,
+    );
+
+    if (!channel) {
+      return { success: false, message: 'Invalid channel' };
+    }
+
+    const crew = await this.getCrew(channel);
+
+    if (!crew) {
+      return { success: false, message: `${channel} does not belong to a crew` };
+    }
+
+    const role = guild.roles.cache.get(crew.role);
+
+    const crewMember = await this.getCrewMember(channel, member);
+
+    if (!crewMember) {
+      return { success: false, message: 'Not a member of this crew' };
+    }
+
+    if (crewMember.access > CrewMemberAccess.ADMIN) {
+      return { success: false, message: 'Only an administrator can perform this action' };
+    }
+
+    await this.crewRepo.update({ channel: channel.id }, { movePrompt });
+
+    return { success: true, message: 'Done' };
+  }
 }
