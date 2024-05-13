@@ -30,10 +30,11 @@ export class TeamService {
     });
   }
 
-  async searchTeam(query: string) {
+  async searchTeam(guild: Guild, query: string) {
     return this.teamRepo
       .createQueryBuilder('team')
       .where(`name ILIKE :query`, { query: `%${query}%` })
+      .andWhere(`guild_sf = :guild`, { guild: guild.id })
       .getMany();
   }
 

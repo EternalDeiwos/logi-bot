@@ -14,7 +14,10 @@ export class TeamSelectAutocompleteInterceptor extends AutocompleteInterceptor {
     const focused = interaction.options.getFocused(true);
 
     if (focused.name === 'team') {
-      const results = await this.teamService.searchTeam(focused.value.toString());
+      const results = await this.teamService.searchTeam(
+        interaction.guild,
+        focused.value.toString(),
+      );
       return interaction.respond(
         results.map((result) => ({ name: result.name, value: result.category })),
       );
