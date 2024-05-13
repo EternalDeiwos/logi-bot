@@ -151,7 +151,7 @@ export class TicketService {
 
     const message = await thread.fetchStarterMessage();
     await message.edit({
-      components: [await this.createMovePrompt(thread, channel), ...message.components],
+      components: [await this.createMovePrompt(thread, channel)],
     });
   }
 
@@ -186,7 +186,7 @@ export class TicketService {
 
     const message = await thread.fetchStarterMessage();
     await message.edit({
-      components: [...message.components, await this.createTriageControl(thread)],
+      components: [await this.createTriageControl(thread)],
     });
   }
 
