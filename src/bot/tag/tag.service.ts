@@ -34,10 +34,10 @@ export class TagService {
     return this.templateRepo.find({ where: { guild: guild.id } });
   }
 
-  async searchTemplates(query: string) {
+  async searchTemplates(guild: Guild, query: string) {
     return this.templateRepo
       .createQueryBuilder('template')
-      .where(`name ILIKE :query`, { query: `%${query}%` })
+      .where(`name ILIKE :query AND guild_sf = :guild`, { query: `%${query}%`, guild: guild.id })
       .getMany();
   }
 

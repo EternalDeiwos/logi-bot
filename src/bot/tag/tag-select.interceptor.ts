@@ -14,7 +14,10 @@ export class TagSelectAutocompleteInterceptor extends AutocompleteInterceptor {
     const focused = interaction.options.getFocused(true);
 
     if (focused.name === 'tag') {
-      const results = await this.tagService.searchTemplates(focused.value.toString());
+      const results = await this.tagService.searchTemplates(
+        interaction.guild,
+        focused.value.toString(),
+      );
       return interaction.respond(
         results.map((result) => ({ name: result.name, value: result.id })),
       );
