@@ -90,9 +90,9 @@ export class CrewService {
       return { success: false, message: `${category} does not belong to a registered team` };
     }
 
-    if (!member.roles.cache.has(team.role)) {
-      return { success: false, message: `You do not have the ${roleMention(team.role)} role.` };
-    }
+    // if (!member.roles.cache.has(team.role)) {
+    //   return { success: false, message: `You do not have the ${roleMention(team.role)} role.` };
+    // }
 
     name = name || category.name;
     shortName = shortName || name;
