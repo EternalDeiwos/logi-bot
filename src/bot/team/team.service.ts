@@ -33,8 +33,7 @@ export class TeamService {
   async searchTeam(guild: Guild, query: string) {
     return this.teamRepo
       .createQueryBuilder('team')
-      .where(`name ILIKE :query`, { query: `%${query}%` })
-      .andWhere(`guild_sf = :guild`, { guild: guild.id })
+      .where(`guild_sf = :guild AND name ILIKE :query`, { guild: guild.id, query: `%${query}%` })
       .getMany();
   }
 

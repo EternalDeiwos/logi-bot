@@ -14,7 +14,10 @@ export class CrewSelectAutocompleteInterceptor extends AutocompleteInterceptor {
     const focused = interaction.options.getFocused(true);
 
     if (focused.name === 'crew') {
-      const results = await this.crewService.searchCrew(focused.value.toString());
+      const results = await this.crewService.searchCrew(
+        interaction.guild,
+        focused.value.toString(),
+      );
       return interaction.respond(
         results.map((result) => ({ name: result.name, value: result.channel })),
       );

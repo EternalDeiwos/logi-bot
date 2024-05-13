@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Equal, Repository } from 'typeorm';
+import { DeepPartial, Equal, Or, Repository } from 'typeorm';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -49,11 +49,13 @@ export class CrewService {
     return this.crewRepo.find({ where: { guild: guild.id } });
   }
 
-  async searchCrew(query: string) {
+  async searchCrew(guild: Guild, query: string) {
     return this.crewRepo
       .createQueryBuilder('crew')
-      .where(`name ILIKE :query`, { query: `%${query}%` })
-      .orWhere(`name_short ILIKE :query`, { query: `%${query}%` })
+      .where('guild_sf = :guild AND (name ILIKE :query OR name_short ILIKE :query)', {
+        guild: guild.id,
+        query: `%${query}%`,
+      })
       .getMany();
   }
 
