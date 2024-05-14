@@ -11,6 +11,9 @@ import {
   GuildChannelResolvable,
   GuildMember,
   GuildTextBasedChannel,
+  OverwriteResolvable,
+  PermissionOverwrites,
+  PermissionsBitField,
   inlineCode,
   roleMention,
 } from 'discord.js';
@@ -146,9 +149,13 @@ export class CrewService {
     });
 
     const channel = await member.guild.channels.create({
-      name: slug,
+      name: `🟢${slug}`,
       parent: category.id,
       type: ChannelType.GuildText,
+      permissionOverwrites: [
+        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+        { id: team.role, allow: [PermissionsBitField.Flags.ViewChannel] },
+      ],
     });
 
     if (!movePrompt && movePrompt !== false) {
