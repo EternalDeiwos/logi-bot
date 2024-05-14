@@ -16,6 +16,8 @@ import {
 } from 'necord';
 import {
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   EmbedBuilder,
   GuildChannelResolvable,
   GuildMember,
@@ -195,6 +197,34 @@ export class CrewCommand {
     );
 
     return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @Button('crew/join')
+  async onCrewJoinRequest(@Context() [interaction]: ButtonContext) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    let channel: GuildChannelResolvable = interaction.channel;
+
+    const result = await this.crewService.registerCrewMember(
+      channel,
+      member,
+      CrewMemberAccess.MEMBER,
+    );
+
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'prompt',
+    description:
+      'Show a generic prompt to join the crew of this channel. Must be run in crew channel.',
+    dmPermission: false,
+  })
+  async onCrewJoinPrompt(@Context() [interaction]: SlashCommandContext) {
+    let channel = interaction.channel;
+    const crew = await this.crewService.getCrew(channel);
+    await this.crewService.crewJoinPrompt(channel, crew);
+    return interaction.reply({ content: 'Done', ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -411,7 +441,7 @@ export class CrewCommand {
   }
 
   @Button('crew/reqdelete/:crew')
-  async onTicketRequestDecline(
+  async onCrewDeleteRequest(
     @Context() [interaction]: ButtonContext,
     @ComponentParam('crew') crewRef: Snowflake,
   ) {
@@ -432,7 +462,7 @@ export class CrewCommand {
   }
 
   @Modal('crew/delete/:crew')
-  async onTicketDecline(
+  async onCrewDelete(
     @Context() [interaction]: ModalContext,
     @ModalParam('crew') crewRef: Snowflake,
   ) {

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Equal, Or, Repository } from 'typeorm';
+import { DeepPartial, Equal, Repository } from 'typeorm';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -10,6 +10,7 @@ import {
   Guild,
   GuildChannelResolvable,
   GuildMember,
+  GuildTextBasedChannel,
   inlineCode,
   roleMention,
 } from 'discord.js';
@@ -66,6 +67,24 @@ export class CrewService {
         member: member.id,
       },
     });
+  }
+
+  async crewJoinPrompt(channel: GuildTextBasedChannel, crew: Crew) {
+    const embed = new EmbedBuilder()
+      .setTitle(`Join ${crew.name}`)
+      .setDescription(
+        'Click the button below to join this crew. You can leave again at any time by running the `echo crew leave` command in this channel or optionally selecting the team in the command.',
+      )
+      .setColor('DarkGreen');
+
+    const join = new ButtonBuilder()
+      .setCustomId('crew/join')
+      .setLabel('Join Crew')
+      .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(join);
+
+    await channel.send({ embeds: [embed], components: [row] });
   }
 
   async registerCrew(
@@ -141,6 +160,8 @@ export class CrewService {
     });
 
     const crew = await this.getCrew(channel.id);
+    await this.crewJoinPrompt(channel, crew);
+
     const result = await this.tagService.createTagForCrew(crew);
 
     if (!result.success) {
