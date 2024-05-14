@@ -48,7 +48,7 @@ export class TicketService {
     extra: DeepPartial<Ticket> = {},
   ): Promise<OperationStatus> {
     const guild = member.guild;
-    const channel = guild.channels.cache.get(
+    const channel = await guild.channels.fetch(
       typeof channelRef === 'string' ? channelRef : channelRef.id,
     );
 
@@ -66,7 +66,7 @@ export class TicketService {
       }
     }
 
-    const forum = guild.channels.cache.get(crew.team.forum);
+    const forum = await guild.channels.fetch(crew.team.forum);
 
     if (!forum || !forum.isThreadOnly()) {
       return { success: false, message: `${roleMention(crew.role)} does not have a forum` };
@@ -122,7 +122,7 @@ export class TicketService {
     threadRef: ThreadChannel | ThreadChannelResolvable,
     channelRef: GuildChannelResolvable,
   ) {
-    const thread = await guild.channels.cache.get(
+    const thread = await guild.channels.fetch(
       typeof threadRef === 'string' ? threadRef : threadRef.id,
     );
 
@@ -133,7 +133,7 @@ export class TicketService {
       return;
     }
 
-    const channel = await guild.channels.cache.get(
+    const channel = await guild.channels.fetch(
       typeof channelRef === 'string' ? channelRef : channelRef.id,
     );
 
@@ -173,7 +173,7 @@ export class TicketService {
   }
 
   async addTriageControlToThread(guild: Guild, threadRef: ThreadChannel | ThreadChannelResolvable) {
-    const thread = await guild.channels.cache.get(
+    const thread = await guild.channels.fetch(
       typeof threadRef === 'string' ? threadRef : threadRef.id,
     );
 
@@ -210,7 +210,7 @@ export class TicketService {
     member: GuildMember,
   ) {
     const guild = member.guild;
-    const thread = await guild.channels.cache.get(
+    const thread = await guild.channels.fetch(
       typeof threadRef === 'string' ? threadRef : threadRef.id,
     );
 
@@ -231,7 +231,7 @@ export class TicketService {
       };
     }
 
-    const creator = await guild.members.cache.get(ticket.createdBy);
+    const creator = await guild.members.fetch(ticket.createdBy);
     const createResult = await this.createTicket(channelRef, creator, ticket.name, ticket.content);
 
     if (!createResult.success) {
@@ -246,7 +246,7 @@ export class TicketService {
     member: GuildMember,
   ): Promise<OperationStatus> {
     const guild = member.guild;
-    const thread = await guild.channels.cache.get(
+    const thread = await guild.channels.fetch(
       typeof threadRef === 'string' ? threadRef : threadRef.id,
     );
 
@@ -288,7 +288,7 @@ export class TicketService {
     member: GuildMember,
   ): Promise<OperationStatus> {
     const guild = member.guild;
-    const thread = await guild.channels.cache.get(
+    const thread = await guild.channels.fetch(
       typeof threadRef === 'string' ? threadRef : threadRef.id,
     );
 
@@ -350,7 +350,7 @@ export class TicketService {
     member: GuildMember,
   ): Promise<OperationStatus> {
     const guild = member.guild;
-    const thread = await guild.channels.cache.get(
+    const thread = await guild.channels.fetch(
       typeof threadRef === 'string' ? threadRef : threadRef.id,
     );
 
