@@ -117,7 +117,7 @@ export class CrewService {
     shortName = shortName || name;
     const slug = toSlug(name);
 
-    if (shortName.length) {
+    if (shortName.length > 20) {
       return {
         success: false,
         message:
