@@ -117,6 +117,14 @@ export class CrewService {
     shortName = shortName || name;
     const slug = toSlug(name);
 
+    if (shortName.length) {
+      return {
+        success: false,
+        message:
+          'Your name is too long to create a tag. Please try again with a `short_name` in your command that is under 20 characters.',
+      };
+    }
+
     const knownTags = Object.values(TicketTag).map((t) => t.toLowerCase());
     if (knownTags.includes(name.toLowerCase()) || knownTags.includes(shortName.toLowerCase())) {
       return {
