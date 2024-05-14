@@ -11,8 +11,6 @@ import {
   GuildChannelResolvable,
   GuildMember,
   GuildTextBasedChannel,
-  OverwriteResolvable,
-  PermissionOverwrites,
   PermissionsBitField,
   inlineCode,
   roleMention,
@@ -352,11 +350,11 @@ export class CrewService {
 
     const crewMember = await this.getCrewMember(channel, member);
 
-    if (!crewMember && !force) {
+    if (!force && !crewMember) {
       return { success: false, message: 'Not a member of this crew' };
     }
 
-    if (crewMember.access > CrewMemberAccess.ADMIN && !force) {
+    if (!force && crewMember.access > CrewMemberAccess.ADMIN) {
       return { success: false, message: 'Only an administrator can perform this action' };
     }
 
