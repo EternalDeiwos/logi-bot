@@ -324,6 +324,7 @@ export class CrewService {
   public async deregisterCrew(
     channelRef: GuildChannelResolvable,
     member: GuildMember,
+    force: boolean = false,
   ): Promise<OperationStatus<string>> {
     const guild = member.guild;
     const channel = await guild.channels.cache.get(
@@ -344,11 +345,11 @@ export class CrewService {
 
     const crewMember = await this.getCrewMember(channel, member);
 
-    if (!crewMember) {
+    if (!crewMember && !force) {
       return { success: false, message: 'Not a member of this crew' };
     }
 
-    if (crewMember.access > CrewMemberAccess.ADMIN) {
+    if (crewMember.access > CrewMemberAccess.ADMIN && !force) {
       return { success: false, message: 'Only an administrator can perform this action' };
     }
 

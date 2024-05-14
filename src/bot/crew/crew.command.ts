@@ -469,7 +469,7 @@ export class CrewCommand {
     const guild = interaction.guild;
     const member = await guild.members.fetch(interaction.user);
     const reason = interaction.fields.getTextInputValue('crew/delete/reason');
-    const result = await this.crewService.deregisterCrew(crewRef, member);
+    const result = await this.crewService.deregisterCrew(crewRef, member, true);
     await interaction.reply({ content: result.message, ephemeral: true });
 
     if (result.success) {
