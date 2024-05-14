@@ -435,7 +435,12 @@ export class CrewCommand {
       channel = interaction.guild.channels.cache.get(data.crew);
     }
 
-    const result = await this.crewService.deregisterCrew(channel, member);
+    let force = false;
+    if (member.permissions.has('Administrator')) {
+      force = true;
+    }
+
+    const result = await this.crewService.deregisterCrew(channel, member, force);
 
     return interaction.reply({ content: result.message, ephemeral: true });
   }
