@@ -313,7 +313,7 @@ export class TicketService {
       .setTitle('Ticket Accepted')
       .setColor(0x22fa22)
       .setDescription(`Your ticket ${channelMention(thread.id)} was accepted by ${member}`)
-      .setThumbnail(guild.iconURL({ extension: 'png', forceStatic: true }));
+      .setThumbnail(member.avatarURL() ?? member.user.avatarURL());
 
     const tags = await ticket.crew.team.tags;
     const triageTag = tags.find((tag) => tag.name === TicketTag.TRIAGE);
