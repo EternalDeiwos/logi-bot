@@ -220,7 +220,7 @@ export class TicketCommand {
 
     const title = interaction.fields.getTextInputValue('ticket/form/title');
     const content = [
-      '## Who are you affiliated with?',
+      '## Who is it for?',
       interaction.fields.getTextInputValue('ticket/form/who'),
       '',
       '## What do you need?',
