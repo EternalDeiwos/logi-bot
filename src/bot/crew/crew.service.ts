@@ -453,6 +453,10 @@ export class CrewService {
       crewSummary.push(
         `- ${channelMention(crew.channel)} (${members.length} members / ${tickets.length} tickets)`,
       );
+
+      for (const ticket of tickets) {
+        crewSummary.push(`  - ${channelMention(ticket.thread)}`);
+      }
     }
 
     embed.setDescription(crewSummary.join('\n'));
