@@ -496,4 +496,16 @@ export class CrewCommand {
       });
     }
   }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'status',
+    description: 'Display the current crew status',
+    dmPermission: false,
+  })
+  async onCrewStatusRequest(@Context() [interaction]: SlashCommandContext) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    const result = await this.crewService.sendStatus(interaction.channel, member);
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
 }

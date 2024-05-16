@@ -8,10 +8,13 @@ import {
   ChannelType,
   EmbedBuilder,
   Guild,
+  GuildBasedChannel,
   GuildChannelResolvable,
   GuildMember,
   GuildTextBasedChannel,
   PermissionsBitField,
+  Snowflake,
+  channelMention,
   inlineCode,
   roleMention,
 } from 'discord.js';
@@ -409,6 +412,52 @@ export class CrewService {
     }
 
     await this.crewRepo.update({ channel: channel.id }, { movePrompt });
+
+    return { success: true, message: 'Done' };
+  }
+
+  public async sendStatus(
+    channel: GuildBasedChannel,
+    member: GuildMember,
+  ): Promise<OperationStatus> {
+    const guild = member.guild;
+
+    if (!channel || !channel.isTextBased()) {
+      return { success: false, message: 'Invalid channel' };
+    }
+
+    const crews = await this.getCrews(guild);
+    const accessibleCrews = crews.filter((crew) =>
+      member.permissionsIn(crew.channel).has(PermissionsBitField.Flags.ViewChannel),
+    );
+    const crewChannels: Record<Snowflake, GuildTextBasedChannel> = Object.fromEntries(
+      await Promise.all(
+        accessibleCrews.map(async (crew) => [
+          crew.channel,
+          await guild.channels.fetch(crew.channel),
+        ]),
+      ),
+    );
+
+    const embed = new EmbedBuilder()
+      .setTitle('Crew Status')
+      .setColor('DarkGreen')
+      .setThumbnail(guild.iconURL())
+      .setTimestamp();
+
+    const crewSummary: string[] = [];
+    for (const crew of accessibleCrews) {
+      const members = await crew.members;
+      const tickets = await crew.tickets;
+
+      crewSummary.push(
+        `- ${channelMention(crew.channel)} (${members.length} members / ${tickets.length} tickets)`,
+      );
+    }
+
+    embed.setDescription(crewSummary.join('\n'));
+
+    await channel.send({ embeds: [embed] });
 
     return { success: true, message: 'Done' };
   }
