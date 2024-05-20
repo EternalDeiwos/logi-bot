@@ -19,7 +19,9 @@ export class TicketCreateListener {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const ticket = await this.ticketService.getTicket(thread);
 
-    if (thread.appliedTags.includes(await ticket.crew.team.findTag(TicketTag.TRIAGE))) {
+    if (
+      thread.appliedTags.includes(await ticket.crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE))
+    ) {
       await this.ticketService.addTriageControlToThread(thread.guild, thread);
     }
 

@@ -39,8 +39,24 @@ export class Team {
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  async findTag(tag: TicketTag): Promise<Snowflake> {
+  async resolveSnowflakeFromTag(tag: TicketTag): Promise<Snowflake> {
     const tags = await this.tags;
     return tags.find((t) => t.name === tag)?.tag;
+  }
+
+  async resolveNameFromSnowflake(snowflake: Snowflake): Promise<string> {
+    const tags = await this.tags;
+    return tags.find((t) => t.tag === snowflake)?.name;
+  }
+
+  async getTagMap() {
+    const tags = await this.tags;
+    return tags.reduce(
+      (accumulator, tag) => {
+        accumulator[tag.tag] = tag.name;
+        return accumulator;
+      },
+      {} as Record<Snowflake, string>,
+    );
   }
 }

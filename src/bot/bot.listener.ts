@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Context, ContextOf, On } from 'necord';
 import { ConfigService } from 'src/config';
-import { TagService } from 'src/bot/tag/tag.service';
+import { TagService, TicketTag } from 'src/bot/tag/tag.service';
+import { TicketService } from './ticket/ticket.service';
 
 @Injectable()
 export class BotEventListener {
@@ -10,6 +11,7 @@ export class BotEventListener {
   constructor(
     private readonly configService: ConfigService,
     private readonly tagService: TagService,
+    private readonly ticketService: TicketService,
   ) {}
 
   @On('guildCreate')
@@ -31,6 +33,42 @@ export class BotEventListener {
 
     if (!result.success) {
       return this.logger.warn(`Failed to delete guild tags: ${result.message}`);
+    }
+  }
+
+  @On('threadUpdate')
+  async onThreadUpdate(@Context() [oldThread, newThread]: ContextOf<'threadUpdate'>) {
+    const guild = newThread.guild;
+    const member = await guild.members.fetchMe();
+    const ticket = await this.ticketService.getTicket(oldThread.id);
+
+    if (!ticket) {
+      return;
+    }
+
+    const tagMap = await ticket.crew.team.getTagMap();
+
+    const toDeleteFlag = newThread.appliedTags.reduce((state, snowflake) => {
+      return (
+        state ||
+        [TicketTag.DONE, TicketTag.ABANDONED, TicketTag.DECLINED].includes(
+          tagMap[snowflake] as TicketTag,
+        )
+      );
+    }, false);
+
+    const deletedFlag = oldThread.appliedTags.reduce((state, snowflake) => {
+      return (
+        state ||
+        [TicketTag.DONE, TicketTag.ABANDONED, TicketTag.DECLINED].includes(
+          tagMap[snowflake] as TicketTag,
+        )
+      );
+    }, false);
+
+    if (toDeleteFlag && !deletedFlag) {
+      this.logger.log(`Deleting ticket ${ticket.name}`);
+      await this.ticketService.deleteTicket(newThread.id, member, true, false);
     }
   }
 }

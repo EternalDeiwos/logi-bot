@@ -72,7 +72,7 @@ export class TicketService {
       return { success: false, message: `${roleMention(crew.role)} does not have a forum` };
     }
 
-    const triageTag = await crew.team.findTag(TicketTag.TRIAGE);
+    const triageTag = await crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE);
     const crewTag = await crew.getCrewTag();
     const appliedTags: string[] = [];
 
@@ -244,6 +244,8 @@ export class TicketService {
   async deleteTicket(
     threadRef: ThreadChannelResolvable,
     member: GuildMember,
+    force: boolean = false,
+    deleteThread: boolean = true,
   ): Promise<OperationStatus> {
     const guild = member.guild;
     const thread = await guild.channels.fetch(
@@ -260,7 +262,7 @@ export class TicketService {
       return { success: false, message: `${thread} is not a ticket` };
     }
 
-    if (!member.roles.cache.has(ticket.crew.role)) {
+    if (!force && !member.roles.cache.has(ticket.crew.role)) {
       return {
         success: false,
         message: `You do not have the ${roleMention(ticket.crew.role)} role.`,
@@ -270,15 +272,32 @@ export class TicketService {
     const reason = `${member} has triaged this ticket`;
     const now = new Date();
 
-    await thread.delete(reason);
-    await this.ticketRepo.update(
-      { thread: thread.id },
-      {
-        deletedAt: now,
-        updatedBy: member.id,
-        updatedAt: now,
-      },
-    );
+    if (deleteThread) {
+      await thread.delete(reason);
+    } else {
+      const embed = new EmbedBuilder()
+        .setTitle('Ticket Closed')
+        .setColor('DarkRed')
+        .setDescription(`Your ticket was closed by ${member}`)
+        .setThumbnail(member.avatarURL() ?? member.user.avatarURL());
+
+      await thread.send({ embeds: [embed] });
+      await thread.setLocked(true);
+      await thread.setArchived(true);
+    }
+
+    if (force) {
+      await this.ticketRepo.softDelete({ thread: thread.id });
+    } else {
+      await this.ticketRepo.update(
+        { thread: thread.id },
+        {
+          deletedAt: now,
+          updatedBy: member.id,
+          updatedAt: now,
+        },
+      );
+    }
 
     return { success: true, message: 'Done' };
   }
@@ -311,7 +330,7 @@ export class TicketService {
 
     const embed = new EmbedBuilder()
       .setTitle('Ticket Accepted')
-      .setColor(0x22fa22)
+      .setColor('DarkGreen')
       .setDescription(`Your ticket ${channelMention(thread.id)} was accepted by ${member}`)
       .setThumbnail(member.avatarURL() ?? member.user.avatarURL());
 
