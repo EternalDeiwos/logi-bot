@@ -43,6 +43,7 @@ export class BotEventListener {
     const ticket = await this.ticketService.getTicket(oldThread.id);
 
     if (!ticket) {
+      this.logger.debug(`No ticket for thread update on ${oldThread.name} (${oldThread.id})`);
       return;
     }
 
