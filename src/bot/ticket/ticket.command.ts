@@ -84,11 +84,13 @@ export class TicketCommand {
     @Options() data: SelectCrewCommandParams,
   ) {
     const prompt = new EmbedBuilder()
-      .setColor(0x333333)
+      .setColor('DarkGold')
       .setTitle('Create a Ticket')
-      .setDescription(ticketPromptDescription());
+      .setDescription(ticketPromptDescription(true));
 
     if (data.crew) {
+      prompt.setDescription(ticketPromptDescription());
+
       const crew = await this.crewService.getCrew(data.crew);
 
       if (!crew) {
@@ -133,7 +135,7 @@ export class TicketCommand {
     @ComponentParam('crew') channelRef: Snowflake,
   ) {
     const modal = this.buildTicketModal(channelRef);
-    interaction.showModal(modal);
+    return interaction.showModal(modal);
   }
 
   @StringSelect('ticket/start')
@@ -142,7 +144,7 @@ export class TicketCommand {
     @SelectedStrings() [selected]: string[],
   ) {
     const modal = this.buildTicketModal(selected);
-    interaction.showModal(modal);
+    return interaction.showModal(modal);
   }
 
   @MessageCommand({
@@ -157,7 +159,6 @@ export class TicketCommand {
     const submitter = await guild.members.fetch(interaction.user);
     const author = await guild.members.fetch(message.author);
     const modal = this.buildTicketModal(message.channel.id, {
-      who: author.toString(),
       what: proxyTicketMessage(
         message.content,
         submitter.id,
@@ -173,7 +174,12 @@ export class TicketCommand {
     channelRef: GuildChannelResolvable,
     values: {
       title?: string;
-      who?: string;
+      what?: string;
+      where?: string;
+      when?: string;
+    } = {},
+    emoji: {
+      title?: string;
       what?: string;
       where?: string;
       when?: string;
@@ -181,39 +187,33 @@ export class TicketCommand {
   ) {
     const titleInput = new TextInputBuilder()
       .setCustomId('ticket/form/title')
-      .setLabel('Title')
+      .setLabel((emoji.title ? `${emoji.title} ` : '') + 'Title')
       .setValue(values.title || '')
-      .setStyle(TextInputStyle.Short);
-
-    const whoInput = new TextInputBuilder()
-      .setCustomId('ticket/form/who')
-      .setLabel('Who is it for?')
-      .setValue(values.who || '')
       .setStyle(TextInputStyle.Short);
 
     const whatInput = new TextInputBuilder()
       .setCustomId('ticket/form/what')
-      .setLabel('What do you need?')
+      .setLabel((emoji.what ? `${emoji.what} ` : '') + 'What do you need?')
       .setValue(values.what || '')
       .setStyle(TextInputStyle.Paragraph);
 
     const whereInput = new TextInputBuilder()
       .setCustomId('ticket/form/where')
-      .setLabel('Where do you need it?')
-      .setValue(values.where || '')
+      .setLabel((emoji.where ? `${emoji.where} ` : '') + 'Where do you need it?')
+      .setValue(values.where || 'We will fetch it when it is done')
       .setStyle(TextInputStyle.Paragraph);
 
     const whenInput = new TextInputBuilder()
       .setCustomId('ticket/form/when')
-      .setLabel('When do you need it?')
-      .setValue(values.when || '')
+      .setLabel((emoji.when ? `${emoji.when} ` : '') + 'When do you need it?')
+      .setValue(values.when || 'ASAP')
       .setStyle(TextInputStyle.Short);
 
     return new ModalBuilder()
       .setCustomId(`ticket/create/${channelRef}`)
       .setTitle('Create a Ticket')
       .addComponents(
-        [titleInput, whoInput, whatInput, whereInput, whenInput].map((input) =>
+        [titleInput, whatInput, whereInput, whenInput].map((input) =>
           new ActionRowBuilder<TextInputBuilder>().addComponents(input),
         ),
       );
@@ -240,9 +240,6 @@ export class TicketCommand {
 
     const title = interaction.fields.getTextInputValue('ticket/form/title');
     const content = [
-      '## Who is it for?',
-      interaction.fields.getTextInputValue('ticket/form/who'),
-      '',
       '## What do you need?',
       interaction.fields.getTextInputValue('ticket/form/what'),
       '',

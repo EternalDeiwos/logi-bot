@@ -1,17 +1,17 @@
 import { Snowflake, messageLink, roleMention, userMention } from 'discord.js';
 
-export const ticketPromptDescription = () =>
-  `Select a crew that will receive your ticket. If you are unsure then ask for help in any channel.`;
+export const ticketPromptDescription = (multi = false) =>
+  `${multi ? 'Select a crew that will receive your ticket' : 'Create a ticket by clicking the button below'}. If you are unsure then ask for help in any channel.`;
 
 export const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
-Welcome to the WLL ticket system ${userMention(member)}. Could you please make sure that you have provided the following details in your request:
+Welcome to our ticket system ${userMention(member)}. The members of our ${roleMention(role)} crew will be along as soon as possible to review your request. In the meanwhile, please make sure that you review the following instructions:
 
-- Who are you affiliated with? (if applicable)
-- What do you need? Provide exact numbers or at least estimates where applicable.
-- Where is it needed?
-- When do you need it by?
-
-The ${roleMention(role)} team will triage this request. You will be notified of any changes.
+- You may be required to provide resources for us to complete this ticket. When the ticket is complete, please post proof, such as a screenshot, or ask the member who completed the request to post information so the ticket can be closed.
+- Crew members can accept or decline the ticket using the controls provided.
+- Once accepted, crew members can update the ticket using the buttons which will inform you of any progress, for example: when your request has been started if you are waiting in a queue.
+- Only once a request is **completed, delivered, and proof is posted to this channel** should the ticket be marked as _Done_.
+- At any point if you no longer need this ticket then you can close the ticket yourself by clicking the _Close_ button below.
+- If the ticket is left unattended then it will be closed to keep our work area clean.
 `;
 
 export const newTicketMessage = (body: string, member: Snowflake, role: Snowflake) => `

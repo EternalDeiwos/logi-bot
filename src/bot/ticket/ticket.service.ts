@@ -137,7 +137,7 @@ export class TicketService {
     }
 
     const prompt = new EmbedBuilder()
-      .setColor(0x333333)
+      .setColor('DarkGold')
       .setTitle('New Ticket')
       .setDescription(ticketTriageMessage(member.id, crew.role));
 
