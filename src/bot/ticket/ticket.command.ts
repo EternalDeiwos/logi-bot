@@ -12,6 +12,7 @@ import {
   Options,
   SelectedStrings,
   SlashCommandContext,
+  StringOption,
   StringSelect,
   StringSelectContext,
   Subcommand,
@@ -48,6 +49,15 @@ export const TicketActionToTag: Record<string, TicketTag> = {
   done: TicketTag.DONE,
   close: TicketTag.ABANDONED,
 };
+
+export class TicketDeclineReasonCommandParams {
+  @StringOption({
+    name: 'reason',
+    description: 'Provide a reason',
+    required: true,
+  })
+  reason: string;
+}
 
 @Injectable()
 @EchoCommand({
@@ -345,5 +355,77 @@ export class TicketCommand {
 
     const result = await this.ticketService.updateTicket(thread, member, tag);
     await interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  async lifecycleCommand([interaction]: SlashCommandContext, tag: TicketTag, reason?: string) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    const thread = interaction.channel;
+
+    if (!thread.isThread()) {
+      return interaction.reply({
+        content: 'This command must be used inside a ticket thread.',
+      });
+    }
+
+    const result = await this.ticketService.updateTicket(thread, member, tag, reason);
+
+    await interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @Subcommand({
+    name: 'accept',
+    description: 'Accept a ticket. Team members only',
+    dmPermission: false,
+  })
+  async onTicketAcceptCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.ACCEPTED);
+  }
+
+  @Subcommand({
+    name: 'decline',
+    description: 'Decline a ticket. Team members only',
+    dmPermission: false,
+  })
+  async onTicketDeclineCommand(
+    @Context() context: SlashCommandContext,
+    @Options() data: TicketDeclineReasonCommandParams,
+  ) {
+    return this.lifecycleCommand(context, TicketTag.DECLINED, data.reason);
+  }
+
+  @Subcommand({
+    name: 'abandoned',
+    description: 'Mark a ticket as abandoned. Team members only',
+    dmPermission: false,
+  })
+  async onTicketAbandonedCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.ABANDONED);
+  }
+
+  @Subcommand({
+    name: 'start',
+    description: 'Mark a ticket as being in progress. Team members only',
+    dmPermission: false,
+  })
+  async onTicketStartCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.IN_PROGRESS);
+  }
+
+  @Subcommand({
+    name: 'repeatable',
+    description: 'Mark a ticket as repeatable. Team members only',
+    dmPermission: false,
+  })
+  async onTicketRepeatCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.REPEATABLE);
+  }
+
+  @Subcommand({
+    name: 'done',
+    description: 'Complete a ticket. Team members only',
+    dmPermission: false,
+  })
+  async onTicketDoneCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.DONE);
   }
 }
