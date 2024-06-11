@@ -10,6 +10,7 @@ import {
   GuildBasedChannel,
   GuildChannelResolvable,
   GuildMember,
+  PermissionFlagsBits,
   StringSelectMenuBuilder,
   ThreadChannel,
   ThreadChannelResolvable,
@@ -23,6 +24,46 @@ import { TicketTag } from 'src/bot/tag/tag.service';
 import { CrewService } from 'src/bot/crew/crew.service';
 import { Ticket } from './ticket.entity';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
+import { CrewMemberAccess } from '../crew/crew-member.entity';
+
+export const ticketProperties = {
+  [TicketTag.ACCEPTED]: {
+    color: 'DarkGreen',
+    action: 'accepted',
+    title: 'Ticket Accepted',
+    tagsRemoved: [TicketTag.TRIAGE, TicketTag.DECLINED, TicketTag.ABANDONED],
+  },
+  [TicketTag.DECLINED]: {
+    color: 'DarkRed',
+    action: 'declined',
+    title: 'Ticket Declined',
+    tagsRemoved: [TicketTag.TRIAGE, TicketTag.ACCEPTED, TicketTag.ABANDONED],
+  },
+  [TicketTag.ABANDONED]: {
+    color: 'LightGrey',
+    action: 'closed',
+    title: 'Ticket Abandoned',
+    tagsRemoved: [],
+  },
+  [TicketTag.DONE]: {
+    color: 'DarkGreen',
+    action: 'completed',
+    title: 'Ticket Done',
+    tagsRemoved: [TicketTag.IN_PROGRESS, TicketTag.REPEATABLE, TicketTag.ABANDONED],
+  },
+  [TicketTag.IN_PROGRESS]: {
+    color: 'DarkGold',
+    action: 'started',
+    title: 'In Progress',
+    tagsRemoved: [TicketTag.REPEATABLE, TicketTag.DONE, TicketTag.ABANDONED],
+  },
+  [TicketTag.REPEATABLE]: {
+    color: 'Aqua',
+    action: 'marked repeatable',
+    title: 'Repeatable Ticket / Chore',
+    tagsRemoved: [TicketTag.IN_PROGRESS, TicketTag.DONE, TicketTag.ABANDONED],
+  },
+};
 
 @Injectable()
 export class TicketService {
@@ -151,7 +192,10 @@ export class TicketService {
 
     const message = await thread.fetchStarterMessage();
     await message.edit({
-      components: [await this.createMovePrompt(thread, channel)],
+      components: [
+        await this.createMovePrompt(thread, channel),
+        this.createTriageControl(thread, { accept: true }),
+      ],
     });
   }
 
@@ -186,22 +230,35 @@ export class TicketService {
 
     const message = await thread.fetchStarterMessage();
     await message.edit({
-      components: [await this.createTriageControl(thread)],
+      components: [this.createTriageControl(thread)],
     });
   }
 
-  async createTriageControl(thread: ThreadChannel) {
+  createTriageControl(
+    thread: ThreadChannel,
+    disabled: { [K in 'accept' | 'decline' | 'close']?: boolean } = {},
+  ) {
     const accept = new ButtonBuilder()
-      .setCustomId(`ticket/accept/${thread.id}`)
+      .setCustomId(`ticket/action/accept/${thread.id}`)
       .setLabel('Accept')
+      .setDisabled(Boolean(disabled.accept))
       .setStyle(ButtonStyle.Success);
 
     const decline = new ButtonBuilder()
+      // Decline is not an immediate action.
+      // There is a form before the action is taken and is therefore handled differently
       .setCustomId(`ticket/reqdecline/${thread.id}`)
       .setLabel('Decline')
+      .setDisabled(Boolean(disabled.decline))
       .setStyle(ButtonStyle.Danger);
 
-    return new ActionRowBuilder<ButtonBuilder>().addComponents(accept, decline);
+    const close = new ButtonBuilder()
+      .setCustomId(`ticket/action/close/${thread.id}`)
+      .setLabel('Close')
+      .setDisabled(Boolean(disabled.close))
+      .setStyle(ButtonStyle.Secondary);
+
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(decline, accept, close);
   }
 
   async moveTicket(
@@ -302,129 +359,152 @@ export class TicketService {
     return { success: true, message: 'Done' };
   }
 
-  async acceptTicket(
-    threadRef: ThreadChannelResolvable,
-    member: GuildMember,
-  ): Promise<OperationStatus> {
-    const guild = member.guild;
-    const thread = await guild.channels.fetch(
-      typeof threadRef === 'string' ? threadRef : threadRef.id,
-    );
+  getActiveTicketControls(
+    thread: ThreadChannel,
+    disabled: { [K in 'active' | 'repeat' | 'done' | 'close']?: boolean } = {},
+  ) {
+    const inProgress = new ButtonBuilder()
+      .setCustomId(`ticket/action/active/${thread.id}`)
+      .setLabel('In Progress')
+      .setDisabled(Boolean(disabled.active))
+      .setStyle(ButtonStyle.Primary);
 
-    if (!thread || !thread.isThread()) {
-      return { success: false, message: 'Invalid ticket' };
-    }
+    const repeatable = new ButtonBuilder()
+      .setCustomId(`ticket/action/repeat/${thread.id}`)
+      .setLabel('Repeatable')
+      .setDisabled(Boolean(disabled.repeat))
+      .setStyle(ButtonStyle.Secondary);
 
-    const ticket = await this.getTicket(thread);
+    const done = new ButtonBuilder()
+      .setCustomId(`ticket/action/done/${thread.id}`)
+      .setLabel('Done')
+      .setDisabled(Boolean(disabled.done))
+      .setStyle(ButtonStyle.Success);
 
-    if (!ticket) {
-      return { success: false, message: `${thread} is not a ticket` };
-    }
+    const close = new ButtonBuilder()
+      .setCustomId(`ticket/action/close/${thread.id}`)
+      .setLabel('Close')
+      .setDisabled(Boolean(disabled.close))
+      .setStyle(ButtonStyle.Danger);
 
-    if (!member.roles.cache.has(ticket.crew.role)) {
-      return {
-        success: false,
-        message: `You do not have the ${roleMention(ticket.crew.role)} role.`,
-      };
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle('Ticket Accepted')
-      .setColor('DarkGreen')
-      .setDescription(`Your ticket ${channelMention(thread.id)} was accepted by ${member}`)
-      .setThumbnail(member.avatarURL() ?? member.user.avatarURL());
-
-    const tags = await ticket.crew.team.tags;
-    const triageTag = tags.find((tag) => tag.name === TicketTag.TRIAGE);
-    const acceptedTag = tags.find((tag) => tag.name === TicketTag.ACCEPTED);
-    await thread.setAppliedTags([
-      ...thread.appliedTags.filter((tag) => tag !== triageTag?.tag),
-      acceptedTag?.tag,
-    ]);
-
-    await thread.send({
-      content: userMention(ticket.createdBy),
-      allowedMentions: { users: [ticket.createdBy] },
-      embeds: [embed],
-    });
-
-    const message = await thread.fetchStarterMessage();
-    await message.edit({ components: [] });
-
-    const now = new Date();
-    await this.ticketRepo.update(
-      { thread: thread.id },
-      {
-        updatedBy: member.id,
-        updatedAt: now,
-      },
-    );
-
-    return { success: true, message: 'Done' };
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, repeatable, done, close);
   }
 
-  async declineTicket(
-    threadRef: ThreadChannelResolvable,
-    reason: string,
+  async updateTicket(
+    thread: ThreadChannel,
     member: GuildMember,
-  ): Promise<OperationStatus> {
-    const guild = member.guild;
-    const thread = await guild.channels.fetch(
-      typeof threadRef === 'string' ? threadRef : threadRef.id,
-    );
+    tag: TicketTag,
+    reason?: string,
+  ): Promise<OperationStatus<string>> {
+    const forum = thread.parent;
+    const ticket = await this.getTicket(thread.id);
 
-    if (!thread || !thread.isThread()) {
+    if (!ticket) {
       return { success: false, message: 'Invalid ticket' };
     }
 
-    const ticket = await this.getTicket(thread);
-
-    if (!ticket) {
-      return { success: false, message: `${thread} is not a ticket` };
+    if (!forum.isThreadOnly()) {
+      return { success: false, message: 'Invalid forum' };
     }
 
-    if (!member.roles.cache.has(ticket.crew.role)) {
-      return {
-        success: false,
-        message: `You do not have the ${roleMention(ticket.crew.role)} role.`,
-      };
+    const crewMember = await this.crewService.getCrewMember(ticket.crew.channel, member);
+    const isAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
+
+    // RBAC for ticket lifecycle changes
+    if (tag === TicketTag.ABANDONED) {
+      // OP is allowed to close their own tickets
+      if (!crewMember && thread.ownerId !== member.id && !isAdmin) {
+        return { success: false, message: 'You are not a member of this crew' };
+      }
+
+      if (
+        crewMember &&
+        crewMember.access > CrewMemberAccess.MEMBER &&
+        thread.ownerId !== member.id &&
+        !isAdmin
+      ) {
+        return { success: false, message: 'Only crew members can perform this action' };
+      }
+    } else {
+      if (!crewMember && !isAdmin) {
+        return { success: false, message: 'You are not a member of this crew' };
+      }
+
+      if (crewMember.access > CrewMemberAccess.MEMBER && !isAdmin) {
+        return { success: false, message: 'Only crew members can perform this action' };
+      }
     }
 
-    const message = reason
-      .split('\n')
-      .map((r) => `> ${r}`)
-      .join('\n');
+    ticket.updatedBy = member.id;
+    ticket.updatedAt = new Date();
+
+    await this.ticketRepo.save(ticket);
+
+    const { title, color, action, tagsRemoved } = ticketProperties[tag];
+    const tagSnowflakeMap = await ticket.crew.team.getSnowflakeMap();
+    const tagsRemovedSf = tagsRemoved.map((tagName) => tagSnowflakeMap[tagName]);
+    const tagAdd = tagSnowflakeMap[tag];
+
+    const message =
+      reason &&
+      reason
+        .split('\n')
+        .map((r) => `> ${r}`)
+        .join('\n');
+    const description = `Your ticket ${channelMention(thread.id)} was ${action} by ${member}`;
     const embed = new EmbedBuilder()
-      .setTitle('Ticket Declined')
-      .setColor('DarkRed')
-      .setDescription(
-        `Your ticket ${channelMention(thread.id)} was declined by ${member} for the following reason:\n\n${message}`,
-      )
-      .setThumbnail(guild.iconURL());
-
-    const tags = await ticket.crew.team.tags;
-    const triageTag = tags.find((tag) => tag.name === TicketTag.TRIAGE);
-    const declinedTag = tags.find((tag) => tag.name === TicketTag.DECLINED);
-    await thread.setAppliedTags([
-      ...thread.appliedTags.filter((tag) => tag !== triageTag?.tag),
-      declinedTag?.tag,
-    ]);
+      .setTitle(title)
+      .setColor(color)
+      .setDescription(description + ((reason && ` for the following reason:\n\n${message}`) || ''))
+      .setThumbnail(member.avatarURL() ?? member.user.avatarURL());
 
     await thread.send({
-      content: userMention(ticket.createdBy),
+      content: ticket.createdBy !== member.id ? userMention(ticket.createdBy) : '',
       allowedMentions: { users: [ticket.createdBy] },
       embeds: [embed],
     });
 
-    const now = new Date();
-    await this.ticketRepo.update(
-      { thread: thread.id },
-      {
-        deletedAt: now,
-        updatedBy: member.id,
-        updatedAt: now,
-      },
-    );
+    const starterMessage = await thread.fetchStarterMessage();
+    switch (tag) {
+      case TicketTag.TRIAGE:
+        await starterMessage.edit({
+          components: [this.createTriageControl(thread)],
+        });
+        break;
+
+      case TicketTag.ACCEPTED:
+        await starterMessage.edit({
+          components: [this.getActiveTicketControls(thread)],
+        });
+        break;
+
+      case TicketTag.DECLINED:
+      case TicketTag.ABANDONED:
+      case TicketTag.DONE:
+        await starterMessage.edit({
+          components: [],
+        });
+        break;
+
+      case TicketTag.IN_PROGRESS:
+        await starterMessage.edit({
+          components: [this.getActiveTicketControls(thread, { active: true })],
+        });
+        break;
+
+      case TicketTag.REPEATABLE:
+        await starterMessage.edit({
+          components: [
+            this.getActiveTicketControls(thread, { active: true, repeat: true, close: true }),
+          ],
+        });
+        break;
+    }
+
+    await thread.setAppliedTags([
+      ...thread.appliedTags.filter((tag) => !tagsRemovedSf.includes(tag)),
+      tagAdd,
+    ]);
 
     return { success: true, message: 'Done' };
   }

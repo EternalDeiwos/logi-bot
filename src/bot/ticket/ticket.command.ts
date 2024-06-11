@@ -34,10 +34,20 @@ import {
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
 import { CrewService } from 'src/bot/crew/crew.service';
+import { TicketTag } from 'src/bot/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/bot/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/bot/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
 import { proxyTicketMessage, ticketPromptDescription } from './ticket.messages';
+
+export const TicketActionToTag: Record<string, TicketTag> = {
+  accept: TicketTag.ACCEPTED,
+  decline: TicketTag.DECLINED,
+  active: TicketTag.IN_PROGRESS,
+  repeat: TicketTag.REPEATABLE,
+  done: TicketTag.DONE,
+  close: TicketTag.ABANDONED,
+};
 
 @Injectable()
 @EchoCommand({
@@ -240,17 +250,6 @@ export class TicketCommand {
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 
-  @Button('ticket/accept/:thread')
-  async onTicketAccept(
-    @Context() [interaction]: ButtonContext,
-    @ComponentParam('thread') threadRef: Snowflake,
-  ) {
-    const guild = interaction.guild;
-    const member = await guild.members.fetch(interaction.user);
-    const result = await this.ticketService.acceptTicket(threadRef, member);
-    return interaction.reply({ content: result.message, ephemeral: true });
-  }
-
   buildDeclineModal(threadRef: GuildChannelResolvable) {
     const reason = new TextInputBuilder()
       .setCustomId('ticket/decline/reason')
@@ -280,13 +279,23 @@ export class TicketCommand {
     const guild = interaction.guild;
     const member = await guild.members.fetch(interaction.user);
     const reason = interaction.fields.getTextInputValue('ticket/decline/reason');
-    const result = await this.ticketService.declineTicket(threadRef, reason, member);
-    await interaction.reply({ content: result.message, ephemeral: true });
 
-    if (interaction.channel.isThread()) {
-      await interaction.channel.setLocked(true, reason);
-      await interaction.channel.setArchived(true, reason);
+    const thread = await guild.channels.fetch(threadRef);
+
+    if (!thread.isThread()) {
+      return interaction.reply({
+        content: 'Invalid ticket. Please report this incident',
+        ephemeral: true,
+      });
     }
+
+    const result = await this.ticketService.updateTicket(
+      thread,
+      member,
+      TicketTag.DECLINED,
+      reason,
+    );
+    await interaction.reply({ content: result.message, ephemeral: true });
   }
 
   @Subcommand({
@@ -307,5 +316,34 @@ export class TicketCommand {
     const row = await this.ticketService.createMovePrompt(channel as ThreadChannel, channel.parent);
 
     return interaction.reply({ content: 'Select destination', components: [row], ephemeral: true });
+  }
+
+  @Button('ticket/action/:action/:thread')
+  async onTicketAction(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('action') action: string,
+    @ComponentParam('thread') threadId: Snowflake,
+  ) {
+    const { guild } = interaction;
+    const tag = TicketActionToTag[action];
+    const member = await guild.members.fetch(interaction.user.id);
+    const thread = await guild.channels.fetch(threadId);
+
+    if (!thread.isThread()) {
+      return interaction.reply({
+        content: 'Invalid ticket. Please report this incident',
+        ephemeral: true,
+      });
+    }
+
+    if (!tag) {
+      return interaction.reply({
+        content: 'Invalid ticket action. Please report this incident.',
+        ephemeral: true,
+      });
+    }
+
+    const result = await this.ticketService.updateTicket(thread, member, tag);
+    await interaction.reply({ content: result.message, ephemeral: true });
   }
 }
