@@ -26,7 +26,7 @@ export class CreateTeamCommandParams {
 
   @MentionableOption({
     name: 'role',
-    description: 'Select an associated mentionable role for this team',
+    description: 'Select a general access role for this team',
     required: true,
   })
   role: GuildMember | Role | User;

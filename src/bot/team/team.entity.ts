@@ -59,4 +59,15 @@ export class Team {
       {} as Record<Snowflake, string>,
     );
   }
+
+  async getSnowflakeMap() {
+    const tags = await this.tags;
+    return tags.reduce(
+      (accumulator, tag) => {
+        accumulator[tag.name] = tag.tag;
+        return accumulator;
+      },
+      {} as Record<string, Snowflake>,
+    );
+  }
 }
