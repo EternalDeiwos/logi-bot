@@ -1,7 +1,7 @@
 import { Snowflake, messageLink, roleMention, userMention } from 'discord.js';
 
 export const ticketPromptDescription = (multi = false) =>
-  `${multi ? 'Select a crew that will receive your ticket' : 'Create a ticket by clicking the button below'}. If you are unsure then ask for help in any channel.`;
+  `${multi ? 'Select a crew that will receive your ticket' : 'Create a ticket by clicking the button below'}. Please be patient for a member to discuss the ticket with you. If you are unsure of how to fill in a ticket then ask for help in any channel.`;
 
 export const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
 Welcome to our ticket system ${userMention(member)}. The members of our ${roleMention(role)} crew will be along as soon as possible to review your request. In the meanwhile, please make sure that you review the following instructions:
