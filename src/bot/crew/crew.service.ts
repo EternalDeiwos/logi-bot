@@ -113,10 +113,6 @@ export class CrewService {
       return { success: false, message: `${category} does not belong to a registered team` };
     }
 
-    // if (!member.roles.cache.has(team.role)) {
-    //   return { success: false, message: `You do not have the ${roleMention(team.role)} role.` };
-    // }
-
     name = name || category.name;
     shortName = shortName || name;
     const slug = toSlug(name);
@@ -194,7 +190,7 @@ export class CrewService {
             `New Crew: ${crew.name}` + (crew.name !== crew.shortName ? ` (${crew.shortName})` : ''),
           )
           .setDescription(
-            `A new crew called **${crew.name}** was created in ${roleMention(crew.team.role)} by ${member}. This prompt can be used to remove the team if there is something wrong.`,
+            `A new crew called **${crew.name}** was created under ${crew.team.name} by ${member}. This prompt can be used to remove the team if there is something wrong.`,
           )
           .setTimestamp()
           .setColor('DarkGold');
@@ -231,12 +227,6 @@ export class CrewService {
     if (!crew) {
       return { success: false, message: `${channel} does not belong to a crew` };
     }
-
-    const team = await crew.team;
-
-    // if (!member.roles.cache.has(team.role)) {
-    //   return { success: false, message: `You do not have the ${roleMention(team.role)} role.` };
-    // }
 
     const crewMember = await this.getCrewMember(channel, member);
     if (crewMember) {
