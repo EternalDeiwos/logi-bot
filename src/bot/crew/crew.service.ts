@@ -14,7 +14,6 @@ import {
   GuildMember,
   GuildTextBasedChannel,
   PermissionsBitField,
-  Snowflake,
   channelMention,
   inlineCode,
   roleMention,
@@ -84,10 +83,10 @@ export class CrewService {
     });
   }
 
-  async crewJoinPrompt(channel: GuildTextBasedChannel, crew: Crew) {
+  async crewJoinPrompt(channel: GuildTextBasedChannel, crew: Crew, createdBy: GuildMember) {
     const embed = new EmbedBuilder()
       .setTitle(`Join ${crew.name}`)
-      .setDescription(newCrewMessage())
+      .setDescription(newCrewMessage(createdBy))
       .setColor('DarkGreen');
 
     const join = new ButtonBuilder()
@@ -187,7 +186,7 @@ export class CrewService {
     });
 
     const crew = await this.getCrew(channel.id);
-    await this.crewJoinPrompt(channel, crew);
+    await this.crewJoinPrompt(channel, crew, member);
 
     const result = await this.tagService.createTagForCrew(crew);
 
