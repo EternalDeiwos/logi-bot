@@ -418,7 +418,8 @@ export class TicketService {
       return { success: false, message: 'Invalid forum' };
     }
 
-    const crewMember = await this.crewService.getCrewMember(ticket.crew.channel, member);
+    const crew = await this.crewService.getCrew(ticket.discussion, { withDeleted: true });
+    const crewMember = await this.crewService.getCrewMember(crew.channel, member);
     const isAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
 
     // RBAC for ticket lifecycle changes
@@ -446,13 +447,14 @@ export class TicketService {
       }
     }
 
-    ticket.updatedBy = member.id;
-    ticket.updatedAt = new Date();
-
-    await this.ticketRepo.save(ticket);
+    await this.ticketRepo.update(
+      { thread: ticket.thread },
+      { updatedAt: new Date(), updatedBy: member.id },
+    );
+    // await this.ticketRepo.save(ticket);
 
     const { title, color, action, tagsRemoved } = ticketProperties[tag];
-    const tagSnowflakeMap = await ticket.crew.team.getSnowflakeMap();
+    const tagSnowflakeMap = await crew.team.getSnowflakeMap();
     const tagsRemovedSf = tagsRemoved.map((tagName) => tagSnowflakeMap[tagName]);
     const tagAdd = tagSnowflakeMap[tag];
 

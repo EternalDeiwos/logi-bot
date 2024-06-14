@@ -196,7 +196,7 @@ export class TicketCommand {
       .setCustomId('ticket/form/what')
       .setLabel((emoji.what ? `${emoji.what} ` : '') + 'What do you need?')
       .setPlaceholder(
-        'Describe what you would like. Please be as detailed as possible and use describe exact quantities to prevent delays.',
+        'Please be as detailed as possible and use exact quantities to prevent delays.',
       )
       .setValue(values.what || '')
       .setStyle(TextInputStyle.Paragraph);

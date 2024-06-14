@@ -39,9 +39,10 @@ export class CrewService {
     @InjectRepository(CrewMember) private readonly memberRepo: Repository<CrewMember>,
   ) {}
 
-  async getCrew(channelRef: GuildChannelResolvable) {
+  async getCrew(channelRef: GuildChannelResolvable, options: { withDeleted?: boolean } = {}) {
     return this.crewRepo.findOne({
       where: { channel: typeof channelRef === 'string' ? channelRef : channelRef.id },
+      ...options,
     });
   }
 
@@ -66,6 +67,10 @@ export class CrewService {
   }
 
   async getCrewMember(channelRef: GuildChannelResolvable, member: GuildMember) {
+    if (!channelRef) {
+      return;
+    }
+
     return this.memberRepo.findOne({
       where: {
         channel: typeof channelRef === 'string' ? channelRef : channelRef.id,
