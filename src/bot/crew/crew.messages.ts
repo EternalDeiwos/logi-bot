@@ -1,7 +1,7 @@
 import { GuildMember } from 'discord.js';
 
 export const newCrewMessage = (member: GuildMember) =>
-  `Welcome to you new crew. This crew is led by ${member} and you can join by clicking the button below. You can leave again at any time by running the \`/echo crew leave\` command in this channel or optionally selecting the team in the command.
+  `Welcome to your new crew. This crew is led by ${member} and you can join by clicking the button below. You can leave again at any time by running the \`/echo crew leave\` command in this channel or optionally selecting the team in the command.
   
 To run a successful crew you should do the following:
 - Post a log (command or button) describing your goals. You should communicate what you are doing or a description of the crew, where you are doing it, necessary inputs, and outputs.
