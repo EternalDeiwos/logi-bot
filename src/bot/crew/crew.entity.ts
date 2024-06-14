@@ -16,6 +16,7 @@ import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
 import { Ticket } from 'src/bot/ticket/ticket.entity';
 import { Team } from 'src/bot/team/team.entity';
 import { CrewMember } from './crew-member.entity';
+import { CrewLog } from './crew-log.entity';
 
 @Entity({ name: 'crew' })
 @Unique('unique_crew_tag_name', ['guild', 'shortName', 'deletedAt'])
@@ -66,6 +67,9 @@ export class Crew {
 
   @OneToMany(() => Ticket, (ticket) => ticket.crew)
   tickets: Promise<Ticket[]>;
+
+  @OneToMany(() => CrewLog, (log) => log.crew)
+  logs: Promise<CrewLog[]>;
 
   @Column({ type: 'bigint', name: 'created_by_sf' })
   createdBy: Snowflake;

@@ -18,6 +18,7 @@ import { TagService } from './tag/tag.service';
 import { TagCommand } from './tag/tag.command';
 import { TicketService } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
+import { CrewLog } from './crew/crew-log.entity';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { TicketCommand } from './ticket/ticket.command';
         intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMembers],
       }),
     }),
-    TypeOrmModule.forFeature([Team, Crew, CrewMember, ForumTag, ForumTagTemplate, Ticket]),
+    TypeOrmModule.forFeature([Team, Crew, CrewMember, ForumTag, ForumTagTemplate, Ticket, CrewLog]),
   ],
   providers: [
     BotEventListener,

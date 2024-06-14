@@ -562,7 +562,7 @@ export class CrewCommand {
     @ComponentParam('crew') crewRef: Snowflake,
   ) {
     const modal = this.buildDeclineModal(crewRef);
-    interaction.showModal(modal);
+    return interaction.showModal(modal);
   }
 
   buildDeclineModal(crewRef: GuildChannelResolvable) {
@@ -608,7 +608,6 @@ export class CrewCommand {
     }
   }
 
-  @UseInterceptors(CrewSelectAutocompleteInterceptor)
   @Subcommand({
     name: 'status',
     description: 'Display the current crew status',
@@ -618,5 +617,55 @@ export class CrewCommand {
     const member = await interaction.guild.members.fetch(interaction.user);
     const result = await this.crewService.sendStatus(interaction.channel, member);
     return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'log',
+    description: 'Post a formal update of the crew activities',
+    dmPermission: false,
+  })
+  async onCrewLogPrompt(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    let channel: GuildChannelResolvable = interaction.channel;
+
+    if (data.crew) {
+      channel = await interaction.guild.channels.fetch(data.crew);
+    }
+
+    const modal = this.buildLogModal(channel.id);
+    return interaction.showModal(modal);
+  }
+
+  buildLogModal(channelRef: GuildChannelResolvable) {
+    const log = new TextInputBuilder()
+      .setCustomId('crew/log/content')
+      .setLabel('Crew Status')
+      .setPlaceholder(
+        'This will replace the last log on status updates so please keep it relevant.',
+      )
+      .setStyle(TextInputStyle.Paragraph);
+
+    return new ModalBuilder()
+      .setCustomId(`crew/log/${channelRef}`)
+      .setTitle('New Crew Log')
+      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(log));
+  }
+
+  @Button('crew/log')
+  async onCrewLogButton(@Context() [interaction]: ButtonContext) {
+    const modal = this.buildLogModal(interaction.channel.id);
+    return interaction.showModal(modal);
+  }
+
+  @Modal('crew/log/:crew')
+  async onCrewLog(@Context() [interaction]: ModalContext, @ModalParam('crew') crewRef: Snowflake) {
+    const guild = interaction.guild;
+    const member = await guild.members.fetch(interaction.user);
+    const content = interaction.fields.getTextInputValue('crew/log/content');
+    const result = await this.crewService.addCrewLog(crewRef, member, content);
+    await interaction.reply({ content: result.message, ephemeral: true });
   }
 }

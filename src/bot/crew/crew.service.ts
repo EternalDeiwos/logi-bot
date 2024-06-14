@@ -24,9 +24,11 @@ import { OperationStatus } from 'src/types';
 import { collectResults, toSlug } from 'src/util';
 import { TeamService } from 'src/bot/team/team.service';
 import { TagService, TicketTag } from 'src/bot/tag/tag.service';
+import { TicketService } from 'src/bot/ticket/ticket.service';
 import { CrewMember, CrewMemberAccess } from './crew-member.entity';
+import { CrewLog } from './crew-log.entity';
 import { Crew } from './crew.entity';
-import { TicketService } from '../ticket/ticket.service';
+import { newCrewMessage } from './crew.messages';
 
 @Injectable()
 export class CrewService {
@@ -39,6 +41,7 @@ export class CrewService {
     @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
     @InjectRepository(Crew) private readonly crewRepo: Repository<Crew>,
     @InjectRepository(CrewMember) private readonly memberRepo: Repository<CrewMember>,
+    @InjectRepository(CrewLog) private readonly logRepo: Repository<CrewLog>,
   ) {}
 
   async getCrew(channelRef: GuildChannelResolvable, options: { withDeleted?: boolean } = {}) {
@@ -84,9 +87,7 @@ export class CrewService {
   async crewJoinPrompt(channel: GuildTextBasedChannel, crew: Crew) {
     const embed = new EmbedBuilder()
       .setTitle(`Join ${crew.name}`)
-      .setDescription(
-        'Click the button below to join this crew. You can leave again at any time by running the `echo crew leave` command in this channel or optionally selecting the team in the command.',
-      )
+      .setDescription(newCrewMessage())
       .setColor('DarkGreen');
 
     const join = new ButtonBuilder()
@@ -94,9 +95,15 @@ export class CrewService {
       .setLabel('Join Crew')
       .setStyle(ButtonStyle.Primary);
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(join);
+    const log = new ButtonBuilder()
+      .setCustomId('crew/log')
+      .setLabel('Log')
+      .setStyle(ButtonStyle.Secondary);
 
-    await channel.send({ embeds: [embed], components: [row] });
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(join, log);
+
+    const message = await channel.send({ embeds: [embed], components: [row] });
+    await message.pin();
   }
 
   async registerCrew(
@@ -451,8 +458,6 @@ export class CrewService {
       return { success: false, message: `${channel} does not belong to a crew` };
     }
 
-    const role = guild.roles.cache.get(crew.role);
-
     const crewMember = await this.getCrewMember(channel, member);
 
     if (!crewMember) {
@@ -482,14 +487,6 @@ export class CrewService {
     const accessibleCrews = crews.filter((crew) =>
       member.permissionsIn(crew.channel).has(PermissionsBitField.Flags.ViewChannel),
     );
-    const crewChannels: Record<Snowflake, GuildTextBasedChannel> = Object.fromEntries(
-      await Promise.all(
-        accessibleCrews.map(async (crew) => [
-          crew.channel,
-          await guild.channels.fetch(crew.channel),
-        ]),
-      ),
-    );
 
     const embed = new EmbedBuilder()
       .setTitle('Crew Status')
@@ -514,6 +511,81 @@ export class CrewService {
     embed.setDescription(crewSummary.join('\n'));
 
     await channel.send({ embeds: [embed] });
+
+    return { success: true, message: 'Done' };
+  }
+
+  async getLastCrewLog(
+    channelRef: GuildChannelResolvable,
+    options: { withDeleted?: boolean } = {},
+  ) {
+    return this.logRepo.findOne({
+      where: { discussion: typeof channelRef === 'string' ? channelRef : channelRef.id },
+      order: { createdAt: 'desc' },
+      ...options,
+    });
+  }
+
+  async getCrewLogs(channelRef: GuildChannelResolvable, options: { withDeleted?: boolean } = {}) {
+    return this.logRepo.find({
+      where: { discussion: typeof channelRef === 'string' ? channelRef : channelRef.id },
+      ...options,
+    });
+  }
+
+  async addCrewLog(
+    channelRef: GuildChannelResolvable,
+    member: GuildMember,
+    content: string,
+  ): Promise<OperationStatus> {
+    const guild = member.guild;
+    const channel = await guild.channels.fetch(
+      typeof channelRef === 'string' ? channelRef : channelRef.id,
+    );
+
+    if (!channel || !channel.isTextBased()) {
+      return { success: false, message: 'Invalid channel' };
+    }
+
+    const crew = await this.getCrew(channel);
+
+    if (!crew) {
+      return { success: false, message: `${channel} does not belong to a crew` };
+    }
+
+    const crewMember = await this.getCrewMember(channel, member);
+
+    if (
+      (!crewMember || crewMember.access > CrewMemberAccess.MEMBER) &&
+      !member.permissions.has(PermissionsBitField.Flags.Administrator)
+    ) {
+      return { success: false, message: 'Not a member of this crew' };
+    }
+
+    const createdAt = new Date();
+    const embed = new EmbedBuilder()
+      .setTitle('Crew Update')
+      .setColor('DarkGreen')
+      .setThumbnail(member.avatarURL() ?? member.user.avatarURL())
+      .setDescription(content)
+      .setTimestamp(createdAt);
+
+    const message = await channel.send({
+      content: roleMention(crew.role),
+      embeds: [embed],
+      allowedMentions: { roles: [crew.role] },
+    });
+
+    await message.pin();
+
+    await this.logRepo.insert({
+      guild: member.guild.id,
+      message: message.id,
+      discussion: crew.channel,
+      content,
+      createdAt,
+      createdBy: member.id,
+    });
 
     return { success: true, message: 'Done' };
   }
