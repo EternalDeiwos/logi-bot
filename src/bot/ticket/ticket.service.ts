@@ -92,6 +92,19 @@ export class TicketService {
     });
   }
 
+  async getOpenTickets(channelRef: GuildChannelResolvable) {
+    return this.ticketRepo.find({
+      where: { discussion: typeof channelRef === 'string' ? channelRef : channelRef.id },
+    });
+  }
+
+  async getTickets(channelRef: GuildChannelResolvable) {
+    return this.ticketRepo.find({
+      where: { discussion: typeof channelRef === 'string' ? channelRef : channelRef.id },
+      withDeleted: true,
+    });
+  }
+
   async createTicket(
     channelRef: GuildChannelResolvable,
     member: GuildMember,

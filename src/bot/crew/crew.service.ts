@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Equal, Repository } from 'typeorm';
 import {
@@ -21,11 +21,12 @@ import {
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
-import { toSlug } from 'src/util';
+import { collectResults, toSlug } from 'src/util';
 import { TeamService } from 'src/bot/team/team.service';
 import { TagService, TicketTag } from 'src/bot/tag/tag.service';
 import { CrewMember, CrewMemberAccess } from './crew-member.entity';
 import { Crew } from './crew.entity';
+import { TicketService } from '../ticket/ticket.service';
 
 @Injectable()
 export class CrewService {
@@ -35,6 +36,7 @@ export class CrewService {
     private readonly configService: ConfigService,
     private readonly teamService: TeamService,
     private readonly tagService: TagService,
+    @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
     @InjectRepository(Crew) private readonly crewRepo: Repository<Crew>,
     @InjectRepository(CrewMember) private readonly memberRepo: Repository<CrewMember>,
   ) {}
@@ -359,13 +361,43 @@ export class CrewService {
       return { success: false, message: 'Only an administrator can perform this action' };
     }
 
+    const discussion = (await guild.channels.fetch(crew.channel)) as GuildTextBasedChannel;
+
+    const tickets = await this.ticketService.getOpenTickets(discussion);
+
+    const ticketResults = collectResults(
+      await Promise.all(
+        tickets.map(async (ticket) => {
+          const thread = await guild.channels.fetch(ticket.thread);
+
+          if (!thread.isThread()) {
+            return {
+              success: false,
+              message: `${ticket.name} has an invalid thread. Please report this incident`,
+            };
+          }
+
+          const triageSnowflake = await crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE);
+
+          if (thread.appliedTags.includes(triageSnowflake)) {
+            return this.ticketService.updateTicket(thread, member, TicketTag.ABANDONED);
+          } else {
+            return this.ticketService.updateTicket(thread, member, TicketTag.DONE);
+          }
+        }),
+      ),
+    );
+
+    if (!ticketResults.success) {
+      return ticketResults;
+    }
+
     const tagTemplate = await this.tagService.getTemplateForCrew(crew.channel);
     const botMember = await guild.members.fetchMe();
     await this.tagService.deleteTags(botMember, [tagTemplate]);
     await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
 
     const reason = `Team archived by ${member.displayName}`;
-    const discussion = (await guild.channels.fetch(crew.channel)) as GuildTextBasedChannel;
 
     if (archiveTargetRef) {
       const archiveTargetCategory = await guild.channels.fetch(
