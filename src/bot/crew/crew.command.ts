@@ -290,7 +290,8 @@ export class CrewCommand {
   async onCrewJoinPrompt(@Context() [interaction]: SlashCommandContext) {
     let channel = interaction.channel;
     const crew = await this.crewService.getCrew(channel);
-    await this.crewService.crewJoinPrompt(channel, crew);
+    const member = await interaction.guild.members.fetch(crew.createdBy);
+    await this.crewService.crewJoinPrompt(channel, crew, member);
     return interaction.reply({ content: 'Done', ephemeral: true });
   }
 
