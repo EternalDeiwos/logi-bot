@@ -546,7 +546,7 @@ export class CrewCommand {
           crew.channel,
           member,
           force,
-          data.archive.id,
+          data.archive?.id,
           data.tag,
         );
       }),
