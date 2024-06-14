@@ -3,6 +3,7 @@ import { Context, ContextOf, On } from 'necord';
 import { ConfigService } from 'src/config';
 import { TagService, TicketTag } from 'src/bot/tag/tag.service';
 import { TicketService } from './ticket/ticket.service';
+import { CrewService } from './crew/crew.service';
 
 @Injectable()
 export class BotEventListener {
@@ -12,6 +13,7 @@ export class BotEventListener {
     private readonly configService: ConfigService,
     private readonly tagService: TagService,
     private readonly ticketService: TicketService,
+    private readonly crewService: CrewService,
   ) {}
 
   @On('guildCreate')
@@ -47,7 +49,8 @@ export class BotEventListener {
       return;
     }
 
-    const tagMap = await ticket.crew.team.getTagMap();
+    const crew = await this.crewService.getCrew(ticket.discussion, { withDeleted: true });
+    const tagMap = await crew.team.getTagMap();
 
     const toDeleteFlag = newThread.appliedTags.reduce((state, snowflake) => {
       return (
