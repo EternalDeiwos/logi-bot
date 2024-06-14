@@ -5,6 +5,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  CategoryChannel,
   ChannelType,
   EmbedBuilder,
   Guild,
@@ -323,9 +324,11 @@ export class CrewService {
     channelRef: GuildChannelResolvable,
     member: GuildMember,
     force: boolean = false,
+    archiveTargetRef?: GuildChannelResolvable,
+    archiveTag?: string,
   ): Promise<OperationStatus<string>> {
     const guild = member.guild;
-    const channel = await guild.channels.cache.get(
+    const channel = await guild.channels.fetch(
       typeof channelRef === 'string' ? channelRef : channelRef.id,
     );
 
@@ -357,10 +360,32 @@ export class CrewService {
     await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
 
     const reason = `Team archived by ${member.displayName}`;
-    const discussion = await guild.channels.fetch(crew.channel);
+    const discussion = (await guild.channels.fetch(crew.channel)) as GuildTextBasedChannel;
 
-    await Promise.all([discussion.delete(reason), role.delete(reason)]);
-    await this.crewRepo.delete({ channel: channel.id });
+    if (archiveTargetRef) {
+      const archiveTargetCategory = await guild.channels.fetch(
+        typeof archiveTargetRef === 'string' ? archiveTargetRef : archiveTargetRef.id,
+      );
+
+      if (archiveTargetCategory) {
+        await Promise.all([
+          discussion.edit({
+            name: archiveTag
+              ? [discussion.name, archiveTag.toLowerCase()].join('-')
+              : discussion.name,
+            permissionOverwrites: [{ id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }],
+            parent: archiveTargetCategory as CategoryChannel,
+          }),
+          role.delete(reason),
+        ]);
+      } else {
+        return { success: false, message: 'Failed to archive channel. Please report this issue.' };
+      }
+    } else {
+      await Promise.all([discussion.delete(reason), role.delete(reason)]);
+    }
+
+    await this.crewRepo.softDelete({ channel: channel.id });
 
     this.logger.log(
       `${member.displayName} archived crew ${crew.name} (${crew.channel}) in ${guild.name} (${guild.id})`,
@@ -372,7 +397,7 @@ export class CrewService {
   public async updateCrew(
     channelRef: GuildChannelResolvable,
     member: GuildMember,
-    movePrompt: boolean,
+    options: DeepPartial<Pick<Crew, 'movePrompt' | 'permanent'>>,
   ) {
     const guild = member.guild;
     const channel = await guild.channels.cache.get(
@@ -401,7 +426,7 @@ export class CrewService {
       return { success: false, message: 'Only an administrator can perform this action' };
     }
 
-    await this.crewRepo.update({ channel: channel.id }, { movePrompt });
+    await this.crewRepo.update({ channel: channel.id }, options);
 
     return { success: true, message: 'Done' };
   }

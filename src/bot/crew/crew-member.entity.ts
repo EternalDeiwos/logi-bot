@@ -19,6 +19,7 @@ export enum CrewMemberAccess {
 }
 
 @Entity({ name: 'crew_member' })
+@Index('crew_member_unique', ['member', 'channel'], { unique: true })
 export class CrewMember {
   @PrimaryColumn({ type: 'bigint', name: 'member_sf' })
   member: Snowflake;

@@ -3,6 +3,7 @@ import {
   BooleanOption,
   Button,
   ButtonContext,
+  ChannelOption,
   ComponentParam,
   Context,
   MemberOption,
@@ -16,16 +17,15 @@ import {
 } from 'necord';
 import {
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
+  ChannelType,
   EmbedBuilder,
+  GuildChannel,
   GuildChannelResolvable,
   GuildMember,
   ModalBuilder,
   Snowflake,
   TextInputBuilder,
   TextInputStyle,
-  channelMention,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
@@ -34,6 +34,7 @@ import { TeamSelectAutocompleteInterceptor } from 'src/bot/team/team-select.inte
 import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
 import { CrewMemberAccess } from './crew-member.entity';
 import { CrewService } from './crew.service';
+import { collectResults } from 'src/util';
 
 export class CreateCrewCommandParams {
   @StringOption({
@@ -76,10 +77,54 @@ export class SelectCrewCommandParams {
   crew: string;
 }
 
-export class SetTriageCommandParams {
+export class ArchiveCrewCommandParams {
+  @StringOption({
+    name: 'crew',
+    description: 'Select a crew',
+    autocomplete: true,
+    required: false,
+  })
+  crew: string;
+
+  @ChannelOption({
+    name: 'archive',
+    description:
+      'Category where the crew should be archived. Crew will be deleted if not provided.',
+    channel_types: [ChannelType.GuildCategory],
+    required: false,
+  })
+  archive: GuildChannel;
+
+  @StringOption({
+    name: 'tag',
+    description: 'Suffix for archived channels. Useful for keeping track of all archived channels.',
+    required: false,
+  })
+  tag: string;
+}
+
+export class PurgeCrewsCommandParams {
+  @ChannelOption({
+    name: 'archive',
+    description:
+      'Category where the crew should be archived. Crew will be deleted if not provided.',
+    channel_types: [ChannelType.GuildCategory],
+    required: false,
+  })
+  archive: GuildChannel;
+
+  @StringOption({
+    name: 'tag',
+    description: 'Suffix for archived channels. Useful for keeping track of all archived channels.',
+    required: false,
+  })
+  tag: string;
+}
+
+export class SetFlagCommandParams {
   @BooleanOption({
-    name: 'enable_triage',
-    description: 'Set triage prompt enabled or disabled for this crew',
+    name: 'flag',
+    description: 'Set flag enabled or disabled for this crew',
     required: true,
   })
   value: boolean;
@@ -159,7 +204,7 @@ export class CrewCommand {
   })
   async onSetMovePrompt(
     @Context() [interaction]: SlashCommandContext,
-    @Options() data: SetTriageCommandParams,
+    @Options() data: SetFlagCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
     let channel: GuildChannelResolvable = interaction.channel;
@@ -168,7 +213,29 @@ export class CrewCommand {
       channel = interaction.guild.channels.cache.get(data.crew);
     }
 
-    const result = await this.crewService.updateCrew(channel, member, data.value);
+    const result = await this.crewService.updateCrew(channel, member, { movePrompt: data.value });
+
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'set_permanent',
+    description: 'Disables archiving a crew during a purge',
+    dmPermission: false,
+  })
+  async onSetPermanentPrompt(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SetFlagCommandParams,
+  ) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    let channel: GuildChannelResolvable = interaction.channel;
+
+    if (data.crew) {
+      channel = interaction.guild.channels.cache.get(data.crew);
+    }
+
+    const result = await this.crewService.updateCrew(channel, member, { permanent: data.value });
 
     return interaction.reply({ content: result.message, ephemeral: true });
   }
@@ -424,9 +491,9 @@ export class CrewCommand {
     description: 'Archive a crew',
     dmPermission: false,
   })
-  async onArchiveTeam(
+  async onArchiveCrew(
     @Context() [interaction]: SlashCommandContext,
-    @Options() data: SelectCrewCommandParams,
+    @Options() data: ArchiveCrewCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
     let channel: GuildChannelResolvable = interaction.channel;
@@ -440,7 +507,51 @@ export class CrewCommand {
       force = true;
     }
 
-    const result = await this.crewService.deregisterCrew(channel, member, force);
+    const result = await this.crewService.deregisterCrew(
+      channel,
+      member,
+      force,
+      data.archive.id,
+      data.tag,
+    );
+
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @Subcommand({
+    name: 'purge',
+    description: 'Archives all crews',
+    dmPermission: false,
+  })
+  async onPurgeCrews(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: PurgeCrewsCommandParams,
+  ) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    const crews = await this.crewService.getCrews(interaction.guild);
+
+    let force = false;
+    if (member.permissions.has('Administrator')) {
+      force = true;
+    }
+
+    const results = await Promise.all(
+      crews.map(async (crew) => {
+        if (crew.permanent) {
+          return { success: true, message: 'Done' };
+        }
+
+        return this.crewService.deregisterCrew(
+          crew.channel,
+          member,
+          force,
+          data.archive.id,
+          data.tag,
+        );
+      }),
+    );
+
+    const result = collectResults(results);
 
     return interaction.reply({ content: result.message, ephemeral: true });
   }

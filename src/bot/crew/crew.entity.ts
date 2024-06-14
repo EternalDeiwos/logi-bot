@@ -9,6 +9,7 @@ import {
   ManyToOne,
   JoinColumn,
   Unique,
+  DeleteDateColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
@@ -17,7 +18,7 @@ import { Team } from 'src/bot/team/team.entity';
 import { CrewMember } from './crew-member.entity';
 
 @Entity({ name: 'crew' })
-@Unique('unique_short_name', ['guild', 'shortName'])
+@Unique('unique_crew_tag_name', ['guild', 'shortName', 'deletedAt'])
 export class Crew {
   @PrimaryColumn({ type: 'bigint', name: 'crew_channel_sf' })
   channel: Snowflake;
@@ -41,6 +42,9 @@ export class Crew {
 
   @Column({ type: 'boolean', name: 'enable_move_prompt', default: false })
   movePrompt: boolean;
+
+  @Column({ type: 'boolean', name: 'permanent', default: false })
+  permanent: boolean;
 
   @Column({ type: 'bigint', name: 'forum_channel_sf' })
   @RelationId((crew: Crew) => crew.team)
@@ -68,6 +72,9 @@ export class Crew {
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
+
+  @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
+  deletedAt: Date;
 
   async getCrewTag() {
     const tags = await this.team.tags;
