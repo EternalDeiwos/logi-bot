@@ -455,7 +455,7 @@ export class TicketService {
         return { success: false, message: 'You are not a member of this crew' };
       }
 
-      if (crewMember.access > CrewMemberAccess.MEMBER && !isAdmin) {
+      if (crewMember && crewMember.access > CrewMemberAccess.MEMBER && !isAdmin) {
         return { success: false, message: 'Only crew members can perform this action' };
       }
     }
@@ -464,7 +464,6 @@ export class TicketService {
       { thread: ticket.thread },
       { updatedAt: new Date(), updatedBy: member.id },
     );
-    // await this.ticketRepo.save(ticket);
 
     const { title, color, action, tagsRemoved } = ticketProperties[tag];
     const tagSnowflakeMap = await crew.team.getSnowflakeMap();
