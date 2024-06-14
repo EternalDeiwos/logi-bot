@@ -188,12 +188,16 @@ export class TicketCommand {
     const titleInput = new TextInputBuilder()
       .setCustomId('ticket/form/title')
       .setLabel((emoji.title ? `${emoji.title} ` : '') + 'Title')
+      .setPlaceholder('Summary of your request')
       .setValue(values.title || '')
       .setStyle(TextInputStyle.Short);
 
     const whatInput = new TextInputBuilder()
       .setCustomId('ticket/form/what')
       .setLabel((emoji.what ? `${emoji.what} ` : '') + 'What do you need?')
+      .setPlaceholder(
+        'Describe what you would like. Please be as detailed as possible and use describe exact quantities to prevent delays.',
+      )
       .setValue(values.what || '')
       .setStyle(TextInputStyle.Paragraph);
 
