@@ -72,4 +72,21 @@ export class BotEventListener {
       await this.ticketService.deleteTicket(newThread.id, member, true, false);
     }
   }
+
+  @On('threadCreate')
+  async onThreadCreate(@Context() [thread]: ContextOf<'threadCreate'>) {
+    // This is a hack to delay the event to ensure the Ticket record is written to the database before proceeding.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const ticket = await this.ticketService.getTicket(thread);
+
+    if (
+      thread.appliedTags.includes(await ticket.crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE))
+    ) {
+      await this.ticketService.addTriageControlToThread(thread.guild, thread);
+    }
+
+    if (ticket.crew.movePrompt) {
+      await this.ticketService.addMovePromptToThread(thread.guild, thread, ticket.crew.channel);
+    }
+  }
 }
