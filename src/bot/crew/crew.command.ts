@@ -179,21 +179,26 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: CreateCrewCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    const crewResult = await this.crewService.registerCrew(
-      data.team,
-      member,
-      data.name,
-      data.shortName,
-      data.movePrompt,
-    );
+    try {
+      const member = await interaction.guild.members.fetch(interaction.user);
+      const crewResult = await this.crewService.registerCrew(
+        data.team,
+        member,
+        data.name,
+        data.shortName,
+        data.movePrompt,
+      );
 
-    if (!crewResult.success) {
-      return interaction.reply({ content: crewResult.message, ephemeral: true });
+      if (!crewResult.success) {
+        return interaction.reply({ content: crewResult.message, ephemeral: true });
+      }
+
+      const result = await this.teamService.reconcileGuildForumTags(member.guild);
+      return interaction.reply({ content: result.message, ephemeral: true });
+    } catch (err) {
+      this.logger.error(`Failed to create crew: ${err.message}`, err.stack);
+      return interaction.reply({ content: `Failed to create crew. Please report this issue` });
     }
-
-    const result = await this.teamService.reconcileGuildForumTags(member.guild);
-    return interaction.reply({ content: result.message, ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)

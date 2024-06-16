@@ -159,12 +159,25 @@ export class CrewService {
       mentionable: true,
     });
 
+    const prefixes = {
+      Colonial: '🟢',
+      Warden: '🔵',
+    };
+
+    let prefix = '';
+    for (const [search, value] of Object.entries(prefixes)) {
+      if (category.name.toLowerCase().startsWith(search.toLowerCase())) {
+        prefix = value;
+        break;
+      }
+    }
+
     const channel = await member.guild.channels.create({
-      name: `🟢${slug}`,
+      name: `${prefix}${slug}`,
       parent: category.id,
       type: ChannelType.GuildText,
       permissionOverwrites: [
-        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+        { id: guild.roles.everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
         { id: team.role, allow: [PermissionsBitField.Flags.ViewChannel] },
       ],
     });
