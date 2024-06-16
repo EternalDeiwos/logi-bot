@@ -82,6 +82,10 @@ export class BotEventListener {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const ticket = await this.ticketService.getTicket(thread);
 
+    if (!ticket?.crew) {
+      return;
+    }
+
     if (
       thread.appliedTags.includes(await ticket.crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE))
     ) {
