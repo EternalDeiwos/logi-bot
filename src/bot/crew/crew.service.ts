@@ -17,6 +17,7 @@ import {
   channelMention,
   inlineCode,
   roleMention,
+  userMention,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/types';
