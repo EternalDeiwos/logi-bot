@@ -84,4 +84,9 @@ export class Crew {
     const tags = await this.team.tags;
     return tags.find((tag) => tag.name === this.shortName);
   }
+
+  async getCrewOwner() {
+    const members = await this.members;
+    return members.find((member) => member.access === CrewMemberAccess.OWNER);
+  }
 }

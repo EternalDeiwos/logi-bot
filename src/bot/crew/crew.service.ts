@@ -497,9 +497,16 @@ export class CrewService {
     }
 
     const crews = await this.getCrews(guild);
-    const accessibleCrews = crews.filter((crew) =>
-      member.permissionsIn(crew.channel).has(PermissionsBitField.Flags.ViewChannel),
-    );
+    const accessibleCrews = crews.filter((crew) => {
+      try {
+        return member.permissionsIn(crew.channel).has(PermissionsBitField.Flags.ViewChannel);
+      } catch (err) {
+        this.logger.warn(
+          `Failed to test channel permissions for crew ${crew.name}: ${err.message}`,
+        );
+        return false;
+      }
+    });
 
     const embed = new EmbedBuilder()
       .setTitle('Crew Status')
@@ -508,20 +515,36 @@ export class CrewService {
       .setTimestamp();
 
     const crewSummary: string[] = [];
+    const fields: { name: string; value: string }[] = [];
     for (const crew of accessibleCrews) {
       const members = await crew.members;
       const tickets = await crew.tickets;
+      const logs = await crew.logs;
 
       crewSummary.push(
-        `- ${channelMention(crew.channel)} (${members.length} members / ${tickets.length} tickets)`,
+        `- ${channelMention(crew.channel)} (${members.length} members / ${tickets.length} tickets) led by ${userMention((await crew.getCrewOwner()).member)}`,
       );
 
       for (const ticket of tickets) {
         crewSummary.push(`  - ${channelMention(ticket.thread)}`);
       }
+
+      if (logs.length) {
+        fields.push({
+          name: `${crew.name}`,
+          value: logs.pop().content,
+        });
+      }
     }
 
-    embed.setDescription(crewSummary.join('\n'));
+    const content = crewSummary.join('\n');
+    if (content.length) {
+      embed.setDescription(content);
+    } else {
+      embed.setDescription('None');
+    }
+
+    embed.addFields(...fields);
 
     await channel.send({ embeds: [embed] });
 
