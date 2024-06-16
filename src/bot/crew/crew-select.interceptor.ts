@@ -19,7 +19,10 @@ export class CrewSelectAutocompleteInterceptor extends AutocompleteInterceptor {
         focused.value.toString(),
       );
       return interaction.respond(
-        results.map((result) => ({ name: result.name, value: result.channel })),
+        results.map((result) => ({
+          name: `${result.team.name}: ${result.name}`,
+          value: result.channel,
+        })),
       );
     }
   }

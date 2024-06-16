@@ -63,10 +63,11 @@ export class CrewService {
   async searchCrew(guild: Guild, query: string) {
     return this.crewRepo
       .createQueryBuilder('crew')
-      .where('guild_sf = :guild AND (name ILIKE :query OR name_short ILIKE :query)', {
+      .where('crew.guild_sf = :guild AND (crew.name ILIKE :query OR name_short ILIKE :query)', {
         guild: guild.id,
         query: `%${query}%`,
       })
+      .leftJoinAndSelect('crew.team', 'forum')
       .getMany();
   }
 
