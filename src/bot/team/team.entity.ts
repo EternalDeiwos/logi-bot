@@ -70,4 +70,18 @@ export class Team {
       {} as Record<string, Snowflake>,
     );
   }
+
+  async getDefaultTags() {
+    const tags = await this.tags;
+    return (
+      await Promise.all(
+        tags.map(async (tag) => [tag.tag, (await tag.template).default] as [string, boolean]),
+      )
+    ).reduce((acc, [tag_sf, isDefault]) => {
+      if (isDefault) {
+        acc.push(tag_sf);
+      }
+      return acc;
+    }, [] as string[]);
+  }
 }

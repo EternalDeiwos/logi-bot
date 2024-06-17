@@ -149,6 +149,9 @@ export class TicketService {
       appliedTags.push(crewTag.tag);
     }
 
+    const defaultTags = await crew.team.getDefaultTags();
+    appliedTags.push(...defaultTags);
+
     const prompt = new EmbedBuilder()
       .setColor('DarkGold')
       .setTitle('New Ticket')
