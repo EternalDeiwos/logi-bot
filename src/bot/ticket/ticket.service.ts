@@ -9,6 +9,7 @@ import {
   Guild,
   GuildBasedChannel,
   GuildChannelResolvable,
+  GuildManager,
   GuildMember,
   PermissionFlagsBits,
   StringSelectMenuBuilder,
@@ -83,6 +84,7 @@ export class TicketService {
   constructor(
     private readonly configService: ConfigService,
     private readonly crewService: CrewService,
+    private readonly guildManager: GuildManager,
     @InjectRepository(Ticket) private readonly ticketRepo: Repository<Ticket>,
   ) {}
 
@@ -113,7 +115,20 @@ export class TicketService {
     extra: DeepPartial<Ticket> = {},
   ): Promise<OperationStatus> {
     const guild = member.guild;
-    const channel = await guild.channels.fetch(
+
+    let crew = await this.crewService.getCrew(channelRef);
+
+    if (!crew) {
+      crew = await this.crewService.getFirstCrew(guild);
+
+      if (!crew) {
+        return { success: false, message: `Channel does not belong to a crew` };
+      }
+    }
+
+    const targetGuild = await this.guildManager.fetch(crew.parent.guild);
+
+    const channel = await targetGuild.channels.fetch(
       typeof channelRef === 'string' ? channelRef : channelRef.id,
     );
 
@@ -121,17 +136,7 @@ export class TicketService {
       return { success: false, message: 'Invalid channel' };
     }
 
-    let crew = await this.crewService.getCrew(channel);
-
-    if (!crew) {
-      crew = await this.crewService.getFirstCrew(guild);
-
-      if (!crew) {
-        return { success: false, message: `${channel} does not belong to a crew` };
-      }
-    }
-
-    const forum = await guild.channels.fetch(crew.team.forum);
+    const forum = await targetGuild.channels.fetch(crew.team.forum);
 
     if (!forum || !forum.isThreadOnly()) {
       return { success: false, message: `${roleMention(crew.role)} does not have a forum` };
@@ -169,7 +174,7 @@ export class TicketService {
 
     await this.ticketRepo.insert({
       thread: thread.id,
-      guild: guild.id,
+      guild: targetGuild.id,
       discussion: crew.channel,
       name: title,
       content,
