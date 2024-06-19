@@ -34,7 +34,7 @@ export class CrewShareAutocompleteInterceptor extends AutocompleteInterceptor {
     if (focused.name === 'guild') {
       const results = await this.guildService.searchGuild(
         focused.value.toString(),
-        // interaction.guildId,
+        interaction.guildId,
       );
       return interaction.respond(
         results.map((result) => ({
