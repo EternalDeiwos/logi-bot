@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Equal, Repository } from 'typeorm';
+import { DeepPartial, Equal, Or, Repository } from 'typeorm';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -62,8 +62,8 @@ export class CrewService {
     });
   }
 
-  async getCrews(guild: Guild) {
-    return this.crewRepo.find({ where: { guild: guild.id } });
+  async getCrews(guild: Guild, includeShared = true) {
+    return this.crewRepo.getShared(guild.id, includeShared).getMany();
   }
 
   async searchCrew(guild: Guild, query: string, includeShared = true) {
