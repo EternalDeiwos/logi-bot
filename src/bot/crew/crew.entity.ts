@@ -17,6 +17,8 @@ import { Ticket } from 'src/bot/ticket/ticket.entity';
 import { Team } from 'src/bot/team/team.entity';
 import { CrewMember, CrewMemberAccess } from './crew-member.entity';
 import { CrewLog } from './crew-log.entity';
+import { CrewShare } from './crew-share.entity';
+import { Guild } from '../guild/guild.entity';
 
 @Entity({ name: 'crew' })
 @Unique('unique_crew_tag_name', ['guild', 'shortName', 'deletedAt'])
@@ -25,6 +27,7 @@ export class Crew {
   channel: Snowflake;
 
   @Column({ type: 'bigint', name: 'guild_sf' })
+  @RelationId((crew: Crew) => crew.parent)
   @Index()
   guild: Snowflake;
 
@@ -59,6 +62,13 @@ export class Crew {
   })
   team: Team;
 
+  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
+  @JoinColumn({
+    name: 'guild_sf',
+    referencedColumnName: 'guild',
+  })
+  parent: Guild;
+
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: Promise<CrewMember[]>;
 
@@ -70,6 +80,9 @@ export class Crew {
 
   @OneToMany(() => CrewLog, (log) => log.crew)
   logs: Promise<CrewLog[]>;
+
+  @OneToMany(() => CrewShare, (share) => share.crew)
+  shared: Promise<CrewShare[]>;
 
   @Column({ type: 'bigint', name: 'created_by_sf' })
   createdBy: Snowflake;

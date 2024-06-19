@@ -9,6 +9,9 @@ import { CrewMember } from './crew/crew-member.entity';
 import { ForumTag } from './tag/tag.entity';
 import { ForumTagTemplate } from './tag/tag-template.entity';
 import { Ticket } from './ticket/ticket.entity';
+import { CrewLog } from './crew/crew-log.entity';
+import { Guild } from './guild/guild.entity';
+import { CrewShare } from './crew/crew-share.entity';
 import { BotEventListener } from './bot.listener';
 import { TeamService } from './team/team.service';
 import { TeamCommand } from './team/team.command';
@@ -18,7 +21,10 @@ import { TagService } from './tag/tag.service';
 import { TagCommand } from './tag/tag.command';
 import { TicketService } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
-import { CrewLog } from './crew/crew-log.entity';
+import { GuildService } from './guild/guild.service';
+import { GuildCommand } from './guild/guild.command';
+import { GuildRepository } from './guild/guild.repository';
+import { CrewRepository } from './crew/crew.repository';
 
 @Module({
   imports: [
@@ -32,18 +38,32 @@ import { CrewLog } from './crew/crew-log.entity';
         intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMembers],
       }),
     }),
-    TypeOrmModule.forFeature([Team, Crew, CrewMember, ForumTag, ForumTagTemplate, Ticket, CrewLog]),
+    TypeOrmModule.forFeature([
+      Team,
+      Crew,
+      CrewMember,
+      ForumTag,
+      ForumTagTemplate,
+      Ticket,
+      CrewLog,
+      Guild,
+      CrewShare,
+    ]),
   ],
   providers: [
     BotEventListener,
     TeamService,
     TeamCommand,
+    CrewRepository,
     CrewService,
     CrewCommand,
     TagService,
     TagCommand,
     TicketService,
     TicketCommand,
+    GuildRepository,
+    GuildService,
+    GuildCommand,
   ],
   exports: [TypeOrmModule],
 })

@@ -28,13 +28,14 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
+import { collectResults } from 'src/util';
 import { EchoCommand } from 'src/bot/echo.command-group';
 import { TeamService } from 'src/bot/team/team.service';
 import { TeamSelectAutocompleteInterceptor } from 'src/bot/team/team-select.interceptor';
 import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
+import { CrewShareAutocompleteInterceptor } from './crew-share.interceptor';
 import { CrewMemberAccess } from './crew-member.entity';
 import { CrewService } from './crew.service';
-import { collectResults } from 'src/util';
 
 export class CreateCrewCommandParams {
   @StringOption({
@@ -145,6 +146,24 @@ export class SelectCrewMemberCommandParams {
     required: true,
   })
   member: GuildMember;
+
+  @StringOption({
+    name: 'crew',
+    description: 'Select a crew',
+    autocomplete: true,
+    required: false,
+  })
+  crew: string;
+}
+
+export class ShareCrewCommandParams {
+  @StringOption({
+    name: 'guild',
+    description: 'Select a guild',
+    autocomplete: true,
+    required: true,
+  })
+  guild: string;
 
   @StringOption({
     name: 'crew',
@@ -673,5 +692,27 @@ export class CrewCommand {
     const content = interaction.fields.getTextInputValue('crew/log/content');
     const result = await this.crewService.addCrewLog(crewRef, member, content);
     await interaction.reply({ content: result.message, ephemeral: true });
+  }
+
+  @UseInterceptors(CrewShareAutocompleteInterceptor)
+  @Subcommand({
+    name: 'share',
+    description: 'Allow other guilds to send tickets to this crew',
+    dmPermission: false,
+  })
+  async onShareCrew(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: ShareCrewCommandParams,
+  ) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    let channel: GuildChannelResolvable = interaction.channel;
+
+    if (data.crew) {
+      channel = interaction.guild.channels.cache.get(data.crew);
+    }
+
+    const result = await this.crewService.shareCrew(data.guild, channel, member);
+
+    return interaction.reply({ content: result.message, ephemeral: true });
   }
 }

@@ -49,7 +49,7 @@ export class TagService {
     return this.templateRepo.exists({ where: { guild: guild.id, name } });
   }
 
-  async createTicketTags(member: GuildMember) {
+  async createTicketTags(member: GuildMember): Promise<OperationStatus> {
     if (!member.permissions.has('Administrator')) {
       return { success: false, message: 'Only guild administrators can perform this action' };
     }

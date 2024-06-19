@@ -14,6 +14,7 @@ import {
   GuildMember,
   GuildTextBasedChannel,
   PermissionsBitField,
+  Snowflake,
   channelMention,
   inlineCode,
   roleMention,
@@ -25,7 +26,10 @@ import { collectResults, toSlug } from 'src/util';
 import { TeamService } from 'src/bot/team/team.service';
 import { TagService, TicketTag } from 'src/bot/tag/tag.service';
 import { TicketService } from 'src/bot/ticket/ticket.service';
+import { CrewRepository } from './crew.repository';
 import { CrewMember, CrewMemberAccess } from './crew-member.entity';
+import { CrewShareRepository } from './crew-share.repository';
+import { CrewShare } from './crew-share.entity';
 import { CrewLog } from './crew-log.entity';
 import { Crew } from './crew.entity';
 import { newCrewMessage } from './crew.messages';
@@ -39,9 +43,10 @@ export class CrewService {
     private readonly teamService: TeamService,
     private readonly tagService: TagService,
     @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
-    @InjectRepository(Crew) private readonly crewRepo: Repository<Crew>,
+    private readonly crewRepo: CrewRepository,
     @InjectRepository(CrewMember) private readonly memberRepo: Repository<CrewMember>,
     @InjectRepository(CrewLog) private readonly logRepo: Repository<CrewLog>,
+    @InjectRepository(CrewShare) private readonly shareRepo: CrewShareRepository,
   ) {}
 
   async getCrew(channelRef: GuildChannelResolvable, options: { withDeleted?: boolean } = {}) {
@@ -61,15 +66,8 @@ export class CrewService {
     return this.crewRepo.find({ where: { guild: guild.id } });
   }
 
-  async searchCrew(guild: Guild, query: string) {
-    return this.crewRepo
-      .createQueryBuilder('crew')
-      .where('crew.guild_sf = :guild AND (crew.name ILIKE :query OR name_short ILIKE :query)', {
-        guild: guild.id,
-        query: `%${query}%`,
-      })
-      .leftJoinAndSelect('crew.team', 'forum')
-      .getMany();
+  async searchCrew(guild: Guild, query: string, includeShared = true) {
+    return this.crewRepo.search(guild.id, query, includeShared).getMany();
   }
 
   async getCrewMember(channelRef: GuildChannelResolvable, member: GuildMember) {
@@ -623,6 +621,45 @@ export class CrewService {
       createdAt,
       createdBy: member.id,
     });
+
+    return { success: true, message: 'Done' };
+  }
+
+  async shareCrew(guildRef: Snowflake, channelRef: GuildChannelResolvable, member: GuildMember) {
+    const guild = member.guild;
+    const channel = await guild.channels.fetch(
+      typeof channelRef === 'string' ? channelRef : channelRef.id,
+    );
+
+    if (!channel || !channel.isTextBased()) {
+      return { success: false, message: 'Invalid channel' };
+    }
+
+    const crew = await this.getCrew(channel);
+
+    if (!crew) {
+      return { success: false, message: `${channel} does not belong to a crew` };
+    }
+
+    const crewMember = await this.getCrewMember(channel, member);
+
+    if (
+      (!crewMember || crewMember.access > CrewMemberAccess.ADMIN) &&
+      !member.permissions.has(PermissionsBitField.Flags.Administrator)
+    ) {
+      return { success: false, message: 'You must be a crew admin to share with other guilds' };
+    }
+
+    try {
+      await this.shareRepo.insert({
+        target: guildRef,
+        channel: channel.id,
+        createdBy: member.id,
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to share ${crew.name} with guild ${guildRef}: ${err.message}`);
+      return { success: false, message: 'Unable to share this crew' };
+    }
 
     return { success: true, message: 'Done' };
   }

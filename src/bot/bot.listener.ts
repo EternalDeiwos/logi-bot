@@ -4,6 +4,8 @@ import { ConfigService } from 'src/config';
 import { TagService, TicketTag } from 'src/bot/tag/tag.service';
 import { TicketService } from './ticket/ticket.service';
 import { CrewService } from './crew/crew.service';
+import { GuildService } from './guild/guild.service';
+import { collectResults } from 'src/util';
 
 @Injectable()
 export class BotEventListener {
@@ -14,17 +16,28 @@ export class BotEventListener {
     private readonly tagService: TagService,
     private readonly ticketService: TicketService,
     private readonly crewService: CrewService,
+    private readonly guildService: GuildService,
   ) {}
 
   @On('guildCreate')
   async onGuildCreate(@Context() [guild]: ContextOf<'guildCreate'>) {
     const member = await guild.members.fetchMe();
-    const result = await this.tagService.createTicketTags(member);
+    const result = collectResults(
+      await Promise.all([
+        this.tagService.createTicketTags(member),
+        this.guildService.registerGuild({
+          guild: guild.id,
+          name: guild.name,
+          shortName: guild.nameAcronym,
+          icon: guild.iconURL({ extension: 'png', forceStatic: true }),
+        }),
+      ]),
+    );
 
     if (result.success) {
-      this.logger.log('Creating guild tags');
+      this.logger.log('Registering guild');
     } else {
-      this.logger.warn(`Failed to create guild tags: ${result.message}`);
+      this.logger.warn(`Failed to register guild: ${result.message}`);
     }
   }
 
