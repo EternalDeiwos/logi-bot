@@ -184,7 +184,7 @@ export class TicketService {
     });
 
     if (crew.movePrompt) {
-      await this.addMovePromptToThread(guild, thread, crew.channel);
+      await this.addMovePromptToThread(targetGuild, thread, crew.channel);
     }
 
     return { success: true, message: 'Done' };
