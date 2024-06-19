@@ -237,7 +237,13 @@ export class TicketService {
       .setCustomId(`ticket/move/${thread.id}`)
       .setPlaceholder('Select a crew')
       .setOptions(
-        crews.map((crew) => ({ label: `${crew.team.name}: ${crew.name}`, value: crew.channel })),
+        crews.map((crew) => {
+          const teamName =
+            crew.parent.guild !== guild.id
+              ? `[${crew.parent.shortName}] ${crew.team.name}`
+              : crew.team.name;
+          return { label: `${teamName}`, value: crew.channel };
+        }),
       );
 
     return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);

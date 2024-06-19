@@ -30,4 +30,20 @@ export class CrewRepository extends Repository<Crew> {
 
     return qb;
   }
+
+  getShared(guildId: Snowflake, includeShared = false) {
+    const qb = this.createQueryBuilder('crew')
+      .leftJoinAndSelect('crew.team', 'team')
+      .where('crew.guild_sf = :guild', {
+        guild: guildId,
+      });
+
+    if (includeShared) {
+      qb.leftJoin('crew.shared', 'shared')
+        .leftJoinAndSelect('crew.parent', 'guild')
+        .orWhere('shared.target = :guild');
+    }
+
+    return qb;
+  }
 }
