@@ -62,7 +62,7 @@ export class Crew {
   })
   team: Team;
 
-  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
+  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true, createForeignKeyConstraints: false })
   @JoinColumn({
     name: 'guild_sf',
     referencedColumnName: 'guild',
