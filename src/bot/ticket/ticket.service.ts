@@ -242,7 +242,7 @@ export class TicketService {
             crew.parent.guild !== guild.id
               ? `[${crew.parent.shortName}] ${crew.team.name}`
               : crew.team.name;
-          return { label: `${teamName}`, value: crew.channel };
+          return { label: `${teamName}: ${crew.name}`, value: crew.channel };
         }),
       );
 
