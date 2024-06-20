@@ -503,11 +503,6 @@ export class TicketService {
       embeds: [embed],
     });
 
-    const dm = await member.createDM();
-    await dm.send({
-      embeds: [embed],
-    });
-
     const starterMessage = await thread.fetchStarterMessage();
     switch (tag) {
       case TicketTag.TRIAGE:
@@ -549,6 +544,12 @@ export class TicketService {
       ...thread.appliedTags.filter((tag) => !tagsRemovedSf.includes(tag)),
       tagAdd,
     ]);
+
+    const creator = await thread.guild.members.fetch(ticket.createdBy);
+    const dm = await creator.createDM();
+    await dm.send({
+      embeds: [embed],
+    });
 
     return { success: true, message: 'Done' };
   }
