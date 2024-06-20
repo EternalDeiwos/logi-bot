@@ -503,6 +503,11 @@ export class TicketService {
       embeds: [embed],
     });
 
+    const dm = await member.createDM();
+    await dm.send({
+      embeds: [embed],
+    });
+
     const starterMessage = await thread.fetchStarterMessage();
     switch (tag) {
       case TicketTag.TRIAGE:
