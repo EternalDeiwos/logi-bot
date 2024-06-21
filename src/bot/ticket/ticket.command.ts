@@ -86,7 +86,29 @@ export class TicketCommand {
     const prompt = new EmbedBuilder()
       .setColor('DarkGold')
       .setTitle('Create a Ticket')
-      .setDescription(ticketPromptDescription(true));
+      .setDescription(ticketPromptDescription(true))
+      .addFields(
+        {
+          name: 'Triage Process',
+          value: ticketPromptTriageHelp(),
+          inline: false,
+        },
+        {
+          name: 'Crews',
+          value: ticketPromptCrewJoinInstructions(),
+          inline: false,
+        },
+        {
+          name: 'Crew Status',
+          value: ticketPromptStatusInstructions(),
+          inline: false,
+        },
+        {
+          name: 'Create a Crew',
+          value: ticketPromptCrewCreateInstructions(),
+          inline: false,
+        },
+      );
 
     if (data.crew) {
       prompt.setDescription(ticketPromptDescription());
