@@ -39,7 +39,14 @@ import { TicketTag } from 'src/bot/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/bot/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/bot/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
-import { proxyTicketMessage, ticketPromptDescription } from './ticket.messages';
+import {
+  proxyTicketMessage,
+  ticketPromptCrewCreateInstructions,
+  ticketPromptCrewJoinInstructions,
+  ticketPromptDescription,
+  ticketPromptStatusInstructions,
+  ticketPromptTriageHelp,
+} from './ticket.messages';
 
 export const TicketActionToTag: Record<string, TicketTag> = {
   accept: TicketTag.ACCEPTED,
