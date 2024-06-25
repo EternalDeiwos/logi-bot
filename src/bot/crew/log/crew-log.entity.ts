@@ -45,4 +45,8 @@ export class CrewLog {
 
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
+
+  get isDeleted() {
+    return Boolean(this.deletedAt);
+  }
 }

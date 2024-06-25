@@ -15,9 +15,9 @@ import { Snowflake } from 'discord.js';
 import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
 import { Ticket } from 'src/bot/ticket/ticket.entity';
 import { Team } from 'src/bot/team/team.entity';
-import { CrewMember, CrewMemberAccess } from './crew-member.entity';
-import { CrewLog } from './crew-log.entity';
-import { CrewShare } from './crew-share.entity';
+import { CrewMember, CrewMemberAccess } from './member/crew-member.entity';
+import { CrewLog } from './log/crew-log.entity';
+import { CrewShare } from './share/crew-share.entity';
 import { Guild } from '../guild/guild.entity';
 
 @Entity({ name: 'crew' })
@@ -92,6 +92,10 @@ export class Crew {
 
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
+
+  get isDeleted() {
+    return Boolean(this.deletedAt);
+  }
 
   async getCrewTag() {
     const tags = await this.team.tags;

@@ -1,5 +1,3 @@
-import { OperationStatus } from './types';
-
 // https://gist.github.com/codeguy/6684588
 export function toSlug(input: string, separator = '-') {
   return input
@@ -12,17 +10,42 @@ export function toSlug(input: string, separator = '-') {
     .replace(/\s+/g, separator);
 }
 
-export function collectResults(results: OperationStatus[]): OperationStatus {
-  const messages = results.reduce((accumulator, result) => {
-    if (!result.success) {
-      accumulator.push(result.message);
-    }
-    return accumulator;
-  }, [] as string[]);
+export class OperationStatus<T = any> {
+  success: boolean;
+  message: string;
+  data?: T;
 
-  if (messages.length) {
-    return { success: false, message: messages.map((m) => `- ${m}`).join('\n') };
+  constructor(options: { [P in keyof OperationStatus]: OperationStatus[P] }) {
+    Object.assign(this, options);
   }
 
-  return { success: true, message: 'Done' };
+  static get SUCCESS() {
+    return new OperationStatus({ success: true, message: 'Done' });
+  }
+
+  static collect(
+    results: OperationStatus[],
+    failMessage: string = 'One or more operations did not succeed',
+  ): OperationStatus<string[]> {
+    const messages = results.reduce((accumulator, result) => {
+      if (!result.success) {
+        accumulator.push(result.message);
+      }
+      return accumulator;
+    }, [] as string[]);
+
+    if (messages.length) {
+      return new OperationStatus({ success: false, message: failMessage, data: messages });
+    }
+
+    return OperationStatus.SUCCESS;
+  }
+
+  toString() {
+    if (!this.data) {
+      return this.message;
+    } else if (Array.isArray(this.data)) {
+      return `${this.message}:\n\n${this.data.map((item) => `- ${item}`).join('\n')}`;
+    }
+  }
 }

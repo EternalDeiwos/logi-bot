@@ -65,7 +65,7 @@ export class TagCommand {
       return interaction.reply({ content: createResult.message, ephemeral: true });
     }
 
-    const result = await this.teamService.reconcileGuildForumTags(interaction.guild);
+    const result = await this.teamService.reconcileGuildForumTags(interaction.guildId);
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 
@@ -82,7 +82,7 @@ export class TagCommand {
       return interaction.reply({ content: createResult.message, ephemeral: true });
     }
 
-    const result = await this.teamService.reconcileGuildForumTags(interaction.guild);
+    const result = await this.teamService.reconcileGuildForumTags(interaction.guildId);
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 
@@ -92,7 +92,7 @@ export class TagCommand {
     dmPermission: false,
   })
   async onRefreshTags(@Context() [interaction]: SlashCommandContext) {
-    const result = await this.teamService.reconcileGuildForumTags(interaction.guild);
+    const result = await this.teamService.reconcileGuildForumTags(interaction.guildId);
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 

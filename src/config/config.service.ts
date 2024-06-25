@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
+import { MoveTicketBehaviour } from 'src/types';
 
 const config = {
   NODE_ENV: undefined,
@@ -25,6 +26,7 @@ const config = {
   APP_PORT: 8080,
   APP_GUILD_ID: undefined,
   APP_RUN_MIGRATIONS: undefined,
+  APP_TICKETS_MOVE_ACTION: MoveTicketBehaviour.DELETE,
 };
 
 export type ConfigKey = keyof typeof config;

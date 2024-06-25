@@ -26,16 +26,22 @@ import {
   Snowflake,
   TextInputBuilder,
   TextInputStyle,
+  userMention,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
-import { collectResults } from 'src/util';
+import { OperationStatus } from 'src/util';
 import { EchoCommand } from 'src/bot/echo.command-group';
 import { TeamService } from 'src/bot/team/team.service';
 import { TeamSelectAutocompleteInterceptor } from 'src/bot/team/team-select.interceptor';
-import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
-import { CrewShareAutocompleteInterceptor } from './crew-share.interceptor';
-import { CrewMemberAccess } from './crew-member.entity';
 import { CrewService } from './crew.service';
+import { CrewRepository } from './crew.repository';
+import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
+import { CrewShareAutocompleteInterceptor } from './share/crew-share.interceptor';
+import { CrewMemberAccess } from './member/crew-member.entity';
+import { CrewMemberService } from './member/crew-member.service';
+import { CrewMemberRepository } from './member/crew-member.repository';
+import { CrewShareService } from './share/crew-share.service';
+import { CrewLogService } from './log/crew-log.service';
 
 export class CreateCrewCommandParams {
   @StringOption({
@@ -185,7 +191,12 @@ export class CrewCommand {
   constructor(
     private readonly configService: ConfigService,
     private readonly teamService: TeamService,
+    private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
+    private readonly memberRepo: CrewMemberRepository,
+    private readonly memberService: CrewMemberService,
+    private readonly shareService: CrewShareService,
+    private readonly logService: CrewLogService,
   ) {}
 
   @UseInterceptors(TeamSelectAutocompleteInterceptor)
@@ -199,24 +210,24 @@ export class CrewCommand {
     @Options() data: CreateCrewCommandParams,
   ) {
     try {
-      const member = await interaction.guild.members.fetch(interaction.user);
-      const crewResult = await this.crewService.registerCrew(
-        data.team,
-        member,
-        data.name,
-        data.shortName,
-        data.movePrompt,
-      );
+      const crewResult = await this.crewService.registerCrew(data.team, interaction.user.id, {
+        name: data.name,
+        shortName: data.shortName,
+        movePrompt: data.movePrompt,
+      });
 
       if (!crewResult.success) {
         return interaction.reply({ content: crewResult.message, ephemeral: true });
       }
 
-      const result = await this.teamService.reconcileGuildForumTags(member.guild);
+      const result = await this.teamService.reconcileGuildForumTags(interaction.guildId);
       return interaction.reply({ content: result.message, ephemeral: true });
     } catch (err) {
       this.logger.error(`Failed to create crew: ${err.message}`, err.stack);
-      return interaction.reply({ content: `Failed to create crew. Please report this issue` });
+      return interaction.reply({
+        content: `Failed to create crew. Please report this issue`,
+        ephemeral: true,
+      });
     }
   }
 
@@ -230,16 +241,17 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SetFlagCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    let channel: GuildChannelResolvable = interaction.channel;
+    const crew = await this.crewRepo.findOne({
+      where: { channel: data.crew || interaction.channelId },
+    });
+    const crewMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+    });
+    const { message: content } = await this.crewService.updateCrew(crew, crewMember, {
+      movePrompt: data.value,
+    });
 
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
-    }
-
-    const result = await this.crewService.updateCrew(channel, member, { movePrompt: data.value });
-
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -252,16 +264,17 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SetFlagCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    let channel: GuildChannelResolvable = interaction.channel;
+    const crew = await this.crewRepo.findOne({
+      where: { channel: data.crew || interaction.channelId },
+    });
+    const crewMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+    });
+    const { message: content } = await this.crewService.updateCrew(crew, crewMember, {
+      permanent: data.value,
+    });
 
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
-    }
-
-    const result = await this.crewService.updateCrew(channel, member, { permanent: data.value });
-
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -274,34 +287,28 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    let channel: GuildChannelResolvable = interaction.channel;
-
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
-    }
-
-    const result = await this.crewService.registerCrewMember(
-      channel,
-      member,
+    const crew = await this.crewRepo.findOne({
+      where: { channel: data.crew || interaction.channelId },
+    });
+    const { message: content } = await this.memberService.registerCrewMember(
+      crew,
+      interaction.user.id,
       CrewMemberAccess.MEMBER,
     );
 
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   }
 
   @Button('crew/join')
   async onCrewJoinRequest(@Context() [interaction]: ButtonContext) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    let channel: GuildChannelResolvable = interaction.channel;
-
-    const result = await this.crewService.registerCrewMember(
-      channel,
-      member,
+    const crew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
+    const { message: content } = await this.memberService.registerCrewMember(
+      crew,
+      interaction.user.id,
       CrewMemberAccess.MEMBER,
     );
 
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -312,11 +319,9 @@ export class CrewCommand {
     dmPermission: false,
   })
   async onCrewJoinPrompt(@Context() [interaction]: SlashCommandContext) {
-    let channel = interaction.channel;
-    const crew = await this.crewService.getCrew(channel);
-    const member = await interaction.guild.members.fetch(crew.createdBy);
-    await this.crewService.crewJoinPrompt(channel, crew, member);
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    const crew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
+    const { message: content } = await this.crewService.crewJoinPrompt(crew);
+    return interaction.reply({ content, ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -329,20 +334,16 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    let channel: GuildChannelResolvable = interaction.channel;
-
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
-    }
-
-    const result = await this.crewService.registerCrewMember(
-      channel,
-      member,
+    const crew = await this.crewRepo.findOne({
+      where: { channel: data.crew || interaction.channelId },
+    });
+    const { message: content } = await this.memberService.registerCrewMember(
+      crew,
+      interaction.user.id,
       CrewMemberAccess.SUBSCRIBED,
     );
 
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -355,16 +356,12 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
+    const crewMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+    });
+    const { message: content } = await this.memberService.removeCrewMember(crewMember);
 
-    let channel: GuildChannelResolvable = interaction.channel;
-
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
-    }
-
-    const result = await this.crewService.removeCrewMember(channel, member);
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -377,23 +374,30 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    let result;
+    const currentMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+    });
+
+    const targetMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: data.member.id },
+    });
+
     const member = await interaction.guild.members.fetch(interaction.user);
+    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
 
-    let channel: GuildChannelResolvable = interaction.channel;
-
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
+    if (!adminResult.success) {
+      return adminResult;
     }
 
-    const crewMember = await this.crewService.getCrewMember(channel, member);
-
-    if (!crewMember) {
+    let result;
+    if (!currentMember) {
       result = { success: false, message: 'You are not a member of this team' };
-    } else if (crewMember.access > CrewMemberAccess.OWNER) {
+    } else if ((currentMember.requireAccess(CrewMemberAccess.OWNER), { isAdmin })) {
       result = { success: false, message: 'Only the team owner can perform this action' };
+    } else if (!targetMember) {
+      result = { success: false, message: `${data.member} is not a member of this team` };
     } else {
-      result = await this.crewService.updateCrewMember(channel, data.member, {
+      result = await this.memberService.updateCrewMember(targetMember, {
         access: CrewMemberAccess.OWNER,
       });
 
@@ -401,7 +405,7 @@ export class CrewCommand {
         return interaction.reply({ content: result.message, ephemeral: true });
       }
 
-      result = await this.crewService.updateCrewMember(channel, member, {
+      result = await this.memberService.updateCrewMember(currentMember, {
         access: CrewMemberAccess.ADMIN,
       });
     }
@@ -419,23 +423,24 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    let result;
+    const crewMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+    });
+
     const member = await interaction.guild.members.fetch(interaction.user);
+    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
 
-    let channel: GuildChannelResolvable = interaction.channel;
-
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
+    if (!adminResult.success) {
+      return adminResult;
     }
 
-    const crewMember = await this.crewService.getCrewMember(channel, member);
-
+    let result;
     if (!crewMember) {
       result = { success: false, message: 'You are not a member of this team' };
-    } else if (crewMember.access > CrewMemberAccess.ADMIN) {
+    } else if (crewMember.requireAccess(CrewMemberAccess.ADMIN, { isAdmin })) {
       result = { success: false, message: 'Only an administrator can perform this action' };
     } else {
-      result = await this.crewService.updateCrewMember(channel, data.member, {
+      result = await this.memberService.updateCrewMember(crewMember, {
         access: CrewMemberAccess.ADMIN,
       });
     }
@@ -453,25 +458,26 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    let result;
+    const crewMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+    });
+
     const member = await interaction.guild.members.fetch(interaction.user);
+    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
 
-    let channel: GuildChannelResolvable = interaction.channel;
-
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
+    if (!adminResult.success) {
+      return adminResult;
     }
 
-    const crewMember = await this.crewService.getCrewMember(channel, member);
-
+    let result;
     if (!crewMember) {
       result = { success: false, message: 'You are not a member of this team' };
-    } else if (crewMember.access > CrewMemberAccess.ADMIN) {
+    } else if ((crewMember.requireAccess(CrewMemberAccess.ADMIN), { isAdmin })) {
       result = { success: false, message: 'Only an administrator can perform this action' };
     } else {
-      result = await this.crewService.registerCrewMember(
-        channel,
-        data.member,
+      result = await this.memberService.registerCrewMember(
+        crewMember.crew,
+        data.member.id,
         CrewMemberAccess.MEMBER,
       );
     }
@@ -489,22 +495,30 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    let result;
-    const member = await interaction.guild.members.fetch(interaction.user);
-    let channel: GuildChannelResolvable = interaction.channel;
+    const crewMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+    });
 
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
+    const targetMember = await this.memberRepo.findOne({
+      where: { channel: data.crew || interaction.channelId, member: data.member.id },
+    });
+
+    const member = await interaction.guild.members.fetch(interaction.user);
+    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
+
+    if (!adminResult.success) {
+      return adminResult;
     }
 
-    const crewMember = await this.crewService.getCrewMember(channel, member);
-
+    let result;
     if (!crewMember) {
       result = { success: false, message: 'You are not a member of this team' };
-    } else if (crewMember.access > CrewMemberAccess.ADMIN) {
+    } else if ((crewMember.requireAccess(CrewMemberAccess.ADMIN), { isAdmin })) {
       result = { success: false, message: 'Only an administrator can perform this action' };
+    } else if (!targetMember) {
+      result = { success: true, message: 'Done' };
     } else {
-      result = await this.crewService.removeCrewMember(channel, data.member);
+      result = await this.memberService.removeCrewMember(targetMember);
     }
 
     return interaction.reply({ content: result.message, ephemeral: true });
@@ -521,26 +535,19 @@ export class CrewCommand {
     @Options() data: ArchiveCrewCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    let channel: GuildChannelResolvable = interaction.channel;
+    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
 
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
+    if (!adminResult.success) {
+      return adminResult;
     }
 
-    let force = false;
-    if (member.permissions.has('Administrator')) {
-      force = true;
-    }
-
-    const result = await this.crewService.deregisterCrew(
-      channel,
-      member,
-      force,
-      data.archive?.id,
-      data.tag,
+    const { message: content } = await this.crewService.deregisterCrew(
+      data.crew || interaction.channelId,
+      interaction.user.id,
+      { isAdmin, archiveTag: data.tag, archiveTargetRef: data.archive?.id, softDelete: true },
     );
 
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   }
 
   @Subcommand({
@@ -553,30 +560,34 @@ export class CrewCommand {
     @Options() data: PurgeCrewsCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const crews = await this.crewService.getCrews(interaction.guild);
+    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
 
-    let force = false;
-    if (member.permissions.has('Administrator')) {
-      force = true;
+    if (!adminResult.success) {
+      return adminResult;
     }
 
-    const results = await Promise.all(
-      crews.map(async (crew) => {
-        if (crew.permanent) {
-          return { success: true, message: 'Done' };
-        }
-
-        return this.crewService.deregisterCrew(
-          crew.channel,
-          member,
-          force,
-          data.archive?.id,
-          data.tag,
-        );
-      }),
+    const crews = await this.crewRepo.find({
+      where: { guild: interaction.guildId, permanent: false },
+    });
+    this.logger.debug(JSON.stringify([crews.length, crews]));
+    const result = OperationStatus.collect(
+      await Promise.all(
+        crews.map((crew) =>
+          this.crewService.deregisterCrew(crew.channel, interaction.user.id, {
+            isAdmin,
+            softDelete: true,
+            archiveTag: data.tag,
+            archiveTargetRef: data.archive?.id,
+          }),
+        ),
+      ),
     );
 
-    const result = collectResults(results);
+    if (!result.success) {
+      for (const message of result.data) {
+        this.logger.error(message);
+      }
+    }
 
     return interaction.reply({ content: result.message, ephemeral: true });
   }
@@ -607,10 +618,20 @@ export class CrewCommand {
     @Context() [interaction]: ModalContext,
     @ModalParam('crew') crewRef: Snowflake,
   ) {
-    const guild = interaction.guild;
-    const member = await guild.members.fetch(interaction.user);
     const reason = interaction.fields.getTextInputValue('crew/delete/reason');
-    const result = await this.crewService.deregisterCrew(crewRef, member, true);
+
+    const { data: member, ...memberResult } = await this.memberService.resolveGuildMember(
+      interaction.user.id,
+      crewRef,
+    );
+
+    if (!memberResult.success) {
+      return memberResult;
+    }
+
+    const result = await this.crewService.deregisterCrew(crewRef, interaction.user.id, {
+      skipAccessControl: true,
+    });
     await interaction.reply({ content: result.message, ephemeral: true });
 
     if (result.success) {
@@ -654,13 +675,7 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    let channel: GuildChannelResolvable = interaction.channel;
-
-    if (data.crew) {
-      channel = await interaction.guild.channels.fetch(data.crew);
-    }
-
-    const modal = this.buildLogModal(channel.id);
+    const modal = this.buildLogModal(data.crew || interaction.channelId);
     return interaction.showModal(modal);
   }
 
@@ -687,10 +702,8 @@ export class CrewCommand {
 
   @Modal('crew/log/:crew')
   async onCrewLog(@Context() [interaction]: ModalContext, @ModalParam('crew') crewRef: Snowflake) {
-    const guild = interaction.guild;
-    const member = await guild.members.fetch(interaction.user);
     const content = interaction.fields.getTextInputValue('crew/log/content');
-    const result = await this.crewService.addCrewLog(crewRef, member, content);
+    const result = await this.logService.addCrewLog(crewRef, interaction.user.id, { content });
     await interaction.reply({ content: result.message, ephemeral: true });
   }
 
@@ -705,14 +718,19 @@ export class CrewCommand {
     @Options() data: ShareCrewCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    let channel: GuildChannelResolvable = interaction.channel;
+    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
 
-    if (data.crew) {
-      channel = interaction.guild.channels.cache.get(data.crew);
+    if (!adminResult.success) {
+      return adminResult;
     }
 
-    const result = await this.crewService.shareCrew(data.guild, channel, member);
+    const { message: content } = await this.shareService.shareCrew(
+      data.guild,
+      data.crew || interaction.channelId,
+      interaction.user.id,
+      { isAdmin },
+    );
 
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content, ephemeral: true });
   }
 }

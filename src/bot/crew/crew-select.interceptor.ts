@@ -1,23 +1,22 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AutocompleteInteraction } from 'discord.js';
 import { AutocompleteInterceptor } from 'necord';
-import { CrewService } from './crew.service';
+import { CrewRepository } from './crew.repository';
 
 @Injectable()
 export class CrewSelectAutocompleteInterceptor extends AutocompleteInterceptor {
   private readonly logger = new Logger(CrewSelectAutocompleteInterceptor.name);
 
   @Inject()
-  private readonly crewService: CrewService;
+  private readonly crewRepo: CrewRepository;
 
   public async transformOptions(interaction: AutocompleteInteraction) {
     const focused = interaction.options.getFocused(true);
 
     if (focused.name === 'crew') {
-      const results = await this.crewService.searchCrew(
-        interaction.guild,
-        focused.value.toString(),
-      );
+      const results = await this.crewRepo
+        .search(interaction.guildId, focused.value.toString(), true)
+        .getMany();
       return interaction.respond(
         results.map((result) => {
           const teamName =

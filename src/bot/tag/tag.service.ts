@@ -1,14 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
 import { Guild, GuildMember, GuildForumTag, Snowflake } from 'discord.js';
 import { ConfigService } from 'src/config';
-import { OperationStatus } from 'src/types';
-import { collectResults } from 'src/util';
+import { OperationStatus } from 'src/util';
 import { Crew } from 'src/bot/crew/crew.entity';
 import { Team } from 'src/bot/team/team.entity';
-import { ForumTag } from './tag.entity';
 import { ForumTagTemplate } from './tag-template.entity';
+import { TagTemplateRepository } from './tag-template.repository';
+import { TagRepository } from './tag.repository';
+import { In } from 'typeorm';
 
 export enum TicketTag {
   TRIAGE = 'Triage',
@@ -17,6 +16,7 @@ export enum TicketTag {
   REPEATABLE = 'Repeatable',
   IN_PROGRESS = 'In Progress',
   DONE = 'Done',
+  MOVED = 'Moved',
   ABANDONED = 'Abandoned',
 }
 
@@ -26,28 +26,9 @@ export class TagService {
 
   constructor(
     private readonly configService: ConfigService,
-    @InjectRepository(ForumTag) private readonly tagRepo: Repository<ForumTag>,
-    @InjectRepository(ForumTagTemplate) private readonly templateRepo: Repository<ForumTagTemplate>,
+    private readonly tagRepo: TagRepository,
+    private readonly templateRepo: TagTemplateRepository,
   ) {}
-
-  async getTemplates(guild: Guild) {
-    return this.templateRepo.find({ where: { guild: guild.id } });
-  }
-
-  async searchTemplates(guild: Guild, query: string) {
-    return this.templateRepo
-      .createQueryBuilder('template')
-      .where(`name ILIKE :query AND guild_sf = :guild`, { query: `%${query}%`, guild: guild.id })
-      .getMany();
-  }
-
-  async getTemplateForCrew(channel: Snowflake) {
-    return this.templateRepo.findOne({ where: { channel } });
-  }
-
-  async existsTemplate(guild: Guild, name: string) {
-    return this.templateRepo.exists({ where: { guild: guild.id, name } });
-  }
 
   async createTicketTags(member: GuildMember): Promise<OperationStatus> {
     if (!member.permissions.has('Administrator')) {
@@ -77,6 +58,13 @@ export class TagService {
       createdBy: member.id,
     };
 
+    const moved = {
+      name: TicketTag.MOVED,
+      guild: guild.id,
+      moderated: true,
+      createdBy: member.id,
+    };
+
     const unmoderated = [
       TicketTag.ABANDONED,
       TicketTag.DONE,
@@ -88,15 +76,17 @@ export class TagService {
       moderated: false,
       createdBy: member.id,
     }));
-    const tags = [triage, accepted, declined].concat(unmoderated);
+    const tags = [triage, accepted, declined, moved].concat(unmoderated);
 
-    try {
-      await this.templateRepo.insert(tags);
-    } catch {
-      return { success: false, message: 'The basic tags already exist' };
+    for (const tag of tags) {
+      try {
+        await this.templateRepo.insert(tag);
+      } catch {
+        this.logger.warn(`${tag.name} already exists`);
+      }
     }
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
   async createTagForCrew(crew: Crew): Promise<OperationStatus> {
@@ -116,7 +106,7 @@ export class TagService {
       return { success: false, message: 'A tag with this name already exists' };
     }
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
   async createTag(name: string, member: GuildMember, moderated = false): Promise<OperationStatus> {
@@ -136,7 +126,7 @@ export class TagService {
       return { success: false, message: 'A tag with this name already exists' };
     }
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
   async addTags(guild: Guild, team: Team, templates: ForumTagTemplate[]): Promise<OperationStatus> {
@@ -189,7 +179,7 @@ export class TagService {
       };
     }
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
   async deleteTags(
@@ -247,11 +237,11 @@ export class TagService {
           };
         }
 
-        return { success: true, message: 'Done' };
+        return OperationStatus.SUCCESS;
       }),
     );
 
-    return collectResults(results);
+    return OperationStatus.collect(results);
   }
 
   async deleteTagTemplates(
@@ -274,6 +264,6 @@ export class TagService {
       templates.map((template) => (typeof template === 'string' ? template : template?.id)),
     );
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 }
