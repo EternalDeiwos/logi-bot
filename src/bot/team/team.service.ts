@@ -1,11 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Guild, GuildChannel, GuildChannelResolvable, GuildMember, Role, User } from 'discord.js';
+import {
+  CategoryChannel,
+  Guild,
+  GuildChannel,
+  GuildChannelResolvable,
+  GuildManager,
+  GuildMember,
+  Role,
+  Snowflake,
+  ThreadOnlyChannel,
+  User,
+} from 'discord.js';
 import { ConfigService } from 'src/config';
-import { OperationStatus } from 'src/types';
+import { OperationStatus } from 'src/util';
 import { TagService } from 'src/bot/tag/tag.service';
 import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
+import { TagTemplateRepository } from 'src/bot/tag/tag-template.repository';
+import { TeamRepository } from './team.repository';
 import { Team } from './team.entity';
 
 @Injectable()
@@ -14,27 +25,87 @@ export class TeamService {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly guildManager: GuildManager,
     private readonly tagService: TagService,
-    @InjectRepository(Team) private readonly teamRepo: Repository<Team>,
+    private readonly templateRepo: TagTemplateRepository,
+    private readonly teamRepo: TeamRepository,
   ) {}
 
-  async getTeam(categoryRef: GuildChannelResolvable) {
-    return this.teamRepo.findOne({
-      where: { category: typeof categoryRef === 'string' ? categoryRef : categoryRef.id },
-    });
+  async resolveTeamGuild(team: Team): Promise<OperationStatus<Guild>> {
+    try {
+      const guild = await this.guildManager.fetch(team.guild);
+      return new OperationStatus({ success: true, message: 'Done', data: guild });
+    } catch (err) {
+      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
+      return {
+        success: false,
+        message: 'Guild is improperly registered. Please report this incident.',
+      };
+    }
   }
 
-  async getTeams(guild: Guild) {
-    return this.teamRepo.find({
-      where: { guild: guild.id },
-    });
+  async resolveTeamCategory(team: Team): Promise<OperationStatus<CategoryChannel>> {
+    const { data: guild, ...guildResult } = await this.resolveTeamGuild(team);
+
+    if (!guildResult.success) {
+      return guildResult;
+    }
+
+    try {
+      const category = await guild.channels.fetch(team.category);
+
+      if (!category) {
+        return {
+          success: false,
+          message: `${team.name} does not have a category. Please report this incident.`,
+        };
+      }
+
+      return new OperationStatus({
+        success: true,
+        message: 'Done',
+        data: category as CategoryChannel,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to fetch category ${team.category} for ${team.name} in ${guild.name}: ${err.message}`,
+        err.stack,
+      );
+      return {
+        success: false,
+        message: `${team.name} does not have a ticket category. Please report this incident.`,
+      };
+    }
   }
 
-  async searchTeam(guild: Guild, query: string) {
-    return this.teamRepo
-      .createQueryBuilder('team')
-      .where(`guild_sf = :guild AND name ILIKE :query`, { guild: guild.id, query: `%${query}%` })
-      .getMany();
+  async resolveTeamForum(team: Team): Promise<OperationStatus<ThreadOnlyChannel>> {
+    const { data: guild, ...guildResult } = await this.resolveTeamGuild(team);
+
+    if (!guildResult.success) {
+      return guildResult;
+    }
+
+    try {
+      const forum = await guild.channels.fetch(team.forum);
+
+      if (!forum || !forum.isThreadOnly()) {
+        return {
+          success: false,
+          message: `${team.name} does not have a ticket forum. Please report this incident.`,
+        };
+      }
+
+      return new OperationStatus({ success: true, message: 'Done', data: forum });
+    } catch (err) {
+      this.logger.error(
+        `Failed to fetch forum ${team.forum} for ${team.name} in ${guild.name}: ${err.message}`,
+        err.stack,
+      );
+      return {
+        success: false,
+        message: `${team.name} does not have a ticket forum. Please report this incident.`,
+      };
+    }
   }
 
   async registerTeam(
@@ -70,7 +141,7 @@ export class TeamService {
       role: role.id,
     });
 
-    return { success: true, message: 'Done', data: teamId };
+    return new OperationStatus({ success: true, message: 'Done', data: teamId });
   }
 
   async deleteTeam(category: GuildChannel, member: GuildMember): Promise<OperationStatus> {
@@ -82,7 +153,7 @@ export class TeamService {
       category: category.id,
     });
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
   async updateTeam(
@@ -105,12 +176,13 @@ export class TeamService {
 
     await this.teamRepo.update({ category: category.id }, { audit: audit.id });
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
-  async reconcileGuildForumTags(guild: Guild): Promise<OperationStatus> {
-    const templates = await this.tagService.getTemplates(guild);
-    const teams = await this.getTeams(guild);
+  async reconcileGuildForumTags(guildId: Snowflake): Promise<OperationStatus> {
+    const guild = await this.guildManager.fetch(guildId);
+    const templates = await this.templateRepo.find({ where: { guild: guildId } });
+    const teams = await this.teamRepo.find({ where: { guild: guildId } });
 
     const result = await Promise.all(
       teams.map((team) => this.reconcileTeamForumTags(guild, team, templates)),
@@ -123,7 +195,7 @@ export class TeamService {
       return { success: false, message };
     }
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
   async reconcileTeamForumTags(

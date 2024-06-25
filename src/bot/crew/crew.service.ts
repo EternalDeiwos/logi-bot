@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Equal, Or, Repository } from 'typeorm';
+import { DeepPartial } from 'typeorm';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -9,30 +8,31 @@ import {
   ChannelType,
   EmbedBuilder,
   Guild,
-  GuildBasedChannel,
-  GuildChannelResolvable,
+  GuildManager,
   GuildMember,
   GuildTextBasedChannel,
   PermissionsBitField,
+  Role,
   Snowflake,
   channelMention,
   inlineCode,
-  roleMention,
   userMention,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
-import { OperationStatus } from 'src/types';
-import { collectResults, toSlug } from 'src/util';
+import { ArchiveOptions, DeleteOptions } from 'src/types';
+import { OperationStatus, toSlug } from 'src/util';
 import { TeamService } from 'src/bot/team/team.service';
+import { TeamRepository } from 'src/bot/team/team.repository';
 import { TagService, TicketTag } from 'src/bot/tag/tag.service';
+import { TagTemplateRepository } from 'src/bot/tag/tag-template.repository';
 import { TicketService } from 'src/bot/ticket/ticket.service';
-import { CrewRepository } from './crew.repository';
-import { CrewMember, CrewMemberAccess } from './crew-member.entity';
-import { CrewShareRepository } from './crew-share.repository';
-import { CrewShare } from './crew-share.entity';
-import { CrewLog } from './crew-log.entity';
+import { TicketRepository } from 'src/bot/ticket/ticket.repository';
 import { Crew } from './crew.entity';
-import { newCrewMessage } from './crew.messages';
+import { CrewRepository } from './crew.repository';
+import { CrewMember, CrewMemberAccess } from './member/crew-member.entity';
+import { CrewMemberRepository } from './member/crew-member.repository';
+import { CrewMemberService } from './member/crew-member.service';
+import { crewAuditPrompt, newCrewMessage } from './crew.messages';
 
 @Injectable()
 export class CrewService {
@@ -40,98 +40,108 @@ export class CrewService {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly guildManager: GuildManager,
     private readonly teamService: TeamService,
+    private readonly teamRepo: TeamRepository,
     private readonly tagService: TagService,
+    private readonly templateRepo: TagTemplateRepository,
     @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
+    private readonly ticketRepo: TicketRepository,
     private readonly crewRepo: CrewRepository,
-    @InjectRepository(CrewMember) private readonly memberRepo: Repository<CrewMember>,
-    @InjectRepository(CrewLog) private readonly logRepo: Repository<CrewLog>,
-    @InjectRepository(CrewShare) private readonly shareRepo: CrewShareRepository,
+    private readonly memberService: CrewMemberService,
+    private readonly memberRepo: CrewMemberRepository,
   ) {}
 
-  async getCrew(channelRef: GuildChannelResolvable, options: { withDeleted?: boolean } = {}) {
-    return this.crewRepo.findOne({
-      where: { channel: typeof channelRef === 'string' ? channelRef : channelRef.id },
-      ...options,
-    });
+  async resolveCrewGuild(crew: Crew): Promise<OperationStatus<Guild>> {
+    try {
+      const guild = await this.guildManager.fetch(crew.parent.guild);
+      return new OperationStatus({ success: true, message: 'Done', data: guild });
+    } catch (err) {
+      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
+      return {
+        success: false,
+        message: 'Guild is improperly registered. Please report this incident.',
+      };
+    }
   }
 
-  async getFirstCrew(guild: Guild) {
-    return this.crewRepo.findOne({
-      where: { guild: guild.id, movePrompt: true },
-    });
-  }
+  async resolveCrewChannel(crew: Crew): Promise<OperationStatus<GuildTextBasedChannel>> {
+    const { data: guild, ...guildResult } = await this.resolveCrewGuild(crew);
 
-  async getCrews(guild: Guild, includeShared = true) {
-    return this.crewRepo.getShared(guild.id, includeShared).getMany();
-  }
-
-  async searchCrew(guild: Guild, query: string, includeShared = true) {
-    return this.crewRepo.search(guild.id, query, includeShared).getMany();
-  }
-
-  async getCrewMember(channelRef: GuildChannelResolvable, member: GuildMember) {
-    if (!channelRef) {
-      return;
+    if (!guildResult.success) {
+      return guildResult;
     }
 
-    return this.memberRepo.findOne({
-      where: {
-        channel: typeof channelRef === 'string' ? channelRef : channelRef.id,
-        member: member.id,
-      },
-    });
+    try {
+      const channel = await guild.channels.fetch(crew.channel);
+
+      if (!channel.isTextBased()) {
+        return {
+          success: false,
+          message: `${channelMention(crew.channel)} is not a text channel`,
+        };
+      }
+
+      return new OperationStatus({ success: true, message: 'Done', data: channel });
+    } catch (err) {
+      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
+      return {
+        success: false,
+        message: 'Guild is improperly registered. Please report this incident.',
+      };
+    }
   }
 
-  async crewJoinPrompt(channel: GuildTextBasedChannel, crew: Crew, createdBy: GuildMember) {
-    const embed = new EmbedBuilder()
-      .setTitle(`Join ${crew.name}`)
-      .setDescription(newCrewMessage(createdBy))
-      .setColor('DarkGreen');
+  async resolveCrewRole(crew: Crew): Promise<OperationStatus<Role>> {
+    const { data: guild, ...guildResult } = await this.resolveCrewGuild(crew);
 
-    const join = new ButtonBuilder()
-      .setCustomId('crew/join')
-      .setLabel('Join Crew')
-      .setStyle(ButtonStyle.Primary);
+    if (!guildResult.success) {
+      return guildResult;
+    }
 
-    const log = new ButtonBuilder()
-      .setCustomId('crew/log')
-      .setLabel('Log')
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(join, log);
-
-    const message = await channel.send({ embeds: [embed], components: [row] });
-    await message.pin();
+    try {
+      const role = await guild.roles.fetch(crew.role);
+      return new OperationStatus({ success: true, message: 'Done', data: role });
+    } catch (err) {
+      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
+      return {
+        success: false,
+        message: 'Guild is improperly registered. Please report this incident.',
+      };
+    }
   }
 
   async registerCrew(
-    categoryRef: GuildChannelResolvable,
-    member: GuildMember,
-    name?: string,
-    shortName?: string,
-    movePrompt = false,
+    categoryRef: Snowflake,
+    memberRef: Snowflake,
+    data: DeepPartial<Pick<Crew, 'name' | 'shortName' | 'slug' | 'movePrompt' | 'permanent'>>,
   ): Promise<OperationStatus> {
-    const guild = member.guild;
-    const category = await guild.channels.cache.get(
-      typeof categoryRef === 'string' ? categoryRef : categoryRef.id,
-    );
-
-    if (!category) {
-      return { success: false, message: 'Invalid channel' };
-    }
-
-    const team = await this.teamService.getTeam(categoryRef);
+    const team = await this.teamRepo.findOne({ where: { category: categoryRef } });
 
     if (!team) {
-      return { success: false, message: `${category} does not belong to a registered team` };
+      return {
+        success: false,
+        message: `${channelMention(categoryRef)} does not belong to a registered team`,
+      };
     }
 
-    name = name || category.name;
-    shortName = shortName || name;
-    const slug = toSlug(name);
+    const { data: guild, ...guildResult } = await this.teamService.resolveTeamGuild(team);
 
-    if (shortName.length > 20) {
+    if (!guildResult.success) {
+      return guildResult;
+    }
+
+    const { data: category, ...categoryResult } = await this.teamService.resolveTeamCategory(team);
+
+    if (!categoryResult.success) {
+      return categoryResult;
+    }
+
+    data.name = data.name || category.name;
+    data.shortName = data.shortName || data.name;
+    data.slug = data.slug || toSlug(data.name);
+
+    if (data.shortName.length > 20) {
       return {
         success: false,
         message:
@@ -140,22 +150,25 @@ export class CrewService {
     }
 
     const knownTags = Object.values(TicketTag).map((t) => t.toLowerCase());
-    if (knownTags.includes(name.toLowerCase()) || knownTags.includes(shortName.toLowerCase())) {
+    if (
+      knownTags.includes(data.name.toLowerCase()) ||
+      knownTags.includes(data.shortName.toLowerCase())
+    ) {
       return {
         success: false,
-        message: `${shortName} is a reserved name. Please choose something else`,
+        message: `${data.shortName} is a reserved name. Please choose something else`,
       };
     }
 
-    if (await this.tagService.existsTemplate(guild, shortName)) {
+    if (await this.templateRepo.exists({ where: { guild: guild.id, name: data.shortName } })) {
       return {
         success: false,
-        message: `Tag named ${shortName} already exists for this guild. Please choose a different ${inlineCode('name')} or a unique ${inlineCode('short_name')}.`,
+        message: `Tag named ${data.shortName} already exists for this guild. Please choose a different ${inlineCode('name')} or a unique ${inlineCode('short_name')}.`,
       };
     }
 
-    const role = await member.guild.roles.create({
-      name,
+    const role = await guild.roles.create({
+      name: data.name,
       mentionable: true,
     });
 
@@ -172,9 +185,9 @@ export class CrewService {
       }
     }
 
-    const channel = await member.guild.channels.create({
-      name: `${prefix}${slug}`,
-      parent: category.id,
+    const channel = await guild.channels.create({
+      name: `${prefix}${data.slug}`,
+      parent: team.category,
       type: ChannelType.GuildText,
       permissionOverwrites: [
         { id: guild.roles.everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
@@ -182,226 +195,132 @@ export class CrewService {
       ],
     });
 
-    if (!movePrompt && movePrompt !== false) {
-      movePrompt = false;
+    if (!data.movePrompt && data.movePrompt !== false) {
+      data.movePrompt = false;
     }
 
-    await this.crewRepo.insert({
-      channel: channel.id,
-      guild: member.guild.id,
-      name,
-      shortName,
-      slug,
-      movePrompt,
-      role: role.id,
-      forum: team.forum,
-      createdBy: member.id,
-    });
-
-    const crew = await this.getCrew(channel.id);
-    await this.crewJoinPrompt(channel, crew, member);
-
-    const result = await this.tagService.createTagForCrew(crew);
-
-    if (!result.success) {
-      return result;
-    }
-
-    // Create audit prompt
-    if (crew?.team?.audit) {
-      const audit = await guild.channels.fetch(crew.team.audit);
-
-      if (audit.isTextBased()) {
-        const embed = new EmbedBuilder()
-          .setTitle(
-            `New Crew: ${crew.name}` + (crew.name !== crew.shortName ? ` (${crew.shortName})` : ''),
-          )
-          .setDescription(
-            `A new crew called **${crew.name}** was created under ${crew.team.name} by ${member}. This prompt can be used to remove the team if there is something wrong.`,
-          )
-          .setTimestamp()
-          .setColor('DarkGold');
-
-        const deleteButton = new ButtonBuilder()
-          .setCustomId(`crew/reqdelete/${crew.channel}`)
-          .setLabel('Delete')
-          .setStyle(ButtonStyle.Danger);
-
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteButton);
-
-        await audit.send({ embeds: [embed], components: [row] });
-      }
-    }
-
-    return await this.registerCrewMember(channel, member, CrewMemberAccess.OWNER);
-  }
-
-  async registerCrewMember(
-    channelRef: GuildChannelResolvable,
-    member: GuildMember,
-    access: CrewMemberAccess = CrewMemberAccess.MEMBER,
-  ): Promise<OperationStatus> {
-    const channel = await member.guild.channels.cache.get(
-      typeof channelRef === 'string' ? channelRef : channelRef.id,
+    const crew = this.crewRepo.create(
+      Object.assign(data, {
+        channel: channel.id,
+        guild: guild.id,
+        role: role.id,
+        forum: team.forum,
+        createdBy: memberRef,
+      }),
     );
 
-    if (!channel) {
-      return { success: false, message: 'Invalid channel' };
+    await this.crewRepo.insert(crew);
+
+    const tagResult = await this.tagService.createTagForCrew(crew);
+
+    if (!tagResult.success) {
+      return tagResult;
     }
 
-    const crew = await this.getCrew(channel);
+    const registerResult = await this.memberService.registerCrewMember(
+      crew,
+      memberRef,
+      CrewMemberAccess.OWNER,
+    );
 
-    if (!crew) {
-      return { success: false, message: `${channel} does not belong to a crew` };
-    }
-
-    const crewMember = await this.getCrewMember(channel, member);
-    if (crewMember) {
-      // If the user would get more privileges then update the existing record instead
-      if (access < crewMember.access) {
-        return this.updateCrewMember(channel, member, { access });
-      }
-
-      // Otherwise prevent an accidental loss of privilege
+    if (!registerResult.success) {
       return {
         success: false,
-        message: `You are already a ${crewMember.access > CrewMemberAccess.MEMBER ? 'subscriber' : 'member'} of ${roleMention(crew.role)}`,
+        message: `Crew was created successfully but failed to register crew member: ${registerResult.message}`,
       };
     }
 
-    await this.memberRepo.insert({
-      member: member.id,
-      guild: member.guild.id,
-      name: member.displayName,
-      icon:
-        member.avatarURL({ extension: 'png', forceStatic: true }) ??
-        member.user.avatarURL({ extension: 'png', forceStatic: true }),
-      access,
-      channel: channel.id,
-    });
+    await this.crewJoinPrompt(crew, channel);
 
-    await member.roles.add(crew.role);
+    // Create audit prompt
+    if (team.audit) {
+      try {
+        const audit = await guild.channels.fetch(crew.team.audit);
 
-    return { success: true, message: 'Done' };
-  }
+        if (audit.isTextBased()) {
+          const embed = new EmbedBuilder()
+            .setTitle(
+              `New Crew: ${crew.name}` +
+                (crew.name !== crew.shortName ? ` (${crew.shortName})` : ''),
+            )
+            .setDescription(crewAuditPrompt(crew))
+            .setTimestamp()
+            .setColor('DarkGold');
 
-  async updateCrewMember(
-    channelRef: GuildChannelResolvable,
-    member: GuildMember,
-    data: DeepPartial<CrewMember>,
-  ) {
-    const channel = await member.guild.channels.cache.get(
-      typeof channelRef === 'string' ? channelRef : channelRef.id,
-    );
+          const deleteButton = new ButtonBuilder()
+            .setCustomId(`crew/reqdelete/${crew.channel}`)
+            .setLabel('Delete')
+            .setStyle(ButtonStyle.Danger);
 
-    if (!channel) {
-      return { success: false, message: 'Invalid channel' };
+          const row = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteButton);
+
+          await audit.send({ embeds: [embed], components: [row] });
+        }
+      } catch (err) {
+        this.logger.error(
+          `Failed to create audit prompt for crew ${crew.name}: ${err.message}`,
+          err.stack,
+        );
+      }
     }
 
-    const crew = await this.getCrew(channel);
-
-    if (!crew) {
-      return { success: false, message: `${channel} does not belong to a crew` };
-    }
-
-    const result = await this.memberRepo.update(
-      { channel: Equal(crew.channel), member: Equal(member.id) },
-      data,
-    );
-
-    if (result.affected) {
-      return { success: true, message: 'Done' };
-    }
-
-    return { success: false, message: `${member.displayName} is not a member of this team` };
-  }
-
-  async removeCrewMember(
-    channelRef: GuildChannelResolvable,
-    member: GuildMember,
-  ): Promise<OperationStatus> {
-    const channel = await member.guild.channels.cache.get(
-      typeof channelRef === 'string' ? channelRef : channelRef.id,
-    );
-
-    if (!channel) {
-      return { success: false, message: 'Invalid channel' };
-    }
-
-    const crew = await this.getCrew(channel);
-
-    if (!crew) {
-      return { success: false, message: `${channel} does not belong to a crew` };
-    }
-
-    const crewMember = await this.getCrewMember(channel, member);
-
-    if (!crewMember) {
-      return { success: false, message: 'Not a member of this crew' };
-    }
-
-    await member.roles.remove(crew.role);
-    await this.memberRepo.delete({ member: member.id, channel: channel.id });
-
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
   public async deregisterCrew(
-    channelRef: GuildChannelResolvable,
-    member: GuildMember,
-    force: boolean = false,
-    archiveTargetRef?: GuildChannelResolvable,
-    archiveTag?: string,
-  ): Promise<OperationStatus<string>> {
-    const guild = member.guild;
-    const channel = await guild.channels.fetch(
-      typeof channelRef === 'string' ? channelRef : channelRef.id,
-    );
+    channelRef: Snowflake,
+    memberRef: Snowflake,
+    options: Partial<DeleteOptions & ArchiveOptions>,
+  ): Promise<OperationStatus> {
+    const crew = await this.crewRepo.findOne({ where: { channel: channelRef } });
 
-    if (!channel) {
+    if (!crew) {
       return { success: false, message: 'Invalid channel' };
     }
 
-    const crew = await this.getCrew(channel);
+    const { data: guild, ...guildResult } = await this.resolveCrewGuild(crew);
 
-    if (!crew) {
-      return { success: false, message: `${channel} does not belong to a crew` };
+    if (!guildResult.success) {
+      return guildResult;
     }
 
-    const role = guild.roles.cache.get(crew.role);
+    const crewMember = await this.memberRepo.findOne({
+      where: { channel: channelRef, member: memberRef },
+    });
 
-    const crewMember = await this.getCrewMember(channel, member);
-
-    if (!force && !crewMember) {
-      return { success: false, message: 'Not a member of this crew' };
+    if (
+      !options.isAdmin &&
+      !options.skipAccessControl &&
+      (!crewMember || !crewMember.requireAccess(CrewMemberAccess.ADMIN, options))
+    ) {
+      return { success: false, message: 'Only crew members can perform this action' };
     }
 
-    if (!force && crewMember.access > CrewMemberAccess.ADMIN) {
-      return { success: false, message: 'Only an administrator can perform this action' };
+    const { data: member, ...memberResult } =
+      await this.memberService.resolveGuildMember(crewMember);
+
+    if (!memberResult.success) {
+      return memberResult;
     }
 
-    const discussion = (await guild.channels.fetch(crew.channel)) as GuildTextBasedChannel;
-
-    const tickets = await this.ticketService.getOpenTickets(discussion);
-
-    const ticketResults = collectResults(
+    // Close all currently open tickets
+    const tickets = await this.ticketRepo.find({ where: { discussion: channelRef } });
+    const ticketResults = OperationStatus.collect(
       await Promise.all(
         tickets.map(async (ticket) => {
-          const thread = await guild.channels.fetch(ticket.thread);
+          const { data: thread, ...threadResult } =
+            await this.ticketService.resolveTicketThread(ticket);
 
-          if (!thread.isThread()) {
-            return {
-              success: false,
-              message: `${ticket.name} has an invalid thread. Please report this incident`,
-            };
+          if (!threadResult.success) {
+            return threadResult;
           }
 
           const triageSnowflake = await crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE);
 
           if (thread.appliedTags.includes(triageSnowflake)) {
-            return this.ticketService.updateTicket(thread, member, TicketTag.ABANDONED);
+            return this.ticketService.updateTicket(ticket.thread, member, TicketTag.ABANDONED);
           } else {
-            return this.ticketService.updateTicket(thread, member, TicketTag.DONE);
+            return this.ticketService.updateTicket(ticket.thread, member, TicketTag.DONE);
           }
         }),
       ),
@@ -411,23 +330,37 @@ export class CrewService {
       return ticketResults;
     }
 
-    const tagTemplate = await this.tagService.getTemplateForCrew(crew.channel);
-    const botMember = await guild.members.fetchMe();
-    await this.tagService.deleteTags(botMember, [tagTemplate]);
-    await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
+    // TODO: finish refactor
+    try {
+      const tagTemplate = await this.templateRepo.findOne({ where: { channel: crew.channel } });
+      const botMember = await guild.members.fetchMe();
+      await this.tagService.deleteTags(botMember, [tagTemplate]);
+      await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
+    } catch (err) {
+      this.logger.error(`Failed to update ticket tags: ${err.message}`, err.stack);
+    }
 
-    const reason = `Team archived by ${member.displayName}`;
+    const reason = `Team archived by ${userMention(memberRef)}`;
+    const { data: discussion, ...channelResult } = await this.resolveCrewChannel(crew);
+    const { data: role, ...roleResult } = await this.resolveCrewRole(crew);
 
-    if (archiveTargetRef) {
-      const archiveTargetCategory = await guild.channels.fetch(
-        typeof archiveTargetRef === 'string' ? archiveTargetRef : archiveTargetRef.id,
-      );
+    if (options.archiveTargetRef) {
+      let archiveTargetCategory;
 
-      if (archiveTargetCategory) {
+      try {
+        archiveTargetCategory = await guild.channels.fetch(options.archiveTargetRef);
+      } catch (err) {
+        this.logger.error(
+          `Failed to load archive category ${options.archiveTargetRef} for crew ${crew.name} in ${guild.name}: ${err.message}`,
+          err.stack,
+        );
+      }
+
+      if (archiveTargetCategory && channelResult.success && roleResult.success) {
         await Promise.all([
           discussion.edit({
-            name: archiveTag
-              ? [discussion.name, archiveTag.toLowerCase()].join('-')
+            name: options.archiveTag
+              ? [discussion.name, options.archiveTag.toLowerCase()].join('-')
               : discussion.name,
             permissionOverwrites: [{ id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }],
             parent: archiveTargetCategory as CategoryChannel,
@@ -441,52 +374,46 @@ export class CrewService {
       await Promise.all([discussion.delete(reason), role.delete(reason)]);
     }
 
-    await this.crewRepo.softDelete({ channel: channel.id });
+    await this.crewRepo.softDelete({ channel: channelRef });
 
     this.logger.log(
-      `${member.displayName} archived crew ${crew.name} (${crew.channel}) in ${guild.name} (${guild.id})`,
+      `${userMention(memberRef)} archived crew ${crew.name} (${crew.channel}) in ${guild.name} (${guild.id})`,
     );
 
-    return { success: true, message: 'Done', data: crew.name };
+    return new OperationStatus({ success: true, message: 'Done', data: crew.name });
   }
 
   public async updateCrew(
-    channelRef: GuildChannelResolvable,
-    member: GuildMember,
+    crew: Crew,
+    crewMember: CrewMember,
     options: DeepPartial<Pick<Crew, 'movePrompt' | 'permanent'>>,
   ) {
-    const guild = member.guild;
-    const channel = await guild.channels.cache.get(
-      typeof channelRef === 'string' ? channelRef : channelRef.id,
-    );
-
-    if (!channel) {
-      return { success: false, message: 'Invalid channel' };
+    if (!crew || !(crew instanceof Crew)) {
+      return { success: false, message: 'Invalid crew' };
     }
 
-    const crew = await this.getCrew(channel);
+    crewMember =
+      typeof crewMember === 'string'
+        ? await this.memberRepo.findOne({
+            where: { channel: crew.channel, member: crewMember },
+          })
+        : crewMember;
 
-    if (!crew) {
-      return { success: false, message: `${channel} does not belong to a crew` };
+    if (!crewMember || !(crewMember instanceof CrewMember)) {
+      return { success: false, message: 'You are not a member of this crew' };
     }
 
-    const crewMember = await this.getCrewMember(channel, member);
-
-    if (!crewMember) {
-      return { success: false, message: 'Not a member of this crew' };
-    }
-
-    if (crewMember.access > CrewMemberAccess.ADMIN) {
+    if (!crewMember.requireAccess(CrewMemberAccess.ADMIN)) {
       return { success: false, message: 'Only an administrator can perform this action' };
     }
 
-    await this.crewRepo.update({ channel: channel.id }, options);
+    await this.crewRepo.update({ channel: crew.channel }, options);
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
   public async sendStatus(
-    channel: GuildBasedChannel,
+    channel: GuildTextBasedChannel,
     member: GuildMember,
   ): Promise<OperationStatus> {
     const guild = member.guild;
@@ -495,7 +422,7 @@ export class CrewService {
       return { success: false, message: 'Invalid channel' };
     }
 
-    const crews = await this.getCrews(guild);
+    const crews = await this.crewRepo.find({ where: { guild: channel.guildId } });
     const accessibleCrews = crews.filter((crew) => {
       try {
         return member.permissionsIn(crew.channel).has(PermissionsBitField.Flags.ViewChannel);
@@ -547,120 +474,42 @@ export class CrewService {
 
     await channel.send({ embeds: [embed] });
 
-    return { success: true, message: 'Done' };
+    return OperationStatus.SUCCESS;
   }
 
-  async getLastCrewLog(
-    channelRef: GuildChannelResolvable,
-    options: { withDeleted?: boolean } = {},
-  ) {
-    return this.logRepo.findOne({
-      where: { discussion: typeof channelRef === 'string' ? channelRef : channelRef.id },
-      order: { createdAt: 'desc' },
-      ...options,
-    });
-  }
-
-  async getCrewLogs(channelRef: GuildChannelResolvable, options: { withDeleted?: boolean } = {}) {
-    return this.logRepo.find({
-      where: { discussion: typeof channelRef === 'string' ? channelRef : channelRef.id },
-      ...options,
-    });
-  }
-
-  async addCrewLog(
-    channelRef: GuildChannelResolvable,
-    member: GuildMember,
-    content: string,
-  ): Promise<OperationStatus> {
-    const guild = member.guild;
-    const channel = await guild.channels.fetch(
-      typeof channelRef === 'string' ? channelRef : channelRef.id,
-    );
-
-    if (!channel || !channel.isTextBased()) {
+  async crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel): Promise<OperationStatus> {
+    if (!crew) {
       return { success: false, message: 'Invalid channel' };
     }
 
-    const crew = await this.getCrew(channel);
+    if (!channel) {
+      const { data, ...channelResult } = await this.resolveCrewChannel(crew);
+      channel = data;
 
-    if (!crew) {
-      return { success: false, message: `${channel} does not belong to a crew` };
+      if (!channelResult.success) {
+        return channelResult;
+      }
     }
 
-    const crewMember = await this.getCrewMember(channel, member);
-
-    if (
-      (!crewMember || crewMember.access > CrewMemberAccess.MEMBER) &&
-      !member.permissions.has(PermissionsBitField.Flags.Administrator)
-    ) {
-      return { success: false, message: 'Not a member of this crew' };
-    }
-
-    const createdAt = new Date();
     const embed = new EmbedBuilder()
-      .setTitle('Crew Update')
-      .setColor('DarkGreen')
-      .setThumbnail(member.avatarURL() ?? member.user.avatarURL())
-      .setDescription(content)
-      .setTimestamp(createdAt);
+      .setTitle(`Join ${crew.name}`)
+      // TODO: refactor to use crew repo
+      .setDescription(newCrewMessage((await crew.getCrewOwner()).member))
+      .setColor('DarkGreen');
 
-    const message = await channel.send({
-      content: roleMention(crew.role),
-      embeds: [embed],
-      allowedMentions: { roles: [crew.role] },
-    });
+    const join = new ButtonBuilder()
+      .setCustomId('crew/join')
+      .setLabel('Join Crew')
+      .setStyle(ButtonStyle.Primary);
 
+    const log = new ButtonBuilder()
+      .setCustomId('crew/log')
+      .setLabel('Log')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(join, log);
+
+    const message = await channel.send({ embeds: [embed], components: [row] });
     await message.pin();
-
-    await this.logRepo.insert({
-      guild: member.guild.id,
-      message: message.id,
-      discussion: crew.channel,
-      content,
-      createdAt,
-      createdBy: member.id,
-    });
-
-    return { success: true, message: 'Done' };
-  }
-
-  async shareCrew(guildRef: Snowflake, channelRef: GuildChannelResolvable, member: GuildMember) {
-    const guild = member.guild;
-    const channel = await guild.channels.fetch(
-      typeof channelRef === 'string' ? channelRef : channelRef.id,
-    );
-
-    if (!channel || !channel.isTextBased()) {
-      return { success: false, message: 'Invalid channel' };
-    }
-
-    const crew = await this.getCrew(channel);
-
-    if (!crew) {
-      return { success: false, message: `${channel} does not belong to a crew` };
-    }
-
-    const crewMember = await this.getCrewMember(channel, member);
-
-    if (
-      (!crewMember || crewMember.access > CrewMemberAccess.ADMIN) &&
-      !member.permissions.has(PermissionsBitField.Flags.Administrator)
-    ) {
-      return { success: false, message: 'You must be a crew admin to share with other guilds' };
-    }
-
-    try {
-      await this.shareRepo.insert({
-        target: guildRef,
-        channel: channel.id,
-        createdBy: member.id,
-      });
-    } catch (err) {
-      this.logger.warn(`Failed to share ${crew.name} with guild ${guildRef}: ${err.message}`);
-      return { success: false, message: 'Unable to share this crew' };
-    }
-
-    return { success: true, message: 'Done' };
   }
 }

@@ -9,33 +9,32 @@ export class CrewRepository extends Repository<Crew> {
     super(Crew, dataSource.createEntityManager());
   }
 
-  search(guildId: Snowflake, query: string, includeShared = false) {
+  search(guildRef: Snowflake, query: string, includeShared = false) {
     const qb = this.createQueryBuilder('crew')
       .leftJoinAndSelect('crew.team', 'team')
+      .leftJoinAndSelect('crew.parent', 'guild')
       .where(
         'crew.guild_sf = :guild AND (crew.name ILIKE :query OR crew.name_short ILIKE :query)',
         {
-          guild: guildId,
+          guild: guildRef,
           query: `%${query}%`,
         },
       );
 
     if (includeShared) {
-      qb.leftJoin('crew.shared', 'shared')
-        .leftJoinAndSelect('crew.parent', 'guild')
-        .orWhere(
-          'shared.target = :guild AND (crew.name ILIKE :query OR crew.name_short ILIKE :query)',
-        );
+      qb.leftJoin('crew.shared', 'shared').orWhere(
+        'shared.target = :guild AND (crew.name ILIKE :query OR crew.name_short ILIKE :query)',
+      );
     }
 
     return qb;
   }
 
-  getShared(guildId: Snowflake, includeShared = false) {
+  getShared(guildRef: Snowflake, includeShared = false) {
     const qb = this.createQueryBuilder('crew')
       .leftJoinAndSelect('crew.team', 'team')
       .where('crew.guild_sf = :guild', {
-        guild: guildId,
+        guild: guildRef,
       });
 
     if (includeShared) {

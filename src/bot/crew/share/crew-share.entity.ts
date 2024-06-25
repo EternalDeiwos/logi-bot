@@ -11,7 +11,7 @@ import {
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Guild } from 'src/bot/guild/guild.entity';
-import { Crew } from './crew.entity';
+import { Crew } from 'src/bot/crew/crew.entity';
 
 @Entity({ name: 'crew_share' })
 @Index('crew_share_unique', ['target', 'channel'], { unique: true })
@@ -46,4 +46,8 @@ export class CrewShare {
 
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
+
+  get isDeleted() {
+    return Boolean(this.deletedAt);
+  }
 }

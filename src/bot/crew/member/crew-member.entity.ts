@@ -8,8 +8,9 @@ import {
   RelationId,
   CreateDateColumn,
 } from 'typeorm';
-import { Crew } from './crew.entity';
+import { Crew } from 'src/bot/crew/crew.entity';
 import { Snowflake } from 'discord.js';
+import { AdminOverrideOptions, DeleteOptions, SkipAccessControlOptions } from 'src/types';
 
 export enum CrewMemberAccess {
   OWNER = 0,
@@ -54,4 +55,11 @@ export class CrewMember {
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
+
+  requireAccess(
+    access: CrewMemberAccess,
+    options: Partial<AdminOverrideOptions & SkipAccessControlOptions> = {},
+  ) {
+    return options.skipAccessControl || options.isAdmin || this.access <= access;
+  }
 }

@@ -30,15 +30,16 @@ import {
   StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
-  ThreadChannel,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
 import { CrewService } from 'src/bot/crew/crew.service';
+import { CrewRepository } from 'src/bot/crew/crew.repository';
 import { TicketTag } from 'src/bot/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/bot/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/bot/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
+import { TicketRepository } from './ticket.repository';
 import {
   proxyTicketMessage,
   ticketPromptCrewCreateInstructions,
@@ -77,7 +78,9 @@ export class TicketCommand {
   constructor(
     private readonly configService: ConfigService,
     private readonly crewService: CrewService,
+    private readonly crewRepo: CrewRepository,
     private readonly ticketService: TicketService,
+    private readonly ticketRepo: TicketRepository,
   ) {}
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -120,7 +123,7 @@ export class TicketCommand {
     if (data.crew) {
       prompt.setDescription(ticketPromptDescription());
 
-      const crew = await this.crewService.getCrew(data.crew);
+      const crew = await this.crewRepo.findOne({ where: { channel: data.crew } });
 
       if (!crew) {
         return interaction.reply({ content: 'Invalid crew', ephemeral: true });
@@ -138,7 +141,7 @@ export class TicketCommand {
         embeds: [prompt],
       });
     } else {
-      const crews = await this.crewService.getCrews(interaction.guild);
+      const crews = await this.crewRepo.find({ where: { guild: interaction.guildId } });
 
       const select = new StringSelectMenuBuilder()
         .setCustomId('ticket/start')
@@ -259,7 +262,7 @@ export class TicketCommand {
     @SelectedStrings() [selected]: string[],
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.ticketService.moveTicket(threadRef, selected, member);
+    const result = await this.ticketService.moveTicket(threadRef, selected, member.id);
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 
@@ -285,7 +288,11 @@ export class TicketCommand {
       '',
     ].join('\n');
 
-    const result = await this.ticketService.createTicket(crewRef, member, title, content);
+    const result = await this.ticketService.createTicket(crewRef, member.id, {
+      name: title,
+      content,
+      createdBy: member.id,
+    });
 
     return interaction.reply({ content: result.message, ephemeral: true });
   }
@@ -330,7 +337,7 @@ export class TicketCommand {
     }
 
     const result = await this.ticketService.updateTicket(
-      thread,
+      thread.id,
       member,
       TicketTag.DECLINED,
       reason,
@@ -340,22 +347,49 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'move',
-    description: 'Move this ticket to another crew',
+    description: 'Show the select prompt send this ticket to another crew',
     dmPermission: false,
   })
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
-    const { channel } = interaction;
-
-    if (!channel.isThread) {
+    const ticket = await this.ticketRepo.findOne({
+      where: { thread: interaction.channelId },
+      withDeleted: true,
+    });
+    if (!ticket) {
       return interaction.reply({
         content: 'This command can only be used in a ticket',
         ephemeral: true,
       });
     }
 
-    const row = await this.ticketService.createMovePrompt(channel as ThreadChannel, channel.parent);
+    const row = await this.ticketService.createMovePrompt(ticket, [ticket.discussion]);
 
     return interaction.reply({ content: 'Select destination', components: [row], ephemeral: true });
+  }
+
+  @Subcommand({
+    name: 'triage',
+    description: 'Show the triage prompt change the state of the ticket',
+    dmPermission: false,
+  })
+  async onTicketTriagePrompt(@Context() [interaction]: SlashCommandContext) {
+    const { channel } = interaction;
+
+    const ticket = await this.ticketRepo.findOne({
+      where: { thread: channel.id },
+      withDeleted: true,
+    });
+
+    if (!ticket) {
+      return interaction.reply({
+        content: 'This command can only be used in a ticket',
+        ephemeral: true,
+      });
+    }
+
+    const row = await this.ticketService.createTriageControl(ticket);
+
+    return interaction.reply({ content: 'Select action', components: [row], ephemeral: true });
   }
 
   @Button('ticket/action/:action/:thread')
@@ -383,7 +417,7 @@ export class TicketCommand {
       });
     }
 
-    const result = await this.ticketService.updateTicket(thread, member, tag);
+    const result = await this.ticketService.updateTicket(thread.id, member, tag);
     await interaction.reply({ content: result.message, ephemeral: true });
   }
 
@@ -397,7 +431,7 @@ export class TicketCommand {
       });
     }
 
-    const result = await this.ticketService.updateTicket(thread, member, tag, reason);
+    const result = await this.ticketService.updateTicket(thread.id, member, tag, reason);
 
     await interaction.reply({ content: result.message, ephemeral: true });
   }
