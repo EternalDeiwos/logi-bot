@@ -412,7 +412,50 @@ export class CrewService {
     return OperationStatus.SUCCESS;
   }
 
-  public async sendStatus(
+  public async sendIndividualStatus(
+    channel: GuildTextBasedChannel,
+    member: GuildMember,
+    crew: Crew,
+  ): Promise<OperationStatus> {
+    const guild = member.guild;
+
+    if (!channel || !channel.isTextBased()) {
+      return { success: false, message: 'Invalid channel' };
+    }
+
+    const fields: { name: string; value: string }[] = [];
+    const members = await crew.members;
+    const logs = await crew.logs;
+
+    const embed = new EmbedBuilder()
+      .setTitle(`Crew: ${crew.name}`)
+      .setColor('DarkGreen')
+      .setThumbnail(guild.iconURL())
+      .setTimestamp()
+      .setDescription(
+        `${channelMention(crew.channel)} is led by ${userMention((await crew.getCrewOwner()).member)}.`,
+      );
+
+    fields.push({
+      name: 'Members',
+      value: members.map((member) => `- ${userMention(member.member)}`).join('\n'),
+    });
+
+    if (logs.length) {
+      fields.push({
+        name: 'Status',
+        value: logs.pop().content,
+      });
+    }
+
+    embed.addFields(...fields);
+
+    await channel.send({ embeds: [embed] });
+
+    return OperationStatus.SUCCESS;
+  }
+
+  public async sendAllStatus(
     channel: GuildTextBasedChannel,
     member: GuildMember,
   ): Promise<OperationStatus> {
@@ -421,6 +464,9 @@ export class CrewService {
     if (!channel || !channel.isTextBased()) {
       return { success: false, message: 'Invalid channel' };
     }
+
+    const crewSummary: string[] = [];
+    const fields: { name: string; value: string }[] = [];
 
     const crews = await this.crewRepo.find({ where: { guild: channel.guildId } });
     const accessibleCrews = crews.filter((crew) => {
@@ -434,41 +480,25 @@ export class CrewService {
       }
     });
 
+    for (const crew of accessibleCrews) {
+      const members = await crew.members;
+      const logs = await crew.logs;
+
+      const description = `${channelMention(crew.channel)} is led by ${userMention((await crew.getCrewOwner()).member)} and has ${members.length} ${members.length > 1 ? 'members' : 'member'}.`;
+
+      if (logs.length) {
+        fields.push({
+          name: `${crew.name}`,
+          value: `${description}\n\n${logs.pop().content}`,
+        });
+      }
+    }
+
     const embed = new EmbedBuilder()
       .setTitle('Crew Status')
       .setColor('DarkGreen')
       .setThumbnail(guild.iconURL())
       .setTimestamp();
-
-    const crewSummary: string[] = [];
-    const fields: { name: string; value: string }[] = [];
-    for (const crew of accessibleCrews) {
-      const members = await crew.members;
-      const tickets = await crew.tickets;
-      const logs = await crew.logs;
-
-      crewSummary.push(
-        `- ${channelMention(crew.channel)} (${members.length} members / ${tickets.length} tickets) led by ${userMention((await crew.getCrewOwner()).member)}`,
-      );
-
-      for (const ticket of tickets) {
-        crewSummary.push(`  - ${channelMention(ticket.thread)}`);
-      }
-
-      if (logs.length) {
-        fields.push({
-          name: `${crew.name}`,
-          value: logs.pop().content,
-        });
-      }
-    }
-
-    const content = crewSummary.join('\n');
-    if (content.length) {
-      embed.setDescription(content);
-    } else {
-      embed.setDescription('None');
-    }
 
     embed.addFields(...fields);
 

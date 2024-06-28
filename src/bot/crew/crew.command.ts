@@ -654,14 +654,24 @@ export class CrewCommand {
     }
   }
 
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
   @Subcommand({
     name: 'status',
     description: 'Display the current crew status',
     dmPermission: false,
   })
-  async onCrewStatusRequest(@Context() [interaction]: SlashCommandContext) {
+  async onCrewStatusRequest(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.crewService.sendStatus(interaction.channel, member);
+    let result;
+    if (data.crew) {
+      const crew = await this.crewRepo.findOne({ where: { channel: data.crew } });
+      result = await this.crewService.sendIndividualStatus(interaction.channel, member, crew);
+    } else {
+      result = await this.crewService.sendAllStatus(interaction.channel, member);
+    }
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 
