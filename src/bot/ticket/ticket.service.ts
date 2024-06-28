@@ -27,6 +27,7 @@ import { TeamService } from 'src/bot/team/team.service';
 import { Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
+import { uniq } from 'lodash';
 
 export const ticketProperties = {
   [TicketTag.ACCEPTED]: {
@@ -634,20 +635,33 @@ export class TicketService {
         break;
     }
 
-    await thread.setAppliedTags([
-      ...thread.appliedTags.filter((tag) => !tagsRemovedSf.includes(tag)),
-      tagAdd,
-    ]);
-
-    const creator = await thread.guild.members.fetch(ticket.createdBy);
-    const dm = await creator.createDM();
+    try {
+      await thread.setAppliedTags(
+        uniq([...thread.appliedTags.filter((tag) => !tagsRemovedSf.includes(tag)), tagAdd]),
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to apply tags to ${ticket.name} in ${guild.name}: ${err.message}`,
+        err.stack,
+      );
+    }
 
     if (
       [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.IN_PROGRESS].includes(tag)
     ) {
-      await dm.send({
-        embeds: [embed],
-      });
+      try {
+        const creator = await thread.guild.members.fetch(ticket.createdBy);
+        const dm = await creator.createDM();
+
+        await dm.send({
+          embeds: [embed],
+        });
+      } catch (err) {
+        this.logger.error(
+          `Failed to DM ticket creator for ${ticket.name} in ${guild.name}: ${err.message}`,
+          err.stack,
+        );
+      }
     }
 
     return OperationStatus.SUCCESS;
