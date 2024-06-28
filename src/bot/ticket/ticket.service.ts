@@ -8,6 +8,8 @@ import {
   Guild,
   GuildManager,
   GuildMember,
+  GuildTextBasedChannel,
+  PermissionsBitField,
   Snowflake,
   StringSelectMenuBuilder,
   ThreadChannel,
@@ -663,6 +665,63 @@ export class TicketService {
         );
       }
     }
+
+    return OperationStatus.SUCCESS;
+  }
+
+  public async sendStatus(
+    channel: GuildTextBasedChannel,
+    member: GuildMember,
+  ): Promise<OperationStatus> {
+    const guild = member.guild;
+
+    if (!channel || !channel.isTextBased()) {
+      return { success: false, message: 'Invalid channel' };
+    }
+
+    const crews = await this.crewRepo.find({ where: { guild: channel.guildId } });
+    const accessibleCrews = crews.filter((crew) => {
+      try {
+        return member.permissionsIn(crew.channel).has(PermissionsBitField.Flags.ViewChannel);
+      } catch (err) {
+        this.logger.warn(
+          `Failed to test channel permissions for crew ${crew.name}: ${err.message}`,
+        );
+        return false;
+      }
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle('Ticket Status')
+      .setColor('DarkGreen')
+      .setThumbnail(guild.iconURL())
+      .setTimestamp();
+
+    const crewSummary: string[] = [];
+    const fields: { name: string; value: string }[] = [];
+    for (const crew of accessibleCrews) {
+      const members = await crew.members;
+      const tickets = await crew.tickets;
+
+      crewSummary.push(
+        `- ${channelMention(crew.channel)} (${members.length} members) led by ${userMention((await crew.getCrewOwner()).member)}`,
+      );
+
+      for (const ticket of tickets) {
+        crewSummary.push(`  - ${channelMention(ticket.thread)}`);
+      }
+    }
+
+    const content = crewSummary.join('\n');
+    if (content.length) {
+      embed.setDescription(content);
+    } else {
+      embed.setDescription('None');
+    }
+
+    embed.addFields(...fields);
+
+    await channel.send({ embeds: [embed] });
 
     return OperationStatus.SUCCESS;
   }

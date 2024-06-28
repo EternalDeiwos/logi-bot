@@ -492,4 +492,15 @@ export class TicketCommand {
   async onTicketDoneCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.DONE);
   }
+
+  @Subcommand({
+    name: 'status',
+    description: 'Display the current ticket status for crews',
+    dmPermission: false,
+  })
+  async onCrewStatusRequest(@Context() [interaction]: SlashCommandContext) {
+    const member = await interaction.guild.members.fetch(interaction.user);
+    const result = await this.ticketService.sendStatus(interaction.channel, member);
+    return interaction.reply({ content: result.message, ephemeral: true });
+  }
 }
