@@ -186,7 +186,7 @@ export class CrewService {
     }
 
     const channel = await guild.channels.create({
-      name: `${prefix}${data.slug}`,
+      name: `${prefix}c-${data.slug}`,
       parent: team.category,
       type: ChannelType.GuildText,
       permissionOverwrites: [
