@@ -450,7 +450,11 @@ export class CrewService {
 
     embed.addFields(...fields);
 
-    await channel.send({ embeds: [embed] });
+    if (channel.id === crew.channel) {
+      await channel.send({ embeds: [embed], components: [this.createCrewActions()] });
+    } else {
+      await channel.send({ embeds: [embed] });
+    }
 
     return OperationStatus.SUCCESS;
   }
@@ -465,7 +469,6 @@ export class CrewService {
       return { success: false, message: 'Invalid channel' };
     }
 
-    const crewSummary: string[] = [];
     const fields: { name: string; value: string }[] = [];
 
     const crews = await this.crewRepo.find({ where: { guild: channel.guildId } });
@@ -527,6 +530,11 @@ export class CrewService {
       .setDescription(newCrewMessage((await crew.getCrewOwner()).member))
       .setColor('DarkGreen');
 
+    const message = await channel.send({ embeds: [embed], components: [this.createCrewActions()] });
+    await message.pin();
+  }
+
+  createCrewActions() {
     const join = new ButtonBuilder()
       .setCustomId('crew/join')
       .setLabel('Join Crew')
@@ -537,9 +545,6 @@ export class CrewService {
       .setLabel('Log')
       .setStyle(ButtonStyle.Secondary);
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(join, log);
-
-    const message = await channel.send({ embeds: [embed], components: [row] });
-    await message.pin();
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(join, log);
   }
 }
