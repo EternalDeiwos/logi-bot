@@ -650,7 +650,10 @@ export class TicketService {
     }
 
     if (
-      [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.IN_PROGRESS].includes(tag)
+      [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.IN_PROGRESS].includes(
+        tag,
+      ) &&
+      member.id !== ticket.createdBy
     ) {
       try {
         const creator = await thread.guild.members.fetch(ticket.createdBy);
