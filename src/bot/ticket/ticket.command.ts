@@ -162,14 +162,19 @@ export class TicketCommand {
     return interaction.reply({ content: 'Done', ephemeral: true });
   }
 
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
   @Subcommand({
     name: 'new',
     description: 'Create a new ticket',
     dmPermission: false,
   })
-  async onNewTicketCommand(@Context() [interaction]: SlashCommandContext) {
-    const modal = this.buildTicketModal(interaction.channelId);
-    return interaction.showModal(modal);
+  async onNewTicketCommand(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    return interaction.showModal(
+      this.buildTicketModal(data.crew ? data.crew : interaction.channelId),
+    );
   }
 
   @Button('ticket/start/:crew')
