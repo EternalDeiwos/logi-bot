@@ -162,6 +162,16 @@ export class TicketCommand {
     return interaction.reply({ content: 'Done', ephemeral: true });
   }
 
+  @Subcommand({
+    name: 'new',
+    description: 'Create a new ticket',
+    dmPermission: false,
+  })
+  async onNewTicketCommand(@Context() [interaction]: SlashCommandContext) {
+    const modal = this.buildTicketModal(interaction.channelId);
+    return interaction.showModal(modal);
+  }
+
   @Button('ticket/start/:crew')
   async onCrewTicketStart(
     @Context() [interaction]: ButtonContext,
