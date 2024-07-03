@@ -666,11 +666,26 @@ export class CrewCommand {
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
     let result;
+
+    // Use specified crew
     if (data.crew) {
       const crew = await this.crewRepo.findOne({ where: { channel: data.crew } });
       result = await this.crewService.sendIndividualStatus(interaction.channel, member, crew);
+
+      // Try infer crew from current channel
     } else {
-      result = await this.crewService.sendAllStatus(interaction.channel, member);
+      const maybeCrew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
+      if (maybeCrew) {
+        result = await this.crewService.sendIndividualStatus(
+          interaction.channel,
+          member,
+          maybeCrew,
+        );
+
+        // Send status for all crews
+      } else {
+        result = await this.crewService.sendAllStatus(interaction.channel, member);
+      }
     }
     return interaction.reply({ content: result.message, ephemeral: true });
   }
