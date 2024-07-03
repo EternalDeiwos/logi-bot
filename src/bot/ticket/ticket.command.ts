@@ -96,7 +96,7 @@ export class TicketCommand {
     const prompt = new EmbedBuilder()
       .setColor('DarkGold')
       .setTitle('Create a Ticket')
-      .setDescription(ticketPromptDescription(true))
+      .setDescription(ticketPromptDescription())
       .addFields(
         {
           name: 'Triage Process',
@@ -120,9 +120,10 @@ export class TicketCommand {
         },
       );
 
-    if (data.crew) {
-      prompt.setDescription(ticketPromptDescription());
+    const maybeCrew = await this.crewRepo.findOne({ where: { channel: data.crew } });
 
+    // Use selected crew
+    if (data.crew) {
       const crew = await this.crewRepo.findOne({ where: { channel: data.crew } });
 
       if (!crew) {
@@ -137,23 +138,23 @@ export class TicketCommand {
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(create);
 
       await interaction.channel.send({
-        components: [row],
+        components: [this.ticketService.createTicketButton(data.crew)],
         embeds: [prompt],
       });
+      // Try infer crew from interaction channel
+    } else if (maybeCrew) {
+      await interaction.channel.send({
+        components: [this.ticketService.createTicketButton(maybeCrew.channel)],
+        embeds: [prompt],
+      });
+
+      // Show global ticket status
     } else {
+      prompt.setDescription(ticketPromptDescription(true));
       const crews = await this.crewRepo.find({ where: { guild: interaction.guildId } });
 
-      const select = new StringSelectMenuBuilder()
-        .setCustomId('ticket/start')
-        .setPlaceholder('Select a crew')
-        .setOptions(
-          crews.map((crew) => ({ label: `${crew.team.name}: ${crew.name}`, value: crew.channel })),
-        );
-
-      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
-
       await interaction.channel.send({
-        components: [row],
+        components: [this.ticketService.createCrewMenu(crews)],
         embeds: [prompt],
       });
     }

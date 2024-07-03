@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { uniq } from 'lodash';
 import { DeepPartial } from 'typeorm';
 import {
   ActionRowBuilder,
@@ -25,11 +26,11 @@ import { CrewRepository } from 'src/bot/crew/crew.repository';
 import { CrewMemberAccess } from 'src/bot/crew/member/crew-member.entity';
 import { CrewMemberService } from 'src/bot/crew/member/crew-member.service';
 import { CrewMemberRepository } from 'src/bot/crew/member/crew-member.repository';
+import { Crew } from 'src/bot/crew/crew.entity';
 import { TeamService } from 'src/bot/team/team.service';
 import { Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
-import { uniq } from 'lodash';
 
 export const ticketProperties = {
   [TicketTag.ACCEPTED]: {
@@ -724,5 +725,25 @@ export class TicketService {
     await channel.send({ embeds: [embed] });
 
     return OperationStatus.SUCCESS;
+  }
+
+  createTicketButton(crewRef: Snowflake) {
+    const create = new ButtonBuilder()
+      .setCustomId(`ticket/start/${crewRef}`)
+      .setLabel('Create Ticket')
+      .setStyle(ButtonStyle.Primary);
+
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(create);
+  }
+
+  createCrewMenu(crews: Crew[]) {
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('ticket/start')
+      .setPlaceholder('Select a crew')
+      .setOptions(
+        crews.map((crew) => ({ label: `${crew.team.name}: ${crew.name}`, value: crew.channel })),
+      );
+
+    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
   }
 }
