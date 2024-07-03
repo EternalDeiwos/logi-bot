@@ -494,14 +494,39 @@ export class TicketCommand {
     return this.lifecycleCommand(context, TicketTag.DONE);
   }
 
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
   @Subcommand({
     name: 'status',
     description: 'Display the current ticket status for crews',
     dmPermission: false,
   })
-  async onCrewStatusRequest(@Context() [interaction]: SlashCommandContext) {
+  async onCrewStatusRequest(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.ticketService.sendStatus(interaction.channel, member);
+    let result;
+
+    // Use specified crew
+    if (data.crew) {
+      const crew = await this.crewRepo.findOne({ where: { channel: data.crew } });
+      result = await this.ticketService.sendIndividualStatus(interaction.channel, member, crew);
+
+      // Try infer crew from current channel
+    } else {
+      const maybeCrew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
+      if (maybeCrew) {
+        result = await this.ticketService.sendIndividualStatus(
+          interaction.channel,
+          member,
+          maybeCrew,
+        );
+
+        // Send status for all crews
+      } else {
+        result = await this.ticketService.sendAllStatus(interaction.channel, member);
+      }
+    }
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 }

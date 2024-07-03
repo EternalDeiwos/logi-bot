@@ -670,7 +670,48 @@ export class TicketService {
     return OperationStatus.SUCCESS;
   }
 
-  public async sendStatus(
+  public async sendIndividualStatus(
+    channel: GuildTextBasedChannel,
+    member: GuildMember,
+    crew: Crew,
+  ): Promise<OperationStatus> {
+    const guild = member.guild;
+
+    if (!channel || !channel.isTextBased()) {
+      return { success: false, message: 'Invalid channel' };
+    }
+
+    const tickets = await crew.tickets;
+    const embed = new EmbedBuilder()
+      .setTitle(`Tickets: ${crew.name}`)
+      .setColor('DarkGreen')
+      .setThumbnail(guild.iconURL())
+      .setTimestamp()
+      .setDescription(
+        `${channelMention(crew.channel)} is led by ${userMention((await crew.getCrewOwner()).member)}.`,
+      )
+      .setFields([
+        {
+          name: 'Active Tickets',
+          value: tickets
+            .map(
+              (ticket) =>
+                `- ${channelMention(ticket.thread)} from ${userMention(ticket.createdBy)}`,
+            )
+            .join('\n'),
+        },
+      ]);
+
+    if (channel.id === crew.channel) {
+      await channel.send({ embeds: [embed], components: [this.crewService.createCrewActions()] });
+    } else {
+      await channel.send({ embeds: [embed] });
+    }
+
+    return OperationStatus.SUCCESS;
+  }
+
+  public async sendAllStatus(
     channel: GuildTextBasedChannel,
     member: GuildMember,
   ): Promise<OperationStatus> {
