@@ -12,14 +12,6 @@ services:
       POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:?required}'
       POSTGRES_DB: '${POSTGRES_DB:?required}'
       POSTGRES_SCHEMA: '${POSTGRES_SCHEMA:?required}'
-    deploy:
-      resources:
-        limits:
-          cpus: '4000m'
-          memory: 500M
-        reservations:
-          cpus: '1000m'
-          memory: 200M
   redis:
     image: redis:7
     restart: unless-stopped
