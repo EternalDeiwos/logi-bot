@@ -210,6 +210,7 @@ export class CrewService {
     );
 
     await this.crewRepo.insert(crew);
+    crew.team = team;
 
     const tagResult = await this.tagService.createTagForCrew(crew);
 
@@ -235,7 +236,7 @@ export class CrewService {
     // Create audit prompt
     if (team.audit) {
       try {
-        const audit = await guild.channels.fetch(crew.team.audit);
+        const audit = await guild.channels.fetch(team.audit);
 
         if (audit.isTextBased()) {
           const embed = new EmbedBuilder()
