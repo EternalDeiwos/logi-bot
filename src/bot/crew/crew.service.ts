@@ -150,7 +150,7 @@ export class CrewService {
     }
 
     const usedRoles = await guild.roles.fetch();
-    if (usedRoles.find((role) => role.name.toLowerCase() === data.name)) {
+    if (usedRoles.find((role) => role.name.toLowerCase() === data.name.toLowerCase())) {
       return {
         success: false,
         message: `A role with the name _${data.name}_ already exists. Please choose something else`,
