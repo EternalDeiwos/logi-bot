@@ -538,6 +538,8 @@ export class CrewService {
 
     const message = await channel.send({ embeds: [embed], components: [this.createCrewActions()] });
     await message.pin();
+
+    return OperationStatus.SUCCESS;
   }
 
   createCrewActions() {
