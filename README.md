@@ -3,6 +3,8 @@
 > TODO Banner
 
 [![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
+[![docker-unstable](https://github.com/EternalDeiwos/logi-bot/actions/workflows/unstable.yaml/badge.svg)](https://github.com/EternalDeiwos/logi-bot/actions/workflows/unstable.yaml)
+[![docker-release](https://github.com/EternalDeiwos/logi-bot/actions/workflows/release.yaml/badge.svg)](https://github.com/EternalDeiwos/logi-bot/actions/workflows/release.yaml)
 
 > A Foxhole logistics assistant for Discord
 
