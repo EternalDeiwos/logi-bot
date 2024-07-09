@@ -46,7 +46,7 @@ export class CrewMember {
   @RelationId((member: CrewMember) => member.crew)
   channel: Snowflake;
 
-  @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'crew_channel_sf',
     referencedColumnName: 'channel',
