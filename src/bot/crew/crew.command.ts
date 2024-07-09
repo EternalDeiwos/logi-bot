@@ -358,6 +358,7 @@ export class CrewCommand {
   ) {
     const crewMember = await this.memberRepo.findOne({
       where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+      relations: { crew: true },
     });
     const { message: content } = await this.memberService.removeCrewMember(crewMember);
 
