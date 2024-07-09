@@ -149,6 +149,14 @@ export class CrewService {
       };
     }
 
+    const usedRoles = await guild.roles.fetch();
+    if (usedRoles.find((role) => role.name.toLowerCase() === data.name)) {
+      return {
+        success: false,
+        message: `A role with the name _${data.name}_ already exists. Please choose something else`,
+      };
+    }
+
     const knownTags = Object.values(TicketTag).map((t) => t.toLowerCase());
     if (knownTags.includes(data.shortName.toLowerCase())) {
       return {
