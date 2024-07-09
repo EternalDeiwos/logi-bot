@@ -32,7 +32,6 @@ import {
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/bot/echo.command-group';
-import { CrewService } from 'src/bot/crew/crew.service';
 import { CrewRepository } from 'src/bot/crew/crew.repository';
 import { TicketTag } from 'src/bot/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/bot/crew/crew.command';
@@ -76,7 +75,6 @@ export class TicketCommand {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,
@@ -92,6 +90,12 @@ export class TicketCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
+    try {
+      BigInt(data.crew);
+    } catch {
+      return interaction.reply({ ephemeral: true, content: 'Invalid crew selected' });
+    }
+
     const prompt = new EmbedBuilder()
       .setColor('DarkGold')
       .setTitle('Create a Ticket')
