@@ -150,10 +150,7 @@ export class CrewService {
     }
 
     const knownTags = Object.values(TicketTag).map((t) => t.toLowerCase());
-    if (
-      knownTags.includes(data.name.toLowerCase()) ||
-      knownTags.includes(data.shortName.toLowerCase())
-    ) {
+    if (knownTags.includes(data.shortName.toLowerCase())) {
       return {
         success: false,
         message: `${data.shortName} is a reserved name. Please choose something else`,
