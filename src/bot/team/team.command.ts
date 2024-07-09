@@ -92,7 +92,7 @@ export class TeamCommand {
     @Options() data: CreateTeamCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.teamService.registerTeam(data.forum, data.role, member);
+    const result = await this.teamService.registerTeam(data.forum, data.role, member, data.audit);
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 

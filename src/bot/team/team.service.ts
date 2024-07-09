@@ -112,6 +112,7 @@ export class TeamService {
     forum: GuildChannel,
     role: GuildMember | Role | User,
     member: GuildMember,
+    audit?: GuildChannel,
   ): Promise<OperationStatus<string>> {
     if (!member.permissions.has('Administrator')) {
       return { success: false, message: 'Only guild administrators can perform this action' };
@@ -139,6 +140,7 @@ export class TeamService {
       guild: category.guildId,
       forum: forum.id,
       role: role.id,
+      audit: audit?.id,
     });
 
     return new OperationStatus({ success: true, message: 'Done', data: teamId });
