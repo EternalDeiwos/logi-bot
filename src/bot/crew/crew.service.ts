@@ -195,7 +195,7 @@ export class CrewService {
       parent: team.category,
       type: ChannelType.GuildText,
       permissionOverwrites: [
-        { id: guild.roles.everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
+        { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
         { id: team.role, allow: [PermissionsBitField.Flags.ViewChannel] },
       ],
     });
