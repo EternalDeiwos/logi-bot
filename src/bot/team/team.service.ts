@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   CategoryChannel,
+  channelMention,
   Guild,
   GuildChannel,
   GuildChannelResolvable,
@@ -126,7 +127,16 @@ export class TeamService {
       return { success: false, message: `${role} is not a valid role` };
     }
 
-    const category = await forum.parent.fetch();
+    let category;
+    try {
+      category = await forum.parent.fetch();
+    } catch (e) {
+      this.logger.error(`Cannot interact with forum ${forum.parentId}: ${e.message}`, e.stack);
+      return new OperationStatus({
+        success: false,
+        message: `Cannot interact with ${channelMention(forum.parentId)}`,
+      });
+    }
 
     if (await this.teamRepo.exists({ where: { category: category.id } })) {
       return { success: false, message: `${category.name} is already a registered team` };
