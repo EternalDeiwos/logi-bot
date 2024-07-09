@@ -393,7 +393,7 @@ export class CrewCommand {
     let result;
     if (!currentMember) {
       result = { success: false, message: 'You are not a member of this team' };
-    } else if ((currentMember.requireAccess(CrewMemberAccess.OWNER), { isAdmin })) {
+    } else if (!(currentMember.requireAccess(CrewMemberAccess.OWNER), { isAdmin })) {
       result = { success: false, message: 'Only the team owner can perform this action' };
     } else if (!targetMember) {
       result = { success: false, message: `${data.member} is not a member of this team` };
@@ -438,7 +438,7 @@ export class CrewCommand {
     let result;
     if (!crewMember) {
       result = { success: false, message: 'You are not a member of this team' };
-    } else if (crewMember.requireAccess(CrewMemberAccess.ADMIN, { isAdmin })) {
+    } else if (!crewMember.requireAccess(CrewMemberAccess.ADMIN, { isAdmin })) {
       result = { success: false, message: 'Only an administrator can perform this action' };
     } else {
       result = await this.memberService.updateCrewMember(crewMember, {
