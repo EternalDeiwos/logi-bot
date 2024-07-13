@@ -52,14 +52,18 @@ export class CrewMemberService {
     try {
       const guildMember = await guild.members.fetch(memberRef);
 
-      if (guildMember) {
-        return new OperationStatus({ success: true, message: 'Done', data: guildMember });
+      if (!guildMember || !(guildMember instanceof GuildMember)) {
+        this.logger.error(
+          `Unexpected type ${(guildMember as Object)?.constructor?.name}, was expecting GuildMember: ${JSON.stringify(guildMember)}`,
+          new Error().stack,
+        );
+        return new OperationStatus({
+          success: false,
+          message: `Failed to resolve member ${userMention(memberRef)}`,
+        });
       }
 
-      return new OperationStatus({
-        success: false,
-        message: `Failed to resolve member ${userMention(memberRef)}`,
-      });
+      return new OperationStatus({ success: true, message: 'Done', data: guildMember });
     } catch (err) {
       this.logger.error(`Failed to resolve member ${memberRef} in ${guild.name}`, err.stack);
       return new OperationStatus({
