@@ -34,6 +34,10 @@ export class CrewMemberService {
       memberRef = memberRef.member;
     }
 
+    if (!memberRef) {
+      return new OperationStatus({ success: false, message: 'Invalid member reference' });
+    }
+
     const crew = await this.crewRepo.findOne({
       where: { channel: channelRef },
       withDeleted: true,

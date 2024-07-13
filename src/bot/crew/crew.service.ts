@@ -316,22 +316,33 @@ export class CrewService {
       where: { channel: channelRef, member: memberRef },
     });
 
-    if (
-      !options.isAdmin &&
-      !options.skipAccessControl &&
-      (!crewMember || !crewMember.requireAccess(CrewMemberAccess.ADMIN, options))
-    ) {
-      return new OperationStatus({
-        success: false,
-        message: 'Only crew members can perform this action',
-      });
-    }
+    let member;
 
-    const { data: member, ...memberResult } =
-      await this.memberService.resolveGuildMember(crewMember);
+    if (crewMember) {
+      if (!crewMember.requireAccess(CrewMemberAccess.ADMIN, options)) {
+        return new OperationStatus({
+          success: false,
+          message: 'Only crew members can perform this action',
+        });
+      } else if (options.isAdmin || options.skipAccessControl) {
+        try {
+          member = await guild.members.fetch(memberRef);
+        } catch (e) {
+          this.logger.error(`Failed to retrieve member for bot: ${e.message}`, e.stack);
+          return new OperationStatus({
+            success: false,
+            message: 'Failed to deregister crew. Please report this issue',
+          });
+        }
+      } else {
+        const { data, ...memberResult } = await this.memberService.resolveGuildMember(crewMember);
 
-    if (!memberResult.success) {
-      return memberResult;
+        if (!memberResult.success) {
+          return memberResult;
+        }
+
+        member = data;
+      }
     }
 
     // Close all currently open tickets
