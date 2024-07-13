@@ -19,7 +19,12 @@ import {
   userMention,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
-import { ArchiveOptions, DeleteOptions } from 'src/types';
+import {
+  AdminOverrideOptions,
+  ArchiveOptions,
+  DeleteOptions,
+  SkipAccessControlOptions,
+} from 'src/types';
 import { OperationStatus, toSlug } from 'src/util';
 import { TeamService } from 'src/bot/team/team.service';
 import { TeamRepository } from 'src/bot/team/team.repository';
@@ -392,7 +397,7 @@ export class CrewService {
   public async updateCrew(
     crew: Crew,
     crewMember: CrewMember,
-    options: DeepPartial<Pick<Crew, 'movePrompt' | 'permanent'>>,
+    update: DeepPartial<Pick<Crew, 'movePrompt' | 'permanent'>>,
   ) {
     if (!crew || !(crew instanceof Crew)) {
       return { success: false, message: 'Invalid crew' };
@@ -409,11 +414,24 @@ export class CrewService {
       return { success: false, message: 'You are not a member of this crew' };
     }
 
-    if (!crewMember.requireAccess(CrewMemberAccess.ADMIN)) {
+    const { data: member, ...memberResult } =
+      await this.memberService.resolveGuildMember(crewMember);
+
+    if (!memberResult.success) {
+      return memberResult;
+    }
+
+    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
+
+    if (!adminResult.success) {
+      return adminResult;
+    }
+
+    if (!isAdmin && !crewMember.requireAccess(CrewMemberAccess.ADMIN)) {
       return { success: false, message: 'Only an administrator can perform this action' };
     }
 
-    await this.crewRepo.update({ channel: crew.channel }, options);
+    await this.crewRepo.update({ channel: crew.channel }, update);
 
     return OperationStatus.SUCCESS;
   }
