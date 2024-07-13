@@ -83,7 +83,9 @@ export class CrewMemberService {
     }
 
     if (!(member instanceof GuildMember)) {
-      this.logger.error(`Member object is not a member: ${JSON.stringify(member)}`);
+      this.logger.error(
+        `Unexpected type ${(member as Object)?.constructor?.name}, was expecting GuildMember: ${JSON.stringify(member)}`,
+      );
       return new OperationStatus({ success: false, message: 'Failed to resolve guild member' });
     }
 
