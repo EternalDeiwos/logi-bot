@@ -564,7 +564,11 @@ export class CrewService {
       .setThumbnail(guild.iconURL())
       .setTimestamp();
 
-    embed.addFields(...fields);
+    if (fields.length) {
+      embed.addFields(...fields);
+    } else {
+      embed.setDescription('No data');
+    }
 
     await channel.send({ embeds: [embed] });
 
