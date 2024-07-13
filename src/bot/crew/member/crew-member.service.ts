@@ -45,7 +45,7 @@ export class CrewMemberService {
 
     const { data: guild, ...guildResult } = await this.crewService.resolveCrewGuild(crew);
 
-    if (!guildResult) {
+    if (!guildResult.success) {
       return guildResult;
     }
 
@@ -112,7 +112,7 @@ export class CrewMemberService {
       crew.channel,
     );
 
-    if (!memberResult) {
+    if (!memberResult.success) {
       return {
         success: false,
         message: `User ${userMention(memberRef)} is not a part of the guild`,
@@ -164,7 +164,7 @@ export class CrewMemberService {
       crewMember.channel,
     );
 
-    if (!memberResult) {
+    if (!memberResult.success) {
       return {
         success: false,
         message: `User ${userMention(crewMember.member)} is not a part of the guild`,
