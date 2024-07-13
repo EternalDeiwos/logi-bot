@@ -67,10 +67,10 @@ export class CrewService {
       });
     } catch (err) {
       this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
-      return {
+      return new OperationStatus({
         success: false,
         message: 'Guild is improperly registered. Please report this incident.',
-      };
+      });
     }
   }
 
@@ -126,10 +126,10 @@ export class CrewService {
       });
     } catch (err) {
       this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
-      return {
+      return new OperationStatus({
         success: false,
         message: 'Guild is improperly registered. Please report this incident.',
-      };
+      });
     }
   }
 
@@ -141,10 +141,10 @@ export class CrewService {
     const team = await this.teamRepo.findOne({ where: { category: categoryRef } });
 
     if (!team) {
-      return {
+      return new OperationStatus({
         success: false,
         message: `${channelMention(categoryRef)} does not belong to a registered team`,
-      };
+      });
     }
 
     const { data: guild, ...guildResult } = await this.teamService.resolveTeamGuild(team);
@@ -164,34 +164,34 @@ export class CrewService {
     data.slug = data.slug || toSlug(data.name);
 
     if (data.shortName.length > 20) {
-      return {
+      return new OperationStatus({
         success: false,
         message:
           'Your name is too long to create a tag. Please try again with a `short_name` in your command that is under 20 characters.',
-      };
+      });
     }
 
     const usedRoles = await guild.roles.fetch();
     if (usedRoles.find((role) => role.name.toLowerCase() === data.name.toLowerCase())) {
-      return {
+      return new OperationStatus({
         success: false,
         message: `A role with the name _${data.name}_ already exists. Please choose something else`,
-      };
+      });
     }
 
     const knownTags = Object.values(TicketTag).map((t) => t.toLowerCase());
     if (knownTags.includes(data.shortName.toLowerCase())) {
-      return {
+      return new OperationStatus({
         success: false,
         message: `${data.shortName} is a reserved name. Please choose something else`,
-      };
+      });
     }
 
     if (await this.templateRepo.exists({ where: { guild: guild.id, name: data.shortName } })) {
-      return {
+      return new OperationStatus({
         success: false,
         message: `Tag named ${data.shortName} already exists for this guild. Please choose a different ${inlineCode('name')} or a unique ${inlineCode('short_name')}.`,
-      };
+      });
     }
 
     const role = await guild.roles.create({
@@ -252,10 +252,10 @@ export class CrewService {
     );
 
     if (!registerResult.success) {
-      return {
+      return new OperationStatus({
         success: false,
         message: `Crew was created successfully but failed to register crew member: ${registerResult.message}`,
-      };
+      });
     }
 
     await this.crewJoinPrompt(crew, channel);
@@ -303,7 +303,7 @@ export class CrewService {
     const crew = await this.crewRepo.findOne({ where: { channel: channelRef } });
 
     if (!crew) {
-      return { success: false, message: 'Invalid channel' };
+      return new OperationStatus({ success: false, message: 'Invalid channel' });
     }
 
     const { data: guild, ...guildResult } = await this.resolveCrewGuild(crew);
@@ -321,7 +321,10 @@ export class CrewService {
       !options.skipAccessControl &&
       (!crewMember || !crewMember.requireAccess(CrewMemberAccess.ADMIN, options))
     ) {
-      return { success: false, message: 'Only crew members can perform this action' };
+      return new OperationStatus({
+        success: false,
+        message: 'Only crew members can perform this action',
+      });
     }
 
     const { data: member, ...memberResult } =
@@ -396,7 +399,10 @@ export class CrewService {
           role.delete(reason),
         ]);
       } else {
-        return { success: false, message: 'Failed to archive channel. Please report this issue.' };
+        return new OperationStatus({
+          success: false,
+          message: 'Failed to archive channel. Please report this issue.',
+        });
       }
     } else {
       await Promise.all([discussion.delete(reason), role.delete(reason)]);
@@ -417,7 +423,7 @@ export class CrewService {
     update: DeepPartial<Pick<Crew, 'movePrompt' | 'permanent'>>,
   ) {
     if (!crew || !(crew instanceof Crew)) {
-      return { success: false, message: 'Invalid crew' };
+      return new OperationStatus({ success: false, message: 'Invalid crew' });
     }
 
     crewMember =
@@ -428,7 +434,7 @@ export class CrewService {
         : crewMember;
 
     if (!crewMember || !(crewMember instanceof CrewMember)) {
-      return { success: false, message: 'You are not a member of this crew' };
+      return new OperationStatus({ success: false, message: 'You are not a member of this crew' });
     }
 
     const { data: member, ...memberResult } =
@@ -445,7 +451,10 @@ export class CrewService {
     }
 
     if (!isAdmin && !crewMember.requireAccess(CrewMemberAccess.ADMIN)) {
-      return { success: false, message: 'Only an administrator can perform this action' };
+      return new OperationStatus({
+        success: false,
+        message: 'Only an administrator can perform this action',
+      });
     }
 
     await this.crewRepo.update({ channel: crew.channel }, update);
@@ -461,7 +470,7 @@ export class CrewService {
     const guild = member.guild;
 
     if (!channel || !channel.isTextBased()) {
-      return { success: false, message: 'Invalid channel' };
+      return new OperationStatus({ success: false, message: 'Invalid channel' });
     }
 
     const fields: { name: string; value: string }[] = [];
@@ -507,7 +516,7 @@ export class CrewService {
     const guild = member.guild;
 
     if (!channel || !channel.isTextBased()) {
-      return { success: false, message: 'Invalid channel' };
+      return new OperationStatus({ success: false, message: 'Invalid channel' });
     }
 
     const fields: { name: string; value: string }[] = [];
@@ -553,7 +562,7 @@ export class CrewService {
 
   async crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel): Promise<OperationStatus> {
     if (!crew) {
-      return { success: false, message: 'Invalid channel' };
+      return new OperationStatus({ success: false, message: 'Invalid channel' });
     }
 
     if (!channel) {
