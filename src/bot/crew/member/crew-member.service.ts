@@ -51,7 +51,15 @@ export class CrewMemberService {
 
     try {
       const guildMember = await guild.members.fetch(memberRef);
-      return new OperationStatus({ success: true, message: 'Done', data: guildMember });
+
+      if (guildMember) {
+        return new OperationStatus({ success: true, message: 'Done', data: guildMember });
+      }
+
+      return new OperationStatus({
+        success: false,
+        message: `Failed to resolve member ${userMention(memberRef)}`,
+      });
     } catch (err) {
       this.logger.error(`Failed to resolve member ${memberRef} in ${guild.name}`, err.stack);
       return new OperationStatus({

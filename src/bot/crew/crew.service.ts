@@ -16,15 +16,11 @@ import {
   Snowflake,
   channelMention,
   inlineCode,
+  roleMention,
   userMention,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
-import {
-  AdminOverrideOptions,
-  ArchiveOptions,
-  DeleteOptions,
-  SkipAccessControlOptions,
-} from 'src/types';
+import { ArchiveOptions, DeleteOptions } from 'src/types';
 import { OperationStatus, toSlug } from 'src/util';
 import { TeamService } from 'src/bot/team/team.service';
 import { TeamRepository } from 'src/bot/team/team.repository';
@@ -60,7 +56,15 @@ export class CrewService {
   async resolveCrewGuild(crew: Crew): Promise<OperationStatus<Guild>> {
     try {
       const guild = await this.guildManager.fetch(crew.parent.guild);
-      return new OperationStatus({ success: true, message: 'Done', data: guild });
+
+      if (guild) {
+        return new OperationStatus({ success: true, message: 'Done', data: guild });
+      }
+
+      return new OperationStatus({
+        success: false,
+        message: `Failed to resolve guild ${guild.name}`,
+      });
     } catch (err) {
       this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
       return {
@@ -80,20 +84,27 @@ export class CrewService {
     try {
       const channel = await guild.channels.fetch(crew.channel);
 
+      if (!channel) {
+        return new OperationStatus({
+          success: false,
+          message: `Failed to resolve channel ${channelMention(crew.channel)}`,
+        });
+      }
+
       if (!channel.isTextBased()) {
-        return {
+        return new OperationStatus({
           success: false,
           message: `${channelMention(crew.channel)} is not a text channel`,
-        };
+        });
       }
 
       return new OperationStatus({ success: true, message: 'Done', data: channel });
     } catch (err) {
       this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
-      return {
+      return new OperationStatus({
         success: false,
         message: 'Guild is improperly registered. Please report this incident.',
-      };
+      });
     }
   }
 
@@ -106,7 +117,13 @@ export class CrewService {
 
     try {
       const role = await guild.roles.fetch(crew.role);
-      return new OperationStatus({ success: true, message: 'Done', data: role });
+      if (role) {
+        return new OperationStatus({ success: true, message: 'Done', data: role });
+      }
+      return new OperationStatus({
+        success: false,
+        message: `Failed to resolve role ${roleMention(crew.role)}`,
+      });
     } catch (err) {
       this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
       return {
