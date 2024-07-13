@@ -54,10 +54,10 @@ export class CrewMemberService {
       return new OperationStatus({ success: true, message: 'Done', data: guildMember });
     } catch (err) {
       this.logger.error(`Failed to resolve member ${memberRef} in ${guild.name}`, err.stack);
-      return {
+      return new OperationStatus({
         success: false,
         message: `Member ${memberRef} is not a member of ${guild.name}`,
-      };
+      });
     }
   }
 
@@ -74,11 +74,16 @@ export class CrewMemberService {
       member = guildMember;
     }
 
-    return {
+    if (!(member instanceof GuildMember)) {
+      this.logger.error(`Member object is not a member: ${JSON.stringify(member)}`);
+      return new OperationStatus({ success: false, message: 'Failed to resolve guild member' });
+    }
+
+    return new OperationStatus({
       success: true,
       message: 'Done',
       data: member.permissions.has(PermissionsBitField.Flags.Administrator),
-    };
+    });
   }
 
   async registerCrewMember(
@@ -87,7 +92,7 @@ export class CrewMemberService {
     access: CrewMemberAccess = CrewMemberAccess.MEMBER,
   ): Promise<OperationStatus> {
     if (!crew) {
-      return { success: false, message: 'Invalid crew' };
+      return new OperationStatus({ success: false, message: 'Invalid crew' });
     }
 
     const crewMember = await this.memberRepo.findOne({
@@ -101,10 +106,10 @@ export class CrewMemberService {
       }
 
       // Otherwise prevent an accidental loss of privilege
-      return {
+      return new OperationStatus({
         success: false,
         message: `You are already a ${crewMember.access > CrewMemberAccess.MEMBER ? 'subscriber' : 'member'} of ${roleMention(crew.role)}`,
-      };
+      });
     }
 
     const { data: member, ...memberResult } = await this.resolveGuildMember(
@@ -113,10 +118,10 @@ export class CrewMemberService {
     );
 
     if (!memberResult.success) {
-      return {
+      return new OperationStatus({
         success: false,
         message: `User ${userMention(memberRef)} is not a part of the guild`,
-      };
+      });
     }
 
     await this.memberRepo.insert({
@@ -148,15 +153,15 @@ export class CrewMemberService {
       return OperationStatus.SUCCESS;
     }
 
-    return {
+    return new OperationStatus({
       success: false,
       message: `Failed to update crew member record for ${crewMember.name}`,
-    };
+    });
   }
 
   async removeCrewMember(crewMember: CrewMember): Promise<OperationStatus> {
     if (!crewMember || !(crewMember instanceof CrewMember)) {
-      return { success: false, message: 'Invalid crew member' };
+      return new OperationStatus({ success: false, message: 'Invalid crew member' });
     }
 
     const { data: member, ...memberResult } = await this.resolveGuildMember(
@@ -165,10 +170,10 @@ export class CrewMemberService {
     );
 
     if (!memberResult.success) {
-      return {
+      return new OperationStatus({
         success: false,
         message: `User ${userMention(crewMember.member)} is not a part of the guild`,
-      };
+      });
     }
 
     try {
@@ -179,7 +184,7 @@ export class CrewMemberService {
           `Failed to remove crew role for ${crewMember.crew.name} from ${crewMember.name}: ${err.message}`,
           err.stack,
         );
-        return { success: false, message: 'Failed to remove member role' };
+        return new OperationStatus({ success: false, message: 'Failed to remove member role' });
       }
     }
 
