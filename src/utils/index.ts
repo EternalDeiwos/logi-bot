@@ -1,2 +1,2 @@
-export * from './slug'
-export * from './error-base'
+export * from './slug';
+export * from './error-base';
