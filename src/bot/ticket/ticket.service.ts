@@ -685,13 +685,14 @@ export class TicketService {
     }
 
     const tickets = await crew.tickets;
+    const owner = await crew.getCrewOwner();
     const embed = new EmbedBuilder()
       .setTitle(`Tickets: ${crew.name}`)
       .setColor('DarkGreen')
       .setThumbnail(guild.iconURL())
       .setTimestamp()
       .setDescription(
-        `${channelMention(crew.channel)} is led by ${userMention((await crew.getCrewOwner()).member)}.`,
+        `${channelMention(crew.channel)} is led by ${owner ? userMention(owner.member) : 'nobody'}.`,
       )
       .setFields([
         {
@@ -747,9 +748,10 @@ export class TicketService {
     for (const crew of accessibleCrews) {
       const members = await crew.members;
       const tickets = await crew.tickets;
+      const owner = await crew.getCrewOwner();
 
       crewSummary.push(
-        `- ${channelMention(crew.channel)} (${members.length} members) led by ${userMention((await crew.getCrewOwner()).member)}`,
+        `- ${channelMention(crew.channel)} (${members.length} members) led by ${owner ? userMention(owner.member) : 'nobody'}`,
       );
 
       for (const ticket of tickets) {

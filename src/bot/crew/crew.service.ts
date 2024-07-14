@@ -488,13 +488,14 @@ export class CrewService {
     const members = await crew.members;
     const logs = await crew.logs;
 
+    const owner = await crew.getCrewOwner();
     const embed = new EmbedBuilder()
       .setTitle(`Crew: ${crew.name}`)
       .setColor('DarkGreen')
       .setThumbnail(guild.iconURL())
       .setTimestamp()
       .setDescription(
-        `${channelMention(crew.channel)} is led by ${userMention((await crew.getCrewOwner()).member)}.`,
+        `${channelMention(crew.channel)} is led by ${owner ? userMention(owner.member) : 'nobody'}.`,
       );
 
     fields.push({
@@ -548,7 +549,8 @@ export class CrewService {
       const members = await crew.members;
       const logs = await crew.logs;
 
-      const description = `${channelMention(crew.channel)} is led by ${userMention((await crew.getCrewOwner()).member)} and has ${members.length} ${members.length > 1 ? 'members' : 'member'}.`;
+      const owner = await crew.getCrewOwner();
+      const description = `${channelMention(crew.channel)} is led by ${owner ? userMention(owner.member) : 'nobody'} and has ${members.length} ${members.length > 1 ? 'members' : 'member'}.`;
 
       if (logs.length) {
         fields.push({
@@ -589,10 +591,11 @@ export class CrewService {
       }
     }
 
+    const owner = await crew.getCrewOwner();
     const embed = new EmbedBuilder()
       .setTitle(`Join ${crew.name}`)
       // TODO: refactor to use crew repo
-      .setDescription(newCrewMessage((await crew.getCrewOwner()).member))
+      .setDescription(newCrewMessage(owner ? userMention(owner.member) : 'nobody'))
       .setColor('DarkGreen');
 
     const message = await channel.send({ embeds: [embed], components: [this.createCrewActions()] });
