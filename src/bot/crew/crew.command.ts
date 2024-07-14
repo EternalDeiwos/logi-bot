@@ -560,6 +560,7 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: PurgeCrewsCommandParams,
   ) {
+    await interaction.deferReply({ ephemeral: true });
     const member = await interaction.guild.members.fetch(interaction.user);
     const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
 
@@ -570,7 +571,7 @@ export class CrewCommand {
     const crews = await this.crewRepo.find({
       where: { guild: interaction.guildId, permanent: false },
     });
-    this.logger.debug(JSON.stringify([crews.length, crews]));
+
     const result = OperationStatus.collect(
       await Promise.all(
         crews.map((crew) =>
@@ -590,7 +591,7 @@ export class CrewCommand {
       }
     }
 
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.editReply({ content: result.message });
   }
 
   @Button('crew/reqdelete/:crew')
