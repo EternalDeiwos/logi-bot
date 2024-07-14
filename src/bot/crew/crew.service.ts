@@ -553,10 +553,17 @@ export class CrewService {
       const description = `${channelMention(crew.channel)} is led by ${owner ? userMention(owner.member) : 'nobody'} and has ${members.length} ${members.length > 1 ? 'members' : 'member'}.`;
 
       if (logs.length) {
-        fields.push({
-          name: `${crew.name}`,
-          value: `${description}\n\n${logs.pop().content}`,
-        });
+        const content = logs.pop();
+        const value = `${description}\n\n${content}`;
+        this.logger.debug(`Crew status: ${description}`);
+        this.logger.debug(`Crew log: ${content}`);
+
+        if (value) {
+          fields.push({
+            name: crew.name,
+            value,
+          });
+        }
       }
     }
 
