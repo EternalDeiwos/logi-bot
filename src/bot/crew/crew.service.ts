@@ -554,9 +554,9 @@ export class CrewService {
 
       if (logs.length) {
         const content = logs.pop();
-        const value = `${description}\n\n${content}`;
+        const value = `${description}\n\n${content?.message}`;
         this.logger.debug(`Crew status: ${description}`);
-        this.logger.debug(`Crew log: ${content}`);
+        this.logger.debug(`Crew log: ${content?.message}`);
 
         if (value) {
           fields.push({
