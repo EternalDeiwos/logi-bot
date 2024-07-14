@@ -713,6 +713,7 @@ export class CrewCommand {
       .setPlaceholder(
         'This will replace the last log on status updates so please keep it relevant.',
       )
+      .setMaxLength(880)
       .setStyle(TextInputStyle.Paragraph);
 
     return new ModalBuilder()
