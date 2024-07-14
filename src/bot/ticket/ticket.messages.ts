@@ -9,12 +9,15 @@ export const ticketPromptTriageHelp = () =>
 export const ticketPromptCrewJoinInstructions = () =>
   `Crews are groups of players dedicated to one particular task or facility. Each crew has their own channel and anyone can join a crew using the _Join_ button pinned in the relevant channel or using the \`/echo crew join\` slash command. Any crew member may accept or decline tickets for the crew.`;
 
+export const crewPromptStatusInstructions = () =>
+  `You can view a crew's status and current members by running the \`/echo crew status\` slash command inside the crew channel. You can view the current status for all crews by running the same command in any non-crew channel.`;
+
 export const ticketPromptStatusInstructions = () =>
-  `You can view the current status and a summary of open tickets for all crews by running the \`/echo crew status\` slash command in any secure channel.`;
+  `You can view a summary of open tickets for a crew by running the \`/echo ticket status\` slash command  inside the crew channel. You can also see a summary of all tickets by running the same command in any non-crew channel.`;
 
 export const ticketPromptCrewCreateInstructions = () => `
 Any verified members may create a crew using the slash command \`/echo crew create\` and providing the necessary options:
-- \`name\` is the display name of the crew as it will appear in selection lists.
+- \`name\` is the display name of the crew as it will appear in selection lists and the crew mentionable role. The channel name will also be derived from this.
 - \`name_short\` a unique short name for the crew that will be used in forum tags and other space-constrained interfaces. Must be less than 20 characters long.
 
 Once your crew channel has been created, check the prompt for further instructions.

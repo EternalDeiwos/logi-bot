@@ -39,6 +39,7 @@ import { CrewSelectAutocompleteInterceptor } from 'src/bot/crew/crew-select.inte
 import { TicketService } from './ticket.service';
 import { TicketRepository } from './ticket.repository';
 import {
+  crewPromptStatusInstructions,
   proxyTicketMessage,
   ticketPromptCrewCreateInstructions,
   ticketPromptCrewJoinInstructions,
@@ -113,6 +114,11 @@ export class TicketCommand {
         },
         {
           name: 'Crew Status',
+          value: crewPromptStatusInstructions(),
+          inline: false,
+        },
+        {
+          name: 'Ticket Status',
           value: ticketPromptStatusInstructions(),
           inline: false,
         },

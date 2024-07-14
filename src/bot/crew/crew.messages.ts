@@ -1,8 +1,8 @@
-import { Snowflake, userMention } from 'discord.js';
+import { userMention } from 'discord.js';
 import { Crew } from './crew.entity';
 
-export const newCrewMessage = (memberRef: Snowflake) =>
-  `Welcome to your new crew. This crew is led by ${userMention(memberRef)} and you can join by clicking the button below. You can leave again at any time by running the \`/echo crew leave\` command in this channel or optionally selecting the team in the command.
+export const newCrewMessage = (member: string) =>
+  `Welcome to your new crew. This crew is led by ${member}. You can join by clicking the button below. You can leave again at any time by running the \`/echo crew leave\` command in this channel or optionally selecting the team in the command.
   
 To run a successful crew you should do the following:
 - Post a log (command or button) describing your goals. You should communicate what you are doing or a description of the crew, where you are doing it, necessary inputs, and outputs.
