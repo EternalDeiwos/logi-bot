@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Context, ContextOf, On } from 'necord';
 import { Config, ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
+import { MoveTicketBehaviour } from 'src/types';
 import { TagService, TicketTag } from 'src/bot/tag/tag.service';
 import { TicketService } from './ticket/ticket.service';
 import { TicketRepository } from './ticket/ticket.repository';
 import { CrewRepository } from './crew/crew.repository';
 import { CrewMemberRepository } from './crew/member/crew-member.repository';
 import { GuildService } from './guild/guild.service';
-import { MoveTicketBehaviour } from 'src/types';
 
 @Injectable()
 export class BotEventListener {
@@ -21,6 +21,7 @@ export class BotEventListener {
     private readonly ticketRepo: TicketRepository,
     private readonly crewRepo: CrewRepository,
     private readonly guildService: GuildService,
+    private readonly memberRepo: CrewMemberRepository,
   ) {}
 
   @On('guildCreate')
@@ -122,5 +123,10 @@ export class BotEventListener {
     if (ticket.crew.movePrompt) {
       await this.ticketService.addMovePromptToTicket(thread);
     }
+  }
+
+  @On('guildMemberRemove')
+  async onMemberLeave(@Context() [member]: ContextOf<'guildMemberRemove'>) {
+    await this.memberRepo.delete({ guild: member.guild.id, member: member.id });
   }
 }
