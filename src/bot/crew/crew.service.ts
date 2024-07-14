@@ -16,6 +16,7 @@ import {
   Snowflake,
   channelMention,
   inlineCode,
+  messageLink,
   roleMention,
   userMention,
 } from 'discord.js';
@@ -504,10 +505,17 @@ export class CrewService {
     });
 
     if (logs.length) {
-      fields.push({
-        name: 'Status',
-        value: logs.pop().content,
-      });
+      const { content, discussion: channel, message } = logs.pop();
+      const redirectText = `See the full status here: ${messageLink(channel, message)}`;
+      const value =
+        content?.length > 400 ? `${content.substring(0, 400)}...\n\n${redirectText}` : content;
+
+      if (value) {
+        fields.push({
+          name: 'Status',
+          value,
+        });
+      }
     }
 
     embed.addFields(...fields);
@@ -553,10 +561,12 @@ export class CrewService {
       const description = `${channelMention(crew.channel)} is led by ${owner ? userMention(owner.member) : 'nobody'} and has ${members.length} ${members.length > 1 ? 'members' : 'member'}.`;
 
       if (logs.length) {
-        const { content } = logs.pop();
-        const value = `${description}\n\n${content?.length > 880 ? content?.substring(0, 880) + '...' : content}`;
-        this.logger.debug(`Crew status: ${description}`);
-        this.logger.debug(`Crew log: ${content}`);
+        const { content, discussion: channel, message } = logs.pop();
+        const redirectText = `See the full status here: ${messageLink(channel, message)}`;
+        const value =
+          content?.length > 400
+            ? `${description}\n\n${content.substring(0, 400)}...\n\n${redirectText}`
+            : `${description}\n\n${content}`;
 
         if (value) {
           fields.push({
