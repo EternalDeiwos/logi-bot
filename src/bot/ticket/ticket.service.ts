@@ -219,7 +219,7 @@ export class TicketService {
       message: {
         content: newTicketMessage(ticket.content, ticket.createdBy, crew.role),
         embeds: [prompt],
-        allowedMentions: { users: [ticket.createdBy], roles: [crew.role] },
+        allowedMentions: { users: [ticket.createdBy], roles: crew.movePrompt ? [] : [crew.role] },
       },
       appliedTags,
     });
