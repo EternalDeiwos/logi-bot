@@ -437,9 +437,15 @@ export class CrewCommand {
 
     let result;
     if (!crewMember) {
-      result = { success: false, message: 'You are not a member of this team' };
+      result = new OperationStatus({
+        success: false,
+        message: 'You are not a member of this team',
+      });
     } else if (!crewMember.requireAccess(CrewMemberAccess.ADMIN, { isAdmin })) {
-      result = { success: false, message: 'Only an administrator can perform this action' };
+      result = new OperationStatus({
+        success: false,
+        message: 'Only an administrator can perform this action',
+      });
     } else {
       result = await this.memberService.updateCrewMember(crewMember, {
         access: CrewMemberAccess.ADMIN,
@@ -472,9 +478,15 @@ export class CrewCommand {
 
     let result;
     if (!crewMember) {
-      result = { success: false, message: 'You are not a member of this team' };
-    } else if ((crewMember.requireAccess(CrewMemberAccess.ADMIN), { isAdmin })) {
-      result = { success: false, message: 'Only an administrator can perform this action' };
+      result = new OperationStatus({
+        success: false,
+        message: 'You are not a member of this team',
+      });
+    } else if (!crewMember.requireAccess(CrewMemberAccess.ADMIN, { isAdmin })) {
+      result = new OperationStatus({
+        success: false,
+        message: 'Only an administrator can perform this action',
+      });
     } else {
       result = await this.memberService.registerCrewMember(
         crewMember.crew,
@@ -513,11 +525,17 @@ export class CrewCommand {
 
     let result;
     if (!crewMember) {
-      result = { success: false, message: 'You are not a member of this team' };
-    } else if ((crewMember.requireAccess(CrewMemberAccess.ADMIN), { isAdmin })) {
-      result = { success: false, message: 'Only an administrator can perform this action' };
+      result = new OperationStatus({
+        success: false,
+        message: 'You are not a member of this team',
+      });
+    } else if (!crewMember.requireAccess(CrewMemberAccess.ADMIN, { isAdmin })) {
+      result = new OperationStatus({
+        success: false,
+        message: 'Only an administrator can perform this action',
+      });
     } else if (!targetMember) {
-      result = { success: true, message: 'Done' };
+      result = new OperationStatus({ success: true, message: 'Done' });
     } else {
       result = await this.memberService.removeCrewMember(targetMember);
     }
