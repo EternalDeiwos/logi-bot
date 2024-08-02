@@ -97,3 +97,33 @@ BEGIN
 
 END;
 $$ LANGUAGE plpgsql;
+
+--
+-- View helper to retrieve the current war
+CREATE OR REPLACE VIEW
+  war_current
+WITH
+  (security_invoker = on) AS (
+    SELECT DISTINCT
+      ON (war_number) *
+    FROM
+      war
+    ORDER BY
+      war_number DESC
+    LIMIT
+      1
+  );
+
+-- 
+-- Access controls
+GRANT
+SELECT
+  ON TABLE war TO "anon";
+
+GRANT
+SELECT
+  ON TABLE war TO "authenticated";
+
+GRANT
+SELECT
+  ON TABLE war TO "service_role";
