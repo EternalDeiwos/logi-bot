@@ -118,12 +118,12 @@ WITH
 -- Access controls
 GRANT
 SELECT
-  ON TABLE war TO "anon";
+  ON TABLE war_current TO "anon";
 
 GRANT
 SELECT
-  ON TABLE war TO "authenticated";
+  ON TABLE war_current TO "authenticated";
 
 GRANT
 SELECT
-  ON TABLE war TO "service_role";
+  ON TABLE war_current TO "service_role";
