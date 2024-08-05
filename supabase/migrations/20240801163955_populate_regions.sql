@@ -158,3 +158,31 @@ BEGIN
   RETURN 1;
 END;
 $$ LANGUAGE plpgsql;
+
+--
+-- View helper to retrieve the current war
+CREATE OR REPLACE VIEW
+  region_current
+WITH
+  (security_invoker = on) AS (
+    SELECT
+      *
+    FROM
+      region
+    WHERE
+      deleted_at IS NULL
+  );
+
+-- 
+-- Access controls
+GRANT
+SELECT
+  ON TABLE region_current TO "anon";
+
+GRANT
+SELECT
+  ON TABLE region_current TO "authenticated";
+
+GRANT
+SELECT
+  ON TABLE region_current TO "service_role";
