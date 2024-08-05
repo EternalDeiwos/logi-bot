@@ -160,7 +160,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 --
--- View helper to retrieve the current war
+-- View helper to retrieve currently active regions
 CREATE OR REPLACE VIEW
   region_current
 WITH
