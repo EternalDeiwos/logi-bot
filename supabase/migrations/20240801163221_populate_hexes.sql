@@ -1,33 +1,33 @@
--- Create hexes table
-DROP TABLE IF EXISTS hexes;
+-- Create hex table
+DROP TABLE IF EXISTS hex;
 
 CREATE TABLE IF NOT EXISTS
-  hexes (hex TEXT NOT NULL, name TEXT NOT NULL);
+  hex (hex TEXT NOT NULL, name TEXT NOT NULL);
 
 -- 
 -- Access controls
-ALTER TABLE hexes
-ADD CONSTRAINT pk_hexes PRIMARY KEY (hex);
+ALTER TABLE hex
+ADD CONSTRAINT pk_hex PRIMARY KEY (hex);
 
-ALTER TABLE hexes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hex ENABLE ROW LEVEL SECURITY;
 
-GRANT DELETE ON TABLE hexes TO "service_role";
+GRANT DELETE ON TABLE hex TO "service_role";
 
-GRANT INSERT ON TABLE hexes TO "service_role";
+GRANT INSERT ON TABLE hex TO "service_role";
 
-GRANT REFERENCES ON TABLE hexes TO "service_role";
+GRANT REFERENCES ON TABLE hex TO "service_role";
 
 GRANT
 SELECT
-  ON TABLE hexes TO "service_role";
+  ON TABLE hex TO "service_role";
 
-GRANT TRIGGER ON TABLE hexes TO "service_role";
-
-GRANT
-TRUNCATE ON TABLE hexes TO "service_role";
+GRANT TRIGGER ON TABLE hex TO "service_role";
 
 GRANT
-UPDATE ON TABLE hexes TO "service_role";
+TRUNCATE ON TABLE hex TO "service_role";
+
+GRANT
+UPDATE ON TABLE hex TO "service_role";
 
 --
 -- Fetch and populate hex names from map list API
@@ -36,12 +36,12 @@ OR REPLACE FUNCTION populate_hexes () RETURNS INTEGER AS $$
 BEGIN
 
   -- Yeet
-  TRUNCATE TABLE hexes CASCADE;
+  TRUNCATE TABLE hex CASCADE;
 
-  -- Fetch hex names from the API and populate hexes table
-  INSERT INTO hexes
+  -- Fetch hex names from the API and populate hex table
+  INSERT INTO hex
   SELECT
-    hex,
+    split.hex,
     -- Drop "Hex" from the name of the hex
     array_to_string(name[:array_length(name, 1) -1], ' ') name
   FROM (
