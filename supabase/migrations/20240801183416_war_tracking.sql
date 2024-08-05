@@ -69,7 +69,7 @@ BEGIN
       (
         CASE
           WHEN (req.content->>'conquestEndTime') IS NULL THEN NULL
-          ELSE to_timestamp((req.content->'conquestEndTime')::bigint / 1000)
+          ELSE to_timestamp((req.content->>'conquestEndTime')::bigint / 1000)
         END
       ) ended_at
     FROM (
