@@ -62,11 +62,10 @@ DECLARE
 BEGIN
 
   RAISE NOTICE 'Marking previous regions deleted';
-
   UPDATE region SET deleted_at = now() WHERE deleted_at IS NULL;
 
   FOR hex IN 
-  SELECT * FROM hexes
+    SELECT * FROM hex
   LOOP
   
     --
