@@ -64,7 +64,7 @@ BEGIN
     SELECT DISTINCT ON (hex_id)
       *
     FROM region_update
-    ORDER BY hex_id, version DESC
+    ORDER BY hex_id, updated_at DESC
   LOOP
 
     WITH war AS (
@@ -82,7 +82,7 @@ BEGIN
         *
       FROM region_update
       WHERE hex_id=hex.hex_id
-      ORDER BY hex_id, version DESC
+      ORDER BY hex_id, updated_at DESC
     ) u, war w, jsonb_array_elements(u.data) d
     CROSS JOIN (
       SELECT *
