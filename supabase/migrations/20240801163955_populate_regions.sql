@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS
     deleted_at TIMESTAMP WITH TIME ZONE
   );
 
+CREATE INDEX IF NOT EXISTS hex_idx_region ON region USING btree (hex_id);
+
 --
 -- Access controls
 ALTER TABLE region ENABLE ROW LEVEL SECURITY;

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS
     FOREIGN KEY (war_number) REFERENCES war (war_number) ON DELETE RESTRICT
   );
 
-CREATE INDEX IF NOT EXISTS updated_at_idx_region_update ON region_update USING btree (updated_at);
+CREATE INDEX IF NOT EXISTS hex_idx_region_update ON region_update USING btree (hex_id);
 
 CREATE INDEX IF NOT EXISTS war_number_idx_region_update ON region_update USING btree (war_number);
 
