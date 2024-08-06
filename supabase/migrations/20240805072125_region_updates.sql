@@ -2,16 +2,16 @@
 -- Create table
 CREATE TABLE IF NOT EXISTS
   region_update (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     hex_id BIGINT NOT NULL,
     version BIGINT NOT NULL,
     war_number BIGINT NOT NULL,
     data JSONB NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-    PRIMARY KEY (version, hex_id),
     FOREIGN KEY (war_number) REFERENCES war (war_number) ON DELETE RESTRICT
   );
 
-CREATE INDEX IF NOT EXISTS version_idx_region_update ON region_update USING btree (version);
+CREATE INDEX IF NOT EXISTS updated_at_idx_region_update ON region_update USING btree (updated_at);
 
 CREATE INDEX IF NOT EXISTS war_number_idx_region_update ON region_update USING btree (war_number);
 
@@ -56,15 +56,23 @@ BEGIN
     WITH region AS (
       SELECT DISTINCT ON (rr.hex_id)
         rr.hex_id,
-        array_to_string(string_to_array(rr.hex_name, ' '), '') || 'Hex' hex_name,
-        u.version
+        (
+          -- Devman bad
+          CASE 
+            WHEN rr.hex_name = 'Marban Hollow' THEN 'MarbanHollow'
+            ELSE array_to_string(string_to_array(rr.hex_name, ' '), '') || 'Hex'
+          END
+        ) hex_name,
+        u.version,
+        u.updated_at
       FROM region rr
       LEFT OUTER JOIN (
         SELECT DISTINCT ON (hex_id)
           hex_id,
-          version
+          version,
+          updated_at
         FROM region_update
-        ORDER BY hex_id, version DESC
+        ORDER BY hex_id, updated_at DESC
       ) u ON rr.hex_id=u.hex_id
     ), war AS (
       SELECT * FROM war_current
