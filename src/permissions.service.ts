@@ -17,9 +17,7 @@ export class PermissionsService implements OnModuleInit {
   }
 
   getPermissions(): PermissionsBitField {
-    const permissions = this.configService.get<bigint>(
-      'DISCORD_BOT_PERMISSIONS',
-    );
+    const permissions = this.configService.get<bigint>('DISCORD_BOT_PERMISSIONS');
     return new PermissionsBitField(permissions);
   }
 }

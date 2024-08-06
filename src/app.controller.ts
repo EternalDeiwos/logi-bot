@@ -19,12 +19,8 @@ export class AppController {
 
   @Get()
   getInfo(): ApplicationInformation {
-    const scope = this.configService.getOrThrow<string>(
-      'DISCORD_BOT_SCOPE',
-    );
-    const client_id = this.configService.getOrThrow<string>(
-      'DISCORD_BOT_CLIENT_ID',
-    );
+    const scope = this.configService.getOrThrow<string>('DISCORD_BOT_SCOPE');
+    const client_id = this.configService.getOrThrow<string>('DISCORD_BOT_CLIENT_ID');
     const permissions = this.permissions.getPermissions();
     const invite_link = `https://discord.com/api/oauth2/authorize?client_id=${client_id}&permissions=${permissions.valueOf()}&scope=${encodeURIComponent(scope)}`;
 

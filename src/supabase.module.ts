@@ -9,13 +9,13 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
     {
       provide: SupabaseClient,
       inject: [ConfigService],
-      useFactory (configService: ConfigService) {
+      useFactory(configService: ConfigService) {
         return createClient(
-          configService.getOrThrow('SUPABASE_URL'), 
+          configService.getOrThrow('SUPABASE_URL'),
           configService.getOrThrow('SUPABASE_SERVICE_KEY'),
-        )
-      }
-    }
+        );
+      },
+    },
   ],
   exports: [SupabaseClient],
 })

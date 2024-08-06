@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { default as Joi } from 'joi'
+import { default as Joi } from 'joi';
 import { NecordModule } from 'necord';
 import { IntentsBitField } from 'discord.js';
 import { SupabaseModule } from './supabase.module';
@@ -20,9 +20,7 @@ import { PermissionsService } from './permissions.service';
       isGlobal: true,
       cache: true,
       validationSchema: Joi.object({
-        NODE_ENV: Joi.string()
-          .valid('development', 'production')
-          .default('production'),
+        NODE_ENV: Joi.string().valid('development', 'production').default('production'),
 
         // Supabase config
         SUPABASE_URL: Joi.string().uri().default('http://localhost:54321'),
