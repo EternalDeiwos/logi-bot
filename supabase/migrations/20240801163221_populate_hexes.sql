@@ -43,7 +43,12 @@ BEGIN
   SELECT
     split.hex,
     -- Drop "Hex" from the name of the hex
-    array_to_string(name[:array_length(name, 1) -1], ' ') name
+    (
+      CASE 
+        WHEN name[array_length(name, 1)] = 'Hex' THEN array_to_string(name[:array_length(name, 1) -1], ' ')
+        ELSE array_to_string(name, ' ')
+      END
+    ) name
   FROM (
     SELECT
       -- Separate words
