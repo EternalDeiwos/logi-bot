@@ -1,3 +1,7 @@
+CREATE EXTENSION http
+WITH
+  SCHEMA extensions;
+
 -- Create hex table
 DROP TABLE IF EXISTS hex;
 
