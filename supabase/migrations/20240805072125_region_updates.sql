@@ -15,6 +15,8 @@ CREATE INDEX IF NOT EXISTS hex_idx_region_update ON region_update USING btree (h
 
 CREATE INDEX IF NOT EXISTS war_number_idx_region_update ON region_update USING btree (war_number);
 
+CREATE INDEX IF NOT EXISTS updated_at_idx_region_update ON region_update USING btree (updated_at);
+
 --
 -- Access controls
 ALTER TABLE region_update ENABLE ROW LEVEL SECURITY;
@@ -116,4 +118,33 @@ $$ LANGUAGE plpgsql;
 --
 -- Schedule region update every 6 minutes (10 times per hour)
 SELECT
-  cron.schedule ('update_regions', '2-59/6 * * * *', 'SELECT update_region()');
+  cron.schedule ('update_regions', '2-59/6 * * * *', 'SELECT update_regions()');
+
+--
+-- Latest region update for each hex
+CREATE OR REPLACE VIEW
+  region_update_latest
+WITH
+  (security_invoker = on) AS (
+    SELECT DISTINCT
+      ON (hex_id) *
+    FROM
+      region_update u
+    ORDER BY
+      hex_id,
+      updated_at DESC
+  );
+
+-- 
+-- Access controls
+GRANT
+SELECT
+  ON TABLE region_update_latest TO "anon";
+
+GRANT
+SELECT
+  ON TABLE region_update_latest TO "authenticated";
+
+GRANT
+SELECT
+  ON TABLE region_update_latest TO "service_role";
