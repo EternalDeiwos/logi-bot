@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS
     slang TEXT[] NOT NULL DEFAULT '{}',
     x FLOAT NOT NULL,
     y FLOAT NOT NULL,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE NULLS NOT DISTINCT (hex_id, major_name, minor_name, deleted_at)
   );
 
 CREATE INDEX IF NOT EXISTS hex_idx_region ON region USING btree (hex_id);
