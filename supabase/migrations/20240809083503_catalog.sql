@@ -53,7 +53,7 @@ UPDATE ON TABLE catalog TO "service_role";
 -- Catalog version is an internal version ID to identify breaking changes within a single foxhole version.
 -- Versioning is indexed as ${foxhole_version}-${catalog_version} and both can indicate breaking changes
 -- Minor and patch versions are omitted.
-DROP FUNCTION populate_catalog;
+DROP FUNCTION IF EXISTS populate_catalog CASCADE;
 
 CREATE
 OR REPLACE FUNCTION populate_catalog (IN url TEXT, IN foxhole_version TEXT, IN catalog_version TEXT) RETURNS setof catalog AS $$
