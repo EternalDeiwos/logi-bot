@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS
 
 CREATE INDEX IF NOT EXISTS name_idx_guild ON guild USING btree (name);
 
-CREATE INDEX IF NOT EXISTS created_at_idx_created_at ON created_at USING btree (created_at);
+CREATE INDEX IF NOT EXISTS created_at_idx_guild ON guild USING btree (created_at);
 
 --
 -- Access controls
