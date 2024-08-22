@@ -19,6 +19,7 @@ This is a discord bot to assist large regiments in managing distributed resource
 
 ## Table of Contents
 
+- [Documentation](./docs)
 - [Install](#install)
 - [Usage](#usage)
   - [Configuration for Development](#configuration-for-development)
@@ -42,19 +43,20 @@ yarn
 
 ### Configuration for Development
 
-Configuration options are set by editing [`.env`](./.env). The file is tracked in the repository so do not use it to store secrets; instead set secret values using `.env.local` which accepts the same values and will override those provided elsewhere.
+Configuration options for both Docker Compose and the application are set by editing [`.env`](./.env). The file is tracked in the repository so do not use it to store secrets; instead set secret values using `.env.local` which accepts the same values and will override those provided elsewhere. Note that this only works for `docker-compose.yml` if you use multiple `--env-file` flags, or use the helper script provided (`yarn docker-compose ...`).
 
-A full list of application configuration options can be found [here](./src/app.module.ts).
+#### Start Docker Containers
 
-#### Start Local Development Environment
-
-Install the Supabase CLI and start the local development environment by following [these instructions](https://supabase.com/docs/guides/cli/getting-started). You **_DO NOT_** need to run `supabase init` again as this has already been done for this repo.
+If you want to start the containers run:
 
 ```bash
-supabase start
+yarn docker-compose up -d
+```
 
-# If already running you can view urls and credentials as follows
-supabase status
+If you want to stop those containers and recover their resources run:
+
+```bash
+yarn docker-compose down
 ```
 
 #### Running in Development
