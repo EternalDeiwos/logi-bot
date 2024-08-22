@@ -1,7 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PermissionsService } from './permissions.service';
-
+import { Controller, Get, Res } from '@nestjs/common';
+import { Response } from 'express';
+import { AppService } from './app.service';
 import * as pkg from '../package.json';
 
 export type ApplicationInformation = {
@@ -12,26 +11,21 @@ export type ApplicationInformation = {
 
 @Controller()
 export class AppController {
-  constructor(
-    private configService: ConfigService,
-    private permissions: PermissionsService,
-  ) {}
+  constructor(private readonly appService: AppService) {}
 
   @Get()
   getInfo(): ApplicationInformation {
-    const scope = this.configService.getOrThrow<string>(
-      'DISCORD_BOT_SCOPE',
-    );
-    const client_id = this.configService.getOrThrow<string>(
-      'DISCORD_BOT_CLIENT_ID',
-    );
-    const permissions = this.permissions.getPermissions();
-    const invite_link = `https://discord.com/api/oauth2/authorize?client_id=${client_id}&permissions=${permissions.valueOf()}&scope=${encodeURIComponent(scope)}`;
+    const invite_link = this.appService.inviteUrl();
 
     return {
       name: pkg.name,
       version: pkg.version,
       invite_link,
     };
+  }
+
+  @Get('invite')
+  redirectInvite(@Res() res: Response) {
+    return res.status(302).redirect(this.appService.inviteUrl());
   }
 }

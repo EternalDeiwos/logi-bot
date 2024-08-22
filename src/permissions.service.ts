@@ -4,7 +4,7 @@ import { PermissionsBitField } from 'discord.js';
 
 @Injectable()
 export class PermissionsService implements OnModuleInit {
-  private readonly logger: Logger = new Logger(PermissionsService.name);
+  private readonly logger: Logger = new Logger(PermissionsService.name, { timestamp: true });
 
   constructor(private configService: ConfigService) {}
 
@@ -17,9 +17,7 @@ export class PermissionsService implements OnModuleInit {
   }
 
   getPermissions(): PermissionsBitField {
-    const permissions = this.configService.get<bigint>(
-      'DISCORD_BOT_PERMISSIONS',
-    );
+    const permissions = this.configService.get<bigint>('DISCORD_BOT_PERMISSIONS');
     return new PermissionsBitField(permissions);
   }
 }
