@@ -1,12 +1,17 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Context, ContextOf, On } from 'necord';
+import { InternalError } from 'src/errors';
 
 @Injectable()
 export class BotEventListener {
   private readonly logger = new Logger(BotEventListener.name, { timestamp: true });
 
-  constructor(private readonly rmq: AmqpConnection) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly rmq: AmqpConnection,
+  ) {}
 
   @On('ready')
   async onReady(@Context() [client]: ContextOf<'ready'>) {
@@ -14,10 +19,39 @@ export class BotEventListener {
   }
 
   @On('guildCreate')
-  async onGuildCreate(@Context() [guild]: ContextOf<'guildCreate'>) {}
+  async onGuildCreate(@Context() [guild]: ContextOf<'guildCreate'>) {
+    try {
+      const payload = {
+        guildId: guild.id,
+        name: guild.name,
+        shortName: guild.nameAcronym,
+        icon: guild.iconURL({ extension: 'png', forceStatic: true }),
+      };
+
+      const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
+      await this.rmq.publish('discord', 'discord.rpc.guild.register', payload, {
+        expiration: timeout,
+      });
+    } catch (err) {
+      this.logger.error(new InternalError('INTERNAL_SERVER_ERROR', err), err.stack);
+    }
+  }
 
   @On('guildDelete')
-  async onGuildDelete(@Context() [guild]: ContextOf<'guildDelete'>) {}
+  async onGuildDelete(@Context() [guild]: ContextOf<'guildDelete'>) {
+    try {
+      const payload = {
+        guildId: guild.id,
+      };
+
+      const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
+      await this.rmq.publish('discord', 'discord.rpc.guild.deregister', payload, {
+        expiration: timeout,
+      });
+    } catch (err) {
+      this.logger.error(new InternalError('INTERNAL_SERVER_ERROR', err), err.stack);
+    }
+  }
 
   @On('roleDelete')
   async onRoleDelete(@Context() [role]: ContextOf<'roleDelete'>) {}
@@ -48,6 +82,9 @@ export class BotEventListener {
 
   @On('presenceUpdate')
   async onPresenceUpdate(@Context() [old, presence]: ContextOf<'presenceUpdate'>) {}
+
+  @On('messageCreate')
+  async onMessage(@Context() [message]: ContextOf<'messageCreate'>) {}
 
   @On('messageDelete')
   async onMessageDelete(@Context() [message]: ContextOf<'messageDelete'>) {}
