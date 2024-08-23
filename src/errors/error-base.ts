@@ -15,13 +15,19 @@ export class ErrorBase<T extends string, C = any> extends Error {
   }
 
   toString() {
-    return `${this.errorName} \`${this.name}\`: ${this.message}`;
+    return `${this.errorName} [${this.name}]: ${this.message}`;
   }
 }
 
-export const ErrorBaseFactory = <T extends string>(descriptions: { [K in T]: string }) =>
-  class<C = any> extends ErrorBase<T, C> {
+export const ErrorBaseFactory = <T extends string>(
+  className: string,
+  descriptions: { [K in T]: string },
+) => {
+  const Class = class<C = any> extends ErrorBase<T, C> {
     constructor(name: T, cause?: C) {
       super(name, descriptions[name], cause);
     }
   };
+  Object.defineProperty(Class, 'name', { value: className });
+  return Class;
+};
