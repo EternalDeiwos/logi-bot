@@ -1,6 +1,6 @@
 import { Injectable, Logger, UseFilters } from '@nestjs/common';
-import { Nack, RabbitRPC } from '@golevelup/nestjs-rabbitmq';
-import { ValidationError, ErrorBase, RMQExceptionHandler } from 'src/errors';
+import { RabbitRPC } from '@golevelup/nestjs-rabbitmq';
+import { ValidationError, RMQExceptionHandler } from 'src/errors';
 import { GuildService } from './guild.service';
 import { InsertGuild, SelectGuild } from './guild.entity';
 
