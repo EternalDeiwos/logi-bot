@@ -1,9 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UseFilters } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
-import { ApiError, DiscordError, ErrorBase, InternalError } from 'src/errors';
+import {
+  ApiError,
+  ValidationError,
+  ErrorBase,
+  InternalError,
+  BotInteractionExceptionHandler,
+} from 'src/errors';
 import { EchoCommand } from 'src/discord/discord.command-group';
+import { GuildService } from './guild.service';
 
 export class EditGuildCommandParams {
   @StringOption({
@@ -49,58 +56,71 @@ export class GuildCommand {
     description: 'Register this guild',
     dmPermission: false,
   })
-  async onCreateCrew(
+  @UseFilters(new BotInteractionExceptionHandler())
+  async onRegisterGuild(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: EditGuildCommandParams,
   ) {
-    try {
-      try {
-        await interaction.deferReply({ ephemeral: true });
-        const name = data.name ?? interaction.guild.name;
-        const shortName = data.shortName ?? interaction.guild.nameAcronym;
+    await interaction.deferReply({ ephemeral: true });
+    const name = data.name ?? interaction.guild.name;
+    const shortName = data.shortName ?? interaction.guild.nameAcronym;
 
-        if (!name || !shortName) {
-          throw new DiscordError('MALFORMED_INPUT', { name, shortName });
-        }
+    if (!name || !shortName) {
+      throw new ValidationError('MALFORMED_INPUT', { name, shortName });
+    }
 
-        const payload = {
-          guildId: interaction.guild.id,
-          name,
-          shortName,
-          icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),
-        };
+    const payload = {
+      guildId: interaction.guild.id,
+      name,
+      shortName,
+      icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),
+    };
 
-        const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
-        const result = await this.rmq.request<number>({
-          exchange: 'discord',
-          routingKey: 'discord.rpc.guild.register',
-          correlationId: interaction.id,
+    // Send user context alongside payload
+    // How does the consumer test access?
+    const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
+    const result = await this.rmq.request<number>({
+      exchange: 'discord',
+      routingKey: 'discord.rpc.guild.register',
+      correlationId: interaction.id,
+      timeout,
+      expiration: timeout,
+      payload,
+    });
 
-          timeout,
-          expiration: timeout,
-          payload,
-        });
-
-        if (result) {
-          return interaction.followUp({ content: 'Guild registered' });
-        } else {
-          return interaction.followUp({ content: 'Guild already registered' });
-        }
-      } catch (err) {
-        if (err instanceof ErrorBase) {
-          this.logger.error(err, err.cause?.stack ?? err.stack);
-          await interaction.followUp({ content: err.toString() });
-        } else {
-          this.logger.error(err, err.stack);
-          await interaction.followUp({
-            content: new InternalError('INTERNAL_SERVER_ERROR').toString(),
-          });
-        }
-
-        return;
-      }
-    } catch (err) {
-      this.logger.error(new ApiError('DISCORD', 'Interaction failed'), err.stack);
+    if (result) {
+      return interaction.followUp({ content: 'Guild registered' });
+    } else {
+      return interaction.followUp({ content: 'Guild already registered' });
     }
   }
+
+  // @Subcommand({
+  //   name: 'deregister',
+  //   description: 'Deregister this guild',
+  //   dmPermission: false,
+  // })
+  // async onDeregisterGuild(@Context() [interaction]: SlashCommandContext) {
+  //   await interaction.deferReply({ ephemeral: true });
+
+  //   const payload = {
+  //     guildId: interaction.guild.id,
+  //   };
+
+  //   const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
+  //   const result = await this.rmq.request<number>({
+  //     exchange: 'discord',
+  //     routingKey: 'discord.rpc.guild.deregister',
+  //     correlationId: interaction.id,
+  //     timeout,
+  //     expiration: timeout,
+  //     payload,
+  //   });
+
+  //   if (result) {
+  //     return interaction.followUp({ content: 'Guild deregistered' });
+  //   } else {
+  //     return interaction.followUp({ content: 'Guild not registered' });
+  //   }
+  // }
 }

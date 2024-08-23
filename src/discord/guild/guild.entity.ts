@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 
 export type InsertGuild = DeepPartial<Omit<Guild, 'createdAt' | 'deletedAt'>>;
+export type SelectGuild = DeepPartial<Pick<Guild, 'id' | 'guildId'>>;
 export type GuildConfig = {};
 
 @Entity()
