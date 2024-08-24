@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { CommonRepository } from 'src/utils/common-repository';
+import { CommonRepository } from 'src/database/util';
 import { Guild } from './guild.entity';
 
 @Injectable()

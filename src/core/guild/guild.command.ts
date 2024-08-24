@@ -2,15 +2,9 @@ import { Injectable, Logger, UseFilters } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
-import {
-  ApiError,
-  ValidationError,
-  ErrorBase,
-  InternalError,
-  BotInteractionExceptionHandler,
-} from 'src/errors';
-import { EchoCommand } from 'src/discord/discord.command-group';
-import { GuildService } from './guild.service';
+import { ValidationError } from 'src/errors';
+import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
+import { EchoCommand } from 'src/core/core.command-group';
 
 export class EditGuildCommandParams {
   @StringOption({
@@ -43,6 +37,7 @@ export class SelectGuildCommandParams {
   name: 'guild',
   description: 'Manage guilds',
 })
+@UseFilters(DiscordExceptionFilter)
 export class GuildCommand {
   private readonly logger = new Logger(GuildCommand.name);
 
@@ -56,7 +51,6 @@ export class GuildCommand {
     description: 'Register this guild',
     dmPermission: false,
   })
-  @UseFilters(new BotInteractionExceptionHandler())
   async onRegisterGuild(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: EditGuildCommandParams,
