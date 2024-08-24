@@ -34,7 +34,10 @@ const schema = {
     .regex(/\w+-\d+/)
     .default('naval-57'),
   APP_CATALOG_VERSION: Joi.string().regex(/v\d+/).default('v1'),
-  APP_RPC_TIMEOUT: Joi.number().default(3000),
+  APP_QUEUE_RETRY_BACKOFF_BASE: Joi.number().default(2),
+  APP_QUEUE_RETRY_BACKOFF_MULTIPLIER: Joi.number().default(1000),
+  APP_QUEUE_MAX_RETRY_COUNT: Joi.number().default(3),
+  APP_QUEUE_RPC_EXPIRE: Joi.number().default(1000),
 };
 
 export type ConfigKey = keyof typeof schema;

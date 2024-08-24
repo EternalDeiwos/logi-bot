@@ -1,6 +1,5 @@
-import { Injectable, Logger, UseFilters } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RabbitRPC } from '@golevelup/nestjs-rabbitmq';
-import { RMQExceptionHandler } from 'src/rmq/rmq-exception.filter';
 import { ValidationError } from 'src/errors';
 import { GuildService } from './guild.service';
 import { InsertGuild, SelectGuild } from './guild.entity';
@@ -16,10 +15,9 @@ export class GuildConsumer {
     routingKey: 'discord.rpc.guild.register',
     queue: 'discord-guild-register',
     queueOptions: {
-      deadLetterExchange: 'errors',
+      deadLetterExchange: 'retry',
     },
   })
-  @UseFilters(RMQExceptionHandler)
   public async registerGuildHandler(payload: InsertGuild) {
     const result = await this.guildService.registerGuild(payload);
     return result?.identifiers?.length;
@@ -30,10 +28,9 @@ export class GuildConsumer {
     routingKey: 'discord.rpc.guild.deregister',
     queue: 'discord-guild-deregister',
     queueOptions: {
-      deadLetterExchange: 'errors',
+      deadLetterExchange: 'retry',
     },
   })
-  @UseFilters(RMQExceptionHandler)
   public async deregisterGuildHandler(payload: SelectGuild) {
     if (!payload.id && !payload.guildId) {
       throw new ValidationError('MALFORMED_INPUT', payload);

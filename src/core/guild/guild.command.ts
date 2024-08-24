@@ -2,9 +2,10 @@ import { Injectable, Logger, UseFilters } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
-import { ValidationError } from 'src/errors';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { EchoCommand } from 'src/core/core.command-group';
+import { ValidationError } from 'src/errors';
+import { Embeds } from 'src/utils';
 
 export class EditGuildCommandParams {
   @StringOption({
@@ -72,20 +73,23 @@ export class GuildCommand {
 
     // Send user context alongside payload
     // How does the consumer test access?
-    const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
+    const expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
     const result = await this.rmq.request<number>({
       exchange: 'discord',
       routingKey: 'discord.rpc.guild.register',
       correlationId: interaction.id,
-      timeout,
-      expiration: timeout,
+      expiration,
       payload,
     });
 
     if (result) {
-      return interaction.followUp({ content: 'Guild registered' });
+      return interaction.followUp({
+        embeds: [Embeds.Success('Guild registered')],
+      });
     } else {
-      return interaction.followUp({ content: 'Guild already registered' });
+      return interaction.followUp({
+        embeds: [Embeds.Success('Guild already registered')],
+      });
     }
   }
 
@@ -101,20 +105,23 @@ export class GuildCommand {
   //     guildId: interaction.guild.id,
   //   };
 
-  //   const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
+  //   expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
   //   const result = await this.rmq.request<number>({
   //     exchange: 'discord',
   //     routingKey: 'discord.rpc.guild.deregister',
   //     correlationId: interaction.id,
-  //     timeout,
-  //     expiration: timeout,
+  //     expiration,
   //     payload,
   //   });
 
   //   if (result) {
-  //     return interaction.followUp({ content: 'Guild deregistered' });
+  //     return interaction.followUp({
+  //       embeds: [Embeds.Success('Guild deregistered')],
+  //     });
   //   } else {
-  //     return interaction.followUp({ content: 'Guild not registered' });
+  //     return interaction.followUp({
+  //       embeds: [Embeds.Success('Guild not registered')],
+  //     });
   //   }
   // }
 }

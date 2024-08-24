@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
-import { RMQExceptionHandler } from './rmq-exception.filter';
+import { MessageHandlerErrorBehavior, RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
+import { RetryConsumer } from './retry.consumer';
 
 @Module({
   imports: [
@@ -13,11 +13,17 @@ import { RMQExceptionHandler } from './rmq-exception.filter';
         const pass = configService.getOrThrow<string>('RABBITMQ_DEFAULT_PASS');
         const host = configService.getOrThrow<string>('RABBITMQ_HOST');
         const port = configService.getOrThrow<number>('RABBITMQ_PORT');
+        const retryBase = configService.getOrThrow<number>('APP_QUEUE_RETRY_BACKOFF_BASE');
+        const retryMul = configService.getOrThrow<number>('APP_QUEUE_RETRY_BACKOFF_MULTIPLIER');
+        const retryMax = configService.getOrThrow<number>('APP_QUEUE_MAX_RETRY_COUNT');
 
         return {
           exchanges: [
             {
               name: 'discord',
+            },
+            {
+              name: 'retry',
             },
             {
               name: 'errors',
@@ -32,12 +38,20 @@ import { RMQExceptionHandler } from './rmq-exception.filter';
           ],
           uri: `amqp://${user}:${pass}@${host}:${port}`,
           connectionInitOptions: { wait: true },
+          logger: RMQModule.logger,
           defaultExchangeType: 'topic',
+          defaultRpcTimeout: retryMul * Math.pow(retryBase, retryMax),
+          defaultSubscribeErrorBehavior: MessageHandlerErrorBehavior.NACK,
+          defaultRpcErrorHandler: (channel, msg) => {
+            channel.nack(msg, false, false);
+          },
         };
       },
     }),
   ],
-  providers: [RMQExceptionHandler],
-  exports: [RabbitMQModule, RMQExceptionHandler],
+  providers: [RetryConsumer],
+  exports: [RabbitMQModule],
 })
-export class RMQModule {}
+export class RMQModule {
+  private static logger = new Logger(RMQModule.name, { timestamp: true });
+}
