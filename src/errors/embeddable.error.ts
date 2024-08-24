@@ -1,4 +1,4 @@
-import { EmbedBuilder, EmbedData, EmbedField, EmbedFooterData } from 'discord.js';
+import { Colors, EmbedBuilder, EmbedData, EmbedField, EmbedFooterData } from 'discord.js';
 import { ErrorBase } from './base.error';
 
 export class DiscordEmbeddableError<T extends string = string, C = any> extends ErrorBase<T, C> {
@@ -22,7 +22,7 @@ export class DiscordEmbeddableError<T extends string = string, C = any> extends 
     return new EmbedBuilder({
       title: this.name,
       description: this.message,
-      color: 0x992d22,
+      color: Colors.DarkRed,
       footer: this.footer,
       ...this.embed,
     });

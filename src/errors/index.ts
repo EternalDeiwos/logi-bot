@@ -11,7 +11,7 @@ export const InternalError = DiscordEmbeddableErrorFactory('InternalError', {
     fields: [
       {
         name: 'What happened?',
-        value: `You probably haven't done anything wrong but nobody should see this message, and seeing it means something is wrong or at least part of the bot is offline and we might not be aware of it. Please read the instructions below on how to report this.`,
+        value: `You probably haven't done anything wrong but something is wrong or at least part of the bot is offline and we might not be aware of it. Please read the instructions below on how to report this.`,
       },
       {
         name: 'What can I do?',
