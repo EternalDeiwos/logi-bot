@@ -8,7 +8,7 @@ import {
   Index,
   RelationId,
 } from 'typeorm';
-import { Guild } from 'src/discord/guild/guild.entity';
+import { Guild } from 'src/core/guild/guild.entity';
 import { War } from 'src/game/war/war.entity';
 import { Stockpile } from './stockpile.entity';
 

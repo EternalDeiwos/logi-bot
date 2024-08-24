@@ -5,7 +5,7 @@ import { CurrentRegion, Region } from 'src/game/region/region.entity';
 import { CurrentRegionLog, RegionLog } from 'src/game/region/region-log.entity';
 import { CurrentPoi, Poi } from 'src/game/poi/poi.entity';
 import { Catalog, ExpandedCatalog } from 'src/game/catalog/catalog.entity';
-import { Guild } from 'src/discord/guild/guild.entity';
+import { Guild } from 'src/core/guild/guild.entity';
 import { Stockpile } from 'src/inventory/stockpile/stockpile.entity';
 import { StockpileLog } from 'src/inventory/stockpile/stockpile-log.entity';
 import { StockpileEntry } from 'src/inventory/stockpile/stockpile-entry.entity';

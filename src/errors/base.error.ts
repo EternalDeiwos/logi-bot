@@ -1,4 +1,4 @@
-export class ErrorBase<T extends string, C = any> extends Error {
+export class ErrorBase<T extends string = string, C = any> extends Error {
   name: T;
   message: string;
   public cause?: C;
@@ -10,22 +10,22 @@ export class ErrorBase<T extends string, C = any> extends Error {
     this.cause = cause;
   }
 
-  get errorName() {
+  get className() {
     return this.constructor.name;
   }
 
   toString() {
-    return `${this.errorName} [${this.name}]: ${this.message}`;
+    return `${this.className} [${this.name}]: ${this.message}`;
   }
 }
 
-export const ErrorBaseFactory = <T extends string>(
+export const ErrorBaseFactory = <T extends string = string, C = any>(
   className: string,
-  descriptions: { [K in T]: string },
+  messages: { [K in T]: string },
 ) => {
-  const Class = class<C = any> extends ErrorBase<T, C> {
+  const Class = class extends ErrorBase<T, C> {
     constructor(name: T, cause?: C) {
-      super(name, descriptions[name], cause);
+      super(name, messages[name], cause);
     }
   };
   Object.defineProperty(Class, 'name', { value: className });

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { RMQModule } from 'src/rmq.module';
+import { RMQModule } from 'src/rmq/rmq.module';
 import { WarModule } from 'src/game/war/war.module';
 import { RegionModule } from 'src/game/region/region.module';
 import { PoiModule } from 'src/game/poi/poi.module';
