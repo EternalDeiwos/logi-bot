@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
+import { RMQExceptionHandler } from './rmq-exception.filter';
 
 @Module({
   imports: [
@@ -36,7 +37,7 @@ import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
       },
     }),
   ],
-  providers: [],
-  exports: [RabbitMQModule],
+  providers: [RMQExceptionHandler],
+  exports: [RabbitMQModule, RMQExceptionHandler],
 })
 export class RMQModule {}

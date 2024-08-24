@@ -1,6 +1,6 @@
 import { ExceptionFilter, Catch, Logger, ArgumentsHost, ContextType } from '@nestjs/common';
 import { Nack } from '@golevelup/nestjs-rabbitmq';
-import { ErrorBase, InternalError } from '.';
+import { ErrorBase, InternalError } from '../errors';
 
 @Catch()
 export class RMQExceptionHandler implements ExceptionFilter<ErrorBase<any>> {
