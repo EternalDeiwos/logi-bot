@@ -4,8 +4,10 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { EchoCommand } from 'src/core/core.command-group';
-import { ValidationError } from 'src/errors';
+import { AuthError, ValidationError } from 'src/errors';
 import { Embeds } from 'src/utils';
+import { GuildService } from './guild.service';
+import { DiscordAPIInteraction } from 'src/types';
 
 export class EditGuildCommandParams {
   @StringOption({
@@ -44,6 +46,7 @@ export class GuildCommand {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly guildService: GuildService,
     private readonly rmq: AmqpConnection,
   ) {}
 
@@ -65,15 +68,24 @@ export class GuildCommand {
     }
 
     const payload = {
-      guildId: interaction.guild.id,
-      name,
-      shortName,
-      icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),
+      interaction: interaction.toJSON() as DiscordAPIInteraction,
+      guild: {
+        guildId: interaction.guild.id,
+        name,
+        shortName,
+        icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),
+      },
     };
 
-    // Send user context alongside payload
-    // How does the consumer test access?
+    // Access control should happen closer to the logic (i.e. in GuildService etc.)
+    // Errors need to be passed back to RPC caller for proper error reporting
+    if (!(await this.guildService.isGuildAdmin(payload.interaction))) {
+      throw new AuthError('FORBIDDEN', payload.interaction);
+    }
+
     const expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
+
+    // Need to handle errors from the RPC
     const result = await this.rmq.request<number>({
       exchange: 'discord',
       routingKey: 'discord.rpc.guild.register',
@@ -101,9 +113,16 @@ export class GuildCommand {
   // async onDeregisterGuild(@Context() [interaction]: SlashCommandContext) {
   //   await interaction.deferReply({ ephemeral: true });
 
-  //   const payload = {
-  //     guildId: interaction.guild.id,
+  //   payload = {
+  //     interaction: interaction.toJSON(),
+  //     guild: {
+  //       guildId: interaction.guild.id,
+  //     },
   //   };
+
+  //   if (!(await this.guildService.isGuildAdmin(payload.interaction))) {
+  //     throw new AuthError('FORBIDDEN', payload.interaction);
+  //   }
 
   //   expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
   //   const result = await this.rmq.request<number>({

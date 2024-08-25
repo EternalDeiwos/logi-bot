@@ -11,6 +11,17 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validationSchema } from './app.config';
 
+declare global {
+  interface BigInt {
+    toJSON(): string;
+  }
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt#use_within_json
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 @Module({
   imports: [DatabaseModule, GameModule, CoreModule, InventoryModule],
   controllers: [AppController],

@@ -8,6 +8,7 @@ import {
   User,
   GuildMember,
 } from 'discord.js';
+import { DiscordAPIInteraction, isDiscordAPIInteraction } from 'src/types';
 import { ApiError, DatabaseError, ValidationError } from 'src/errors';
 import { GuildRepository } from './guild.repository';
 import { Guild, InsertGuild, SelectGuild } from './guild.entity';
@@ -64,15 +65,25 @@ export class GuildService {
   async isGuildAdmin(guild: DiscordGuild, user: User);
   async isGuildAdmin(guild: DiscordGuild, userId: Snowflake);
   async isGuildAdmin(guildId: Snowflake, user: User);
+  async isGuildAdmin(guildId: Snowflake, userId: Snowflake);
   async isGuildAdmin(member: GuildMember);
-  async isGuildAdmin(maybeMember: Snowflake | DiscordGuild | GuildMember, user?: Snowflake | User) {
+  async isGuildAdmin(interaction: DiscordAPIInteraction);
+  async isGuildAdmin(
+    maybeMember: Snowflake | DiscordGuild | GuildMember | DiscordAPIInteraction,
+    user?: Snowflake | User,
+  ) {
     try {
+      let interaction: DiscordAPIInteraction;
       let member: GuildMember;
       let guild: DiscordGuild;
 
       if (maybeMember instanceof GuildMember) {
         member = maybeMember;
         guild = maybeMember.guild;
+      } else if (isDiscordAPIInteraction(maybeMember)) {
+        interaction = maybeMember;
+        guild = await this.guildManager.fetch(interaction.guildId);
+        user = interaction.member;
       } else if (typeof maybeMember === 'string') {
         guild = await this.guildManager.fetch(maybeMember);
       } else {
