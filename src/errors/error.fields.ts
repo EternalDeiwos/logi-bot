@@ -2,7 +2,7 @@ import { EmbedField } from 'discord.js';
 
 export const HowReportBugField: EmbedField = {
   name: 'How do I report a bug?',
-  value: `The best way to report a bug is to file a new ticket, or if you can't then to post your bug report in a general channel. Your bug report should contain:\n1. Screenshot(s) of your bug\n2. What you were trying to do\n3. Steps to reproduce — please include which specific options you used and their values\n4. Any other information you think should be included — if you think it is relevant then it probably is`,
+  value: `The best way to report a bug is to file a new ticket, or if you can't then to post your bug report in a general channel. Your bug report should contain:\n1. Screenshot(s) of your bug\n2. What you were trying to do\n3. Steps to reproduce — include the options you used and their values\n4. Other relevant information — if you think it is relevant then it probably is`,
   inline: false,
 };
 
