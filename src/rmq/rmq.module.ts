@@ -2,6 +2,7 @@ import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MessageHandlerErrorBehavior, RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { RetryConsumer } from './retry.consumer';
+import { ErrorTraceConsumer } from './error.consumer';
 
 @Module({
   imports: [
@@ -34,6 +35,10 @@ import { RetryConsumer } from './retry.consumer';
               name: 'error-handling-main',
               exchange: 'errors',
               routingKey: '#',
+              options: {
+                durable: true,
+                maxLength: 1e4,
+              },
             },
           ],
           uri: `amqp://${user}:${pass}@${host}:${port}`,
@@ -49,7 +54,7 @@ import { RetryConsumer } from './retry.consumer';
       },
     }),
   ],
-  providers: [RetryConsumer],
+  providers: [RetryConsumer, ErrorTraceConsumer],
   exports: [RabbitMQModule],
 })
 export class RMQModule {

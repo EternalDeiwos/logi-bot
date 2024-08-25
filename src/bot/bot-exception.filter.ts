@@ -23,7 +23,10 @@ export class DiscordExceptionFilter implements ExceptionFilter<ErrorBase> {
     if (exception instanceof InternalError) {
       this.logger.error(exception, exception.cause?.stack ?? exception.stack);
     } else {
-      this.logger.warn(exception);
+      this.logger.warn(
+        exception,
+        exception.cause?.stack ?? JSON.stringify(exception.cause) ?? exception.stack,
+      );
     }
 
     const discovery: NecordBaseDiscovery<any> = host.getArgByIndex(1);

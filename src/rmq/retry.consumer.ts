@@ -40,7 +40,9 @@ export class RetryConsumer {
       expires: expiration * base,
     });
 
-    this.logger.debug(`Retrying ${originalRoutingKey}(${correlationId}) #${retryCount}`);
+    this.logger.debug(
+      `Retrying ${exchange}/${originalRoutingKey}(${correlationId}) #${retryCount}`,
+    );
 
     const result = await this.rmq.publish('', queue, payload, {
       expiration,
