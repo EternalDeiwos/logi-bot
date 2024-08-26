@@ -6,7 +6,7 @@ import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { EchoCommand } from 'src/core/core.command-group';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
-import { AuthError, ValidationError } from 'src/errors';
+import { ValidationError } from 'src/errors';
 import { ConsumerResponsePayload, DiscordAPIInteraction } from 'src/types';
 import { GuildService } from './guild.service';
 
@@ -79,24 +79,17 @@ export class GuildCommand {
       },
     };
 
-    // Access control should happen closer to the logic (i.e. in GuildService etc.)
-    // Errors need to be passed back to RPC caller for proper error reporting
-    if (!(await this.guildService.isGuildAdmin(payload.interaction))) {
-      throw new AuthError('FORBIDDEN', payload.interaction);
-    }
-
     const expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
 
-    // Need to handle errors from the RPC
-    const result = await this.rmq.request<ConsumerResponsePayload<number>>({
+    const { error: handlingError, content } = await this.rmq.request<
+      ConsumerResponsePayload<number>
+    >({
       exchange: 'discord',
       routingKey: 'discord.rpc.guild.register',
       correlationId: interaction.id,
       expiration,
       payload,
     });
-
-    const { error: handlingError, content } = result;
 
     if (handlingError) {
       return this.botService.reportCommandError(interaction, handlingError);

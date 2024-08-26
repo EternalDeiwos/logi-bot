@@ -4,8 +4,6 @@
 
 - Define command structure
 - Define, normalize, and validate inputs
-- ~~Check user/member permissions~~
-  - _Note:_ This is not ideal. Access control should be done as close to the logic as possible.
 - Prepare and serve response
 - Handle and report errors
 
@@ -17,5 +15,7 @@
 ## Queue Consumers
 
 - Call service methods to do the work
+- Check user/member access
 - Handle retry
 - Delegate to other handlers
+- Report errors to RPC caller

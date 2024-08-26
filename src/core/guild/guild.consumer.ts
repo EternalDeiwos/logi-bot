@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RabbitRPC } from '@golevelup/nestjs-rabbitmq';
 import { DiscordCommandHandlerPayload } from 'src/types';
-import { AuthError, InternalError, ValidationError } from 'src/errors';
+import { AuthError, ValidationError } from 'src/errors';
 import { GuildService } from './guild.service';
 import { InsertGuild, SelectGuild } from './guild.entity';
 
@@ -25,6 +25,11 @@ export class GuildConsumer {
   })
   public async registerGuildHandler(payload: RegisterGuildHandlerPayload) {
     const { guild } = payload;
+
+    if (!(await this.guildService.isGuildAdmin(payload.interaction))) {
+      throw new AuthError('FORBIDDEN', payload.interaction);
+    }
+
     const result = await this.guildService.registerGuild(guild);
     return result?.identifiers?.length;
   }
@@ -42,6 +47,10 @@ export class GuildConsumer {
     const { guild } = payload;
     if (!guild.id && !guild.guildId) {
       throw new ValidationError('MALFORMED_INPUT', payload);
+    }
+
+    if (!(await this.guildService.isGuildAdmin(payload.interaction))) {
+      throw new AuthError('FORBIDDEN', payload.interaction);
     }
 
     const result = await this.guildService.deleteGuild(guild);
