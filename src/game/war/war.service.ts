@@ -38,7 +38,7 @@ export class WarService {
       const response = await fetch(uri);
       return response.json();
     } catch (err) {
-      throw new ApiError('CLAPFOOT', err);
+      throw new ApiError('CLAPFOOT_ERROR', err);
     }
   }
 

@@ -59,7 +59,7 @@ export class CatalogService {
         }),
       );
     } catch (err) {
-      throw new ApiError('CATALOG', err);
+      throw new ApiError('CATALOG_ERROR', err);
     }
   }
 

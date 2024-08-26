@@ -55,7 +55,7 @@ export class RegionService {
         };
       });
     } catch (err) {
-      throw new ApiError('CLAPFOOT', err);
+      throw new ApiError('CLAPFOOT_ERROR', err);
     }
   }
 
@@ -73,7 +73,7 @@ export class RegionService {
         const response = await fetch(uri);
         data = await response.json();
       } catch (err) {
-        throw new ApiError('CLAPFOOT', err);
+        throw new ApiError('CLAPFOOT_ERROR', err);
       }
 
       const { mapTextItems, regionId: hexId } = data;
@@ -244,7 +244,7 @@ export class RegionService {
             data,
           });
         } catch (err) {
-          this.logger.error(new ApiError('CLAPFOOT', meta), err.stack);
+          this.logger.error(new ApiError('CLAPFOOT_ERROR', meta), err.stack);
           return;
         }
       });

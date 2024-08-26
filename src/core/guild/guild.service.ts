@@ -105,7 +105,7 @@ export class GuildService {
         member.roles.highest.permissions.has(PermissionsBitField.Flags.Administrator)
       );
     } catch (err) {
-      throw new ApiError('DISCORD', err);
+      throw new ApiError('DISCORD_ERROR', err);
     }
   }
 }
