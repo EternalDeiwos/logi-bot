@@ -1,3 +1,5 @@
+import { PreparedEmbedKey } from 'src/bot/embed';
+
 export class ErrorBase<T extends string = string, C = any> extends Error {
   name: T;
   message: string;
@@ -10,24 +12,19 @@ export class ErrorBase<T extends string = string, C = any> extends Error {
     this.cause = cause;
   }
 
-  get className() {
-    return this.constructor.name;
-  }
-
-  toString() {
-    return `${this.className} [${this.name}]: ${this.message}`;
+  static factory<T extends string = string, C = any>(messages: { [K in T]: string }) {
+    return class extends this<T> {
+      static readonly codes: string[] = Object.keys(messages);
+      constructor(name: T, cause?: C) {
+        super(name, messages[name], cause);
+      }
+    };
   }
 }
 
-export const ErrorBaseFactory = <T extends string = string, C = any>(
-  className: string,
-  messages: { [K in T]: string },
-) => {
-  const Class = class extends ErrorBase<T, C> {
-    constructor(name: T, cause?: C) {
-      super(name, messages[name], cause);
-    }
-  };
-  Object.defineProperty(Class, 'name', { value: className });
-  return Class;
-};
+export class DisplayError<T extends string = PreparedEmbedKey, C = any> extends ErrorBase<T, C> {}
+
+export type PreparedError<T extends string = string, C = any> =
+  | ReturnType<typeof ErrorBase.factory<T, C>>
+  | ReturnType<typeof DisplayError.factory<T, C>>;
+export type PreparedErrorCodes<T extends PreparedError> = ConstructorParameters<T>[0];

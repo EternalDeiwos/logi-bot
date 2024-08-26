@@ -1,16 +1,25 @@
-import { ExceptionFilter, Catch, Logger } from '@nestjs/common';
+import { ExceptionFilter, Catch, Logger, Inject } from '@nestjs/common';
 import { NecordArgumentsHost, NecordBaseDiscovery, NecordContextType } from 'necord';
-import { ApiError, DiscordEmbeddableError, ErrorBase, InternalError } from '../errors';
-import { CommandInteraction } from 'discord.js';
+import { DisplayError, DisplayErrorKey, ErrorBase, InternalError } from 'src/errors';
+import { BotService } from './bot.service';
 
 @Catch()
-export class DiscordExceptionFilter implements ExceptionFilter<ErrorBase> {
+export class DiscordExceptionFilter
+  implements ExceptionFilter<ErrorBase | DisplayError<DisplayErrorKey>>
+{
   private readonly logger = new Logger(DiscordExceptionFilter.name);
 
-  async catch(exception: DiscordEmbeddableError, host: NecordArgumentsHost): Promise<void> {
-    if (!(exception instanceof DiscordEmbeddableError)) {
-      exception = new InternalError('INTERNAL_SERVER_ERROR', exception);
-    }
+  @Inject()
+  private readonly botService: BotService;
+
+  async catch(
+    exception: ErrorBase | DisplayError<DisplayErrorKey>,
+    host: NecordArgumentsHost,
+  ): Promise<void> {
+    const displayable: DisplayError<DisplayErrorKey> =
+      exception instanceof DisplayError
+        ? exception
+        : new InternalError('INTERNAL_SERVER_ERROR', exception);
 
     if (host.getType<NecordContextType>() !== 'necord') {
       this.logger.error(
@@ -20,14 +29,9 @@ export class DiscordExceptionFilter implements ExceptionFilter<ErrorBase> {
       throw exception;
     }
 
-    if (exception instanceof InternalError) {
-      this.logger.error(exception, exception.cause?.stack ?? exception.stack);
-    } else {
-      this.logger.warn(
-        exception,
-        exception.cause?.stack ?? JSON.stringify(exception.cause) ?? exception.stack,
-      );
-    }
+    const pickCause = displayable.cause?.stack ?? displayable.cause ?? displayable.stack;
+    const cause = typeof pickCause === 'string' ? pickCause : JSON.stringify(pickCause);
+    this.logger.error(displayable, cause);
 
     const discovery: NecordBaseDiscovery<any> = host.getArgByIndex(1);
 
@@ -36,14 +40,10 @@ export class DiscordExceptionFilter implements ExceptionFilter<ErrorBase> {
       return this.logger.error(err, err.stack);
     }
 
-    const [interaction]: [CommandInteraction] = host.getArgByIndex(0);
-
-    try {
-      interaction.replied || interaction.deferred
-        ? await interaction.followUp({ embeds: [exception.toEmbed()], ephemeral: true })
-        : await interaction.reply({ embeds: [exception.toEmbed()], ephemeral: true });
-    } catch (err) {
-      this.logger.error(new ApiError('DISCORD'), err.stack);
-    }
+    this.botService.reportCommandError(host.getArgByIndex(0), {
+      code: displayable.name,
+      message: displayable.message,
+      cause,
+    });
   }
 }

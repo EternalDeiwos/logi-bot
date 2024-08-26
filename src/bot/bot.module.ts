@@ -4,6 +4,7 @@ import { NecordPaginationModule } from '@necord/pagination';
 import { NecordModule } from 'necord';
 import { IntentsBitField } from 'discord.js';
 import { DiscordExceptionFilter } from './bot-exception.filter';
+import { BotService } from './bot.service';
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { DiscordExceptionFilter } from './bot-exception.filter';
       allowTraversal: true,
     }),
   ],
-  providers: [DiscordExceptionFilter],
-  exports: [DiscordExceptionFilter],
+  providers: [DiscordExceptionFilter, BotService],
+  exports: [DiscordExceptionFilter, BotService],
 })
 export class BotModule {}

@@ -47,7 +47,28 @@ import { ErrorTraceConsumer } from './error.consumer';
           defaultExchangeType: 'topic',
           defaultRpcTimeout: retryMul * Math.pow(retryBase, retryMax),
           defaultSubscribeErrorBehavior: MessageHandlerErrorBehavior.NACK,
-          defaultRpcErrorHandler: (channel, msg) => {
+          defaultRpcErrorHandler: async (channel, msg, error) => {
+            const { replyTo, correlationId, expiration, headers } = msg.properties;
+            const { ['x-retry-count']: retryCount = 0 } = headers;
+
+            if (retryCount >= retryMax) {
+              const pickCause = error.cause?.stack ?? error.cause ?? error.stack;
+              const cause = typeof pickCause === 'string' ? pickCause : JSON.stringify(pickCause);
+              await channel.publish(
+                '',
+                replyTo,
+                Buffer.from(
+                  JSON.stringify({
+                    error: {
+                      code: error.name,
+                      message: error.message,
+                      cause,
+                    },
+                  }),
+                ),
+                { correlationId, expiration, headers },
+              );
+            }
             channel.nack(msg, false, false);
           },
         };

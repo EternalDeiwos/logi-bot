@@ -4,10 +4,11 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { EchoCommand } from 'src/core/core.command-group';
+import { SuccessEmbed } from 'src/bot/embed';
+import { BotService } from 'src/bot/bot.service';
 import { AuthError, ValidationError } from 'src/errors';
-import { Embeds } from 'src/utils';
+import { ConsumerResponsePayload, DiscordAPIInteraction } from 'src/types';
 import { GuildService } from './guild.service';
-import { DiscordAPIInteraction } from 'src/types';
 
 export class EditGuildCommandParams {
   @StringOption({
@@ -46,6 +47,7 @@ export class GuildCommand {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly botService: BotService,
     private readonly guildService: GuildService,
     private readonly rmq: AmqpConnection,
   ) {}
@@ -86,7 +88,7 @@ export class GuildCommand {
     const expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
 
     // Need to handle errors from the RPC
-    const result = await this.rmq.request<number>({
+    const result = await this.rmq.request<ConsumerResponsePayload<number>>({
       exchange: 'discord',
       routingKey: 'discord.rpc.guild.register',
       correlationId: interaction.id,
@@ -94,53 +96,20 @@ export class GuildCommand {
       payload,
     });
 
-    if (result) {
+    const { error: handlingError, content } = result;
+
+    if (handlingError) {
+      return this.botService.reportCommandError(interaction, handlingError);
+    }
+
+    if (content) {
       return interaction.followUp({
-        embeds: [Embeds.Success('Guild registered')],
+        embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Guild registered')],
       });
     } else {
       return interaction.followUp({
-        embeds: [Embeds.Success('Guild already registered')],
+        embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Guild already registered')],
       });
     }
   }
-
-  // @Subcommand({
-  //   name: 'deregister',
-  //   description: 'Deregister this guild',
-  //   dmPermission: false,
-  // })
-  // async onDeregisterGuild(@Context() [interaction]: SlashCommandContext) {
-  //   await interaction.deferReply({ ephemeral: true });
-
-  //   payload = {
-  //     interaction: interaction.toJSON(),
-  //     guild: {
-  //       guildId: interaction.guild.id,
-  //     },
-  //   };
-
-  //   if (!(await this.guildService.isGuildAdmin(payload.interaction))) {
-  //     throw new AuthError('FORBIDDEN', payload.interaction);
-  //   }
-
-  //   expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
-  //   const result = await this.rmq.request<number>({
-  //     exchange: 'discord',
-  //     routingKey: 'discord.rpc.guild.deregister',
-  //     correlationId: interaction.id,
-  //     expiration,
-  //     payload,
-  //   });
-
-  //   if (result) {
-  //     return interaction.followUp({
-  //       embeds: [Embeds.Success('Guild deregistered')],
-  //     });
-  //   } else {
-  //     return interaction.followUp({
-  //       embeds: [Embeds.Success('Guild not registered')],
-  //     });
-  //   }
-  // }
 }

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RabbitRPC } from '@golevelup/nestjs-rabbitmq';
 import { DiscordCommandHandlerPayload } from 'src/types';
-import { ValidationError } from 'src/errors';
+import { AuthError, InternalError, ValidationError } from 'src/errors';
 import { GuildService } from './guild.service';
 import { InsertGuild, SelectGuild } from './guild.entity';
 
@@ -24,6 +24,7 @@ export class GuildConsumer {
     },
   })
   public async registerGuildHandler(payload: RegisterGuildHandlerPayload) {
+    throw new InternalError('TEST_ERROR', { foo: 'bar' });
     const { guild } = payload;
     const result = await this.guildService.registerGuild(guild);
     return result?.identifiers?.length;
