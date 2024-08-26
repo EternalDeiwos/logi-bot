@@ -24,7 +24,6 @@ export class GuildConsumer {
     },
   })
   public async registerGuildHandler(payload: RegisterGuildHandlerPayload) {
-    throw new InternalError('TEST_ERROR', { foo: 'bar' });
     const { guild } = payload;
     const result = await this.guildService.registerGuild(guild);
     return result?.identifiers?.length;
