@@ -1,11 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { AppModule } from './app.module';
+import { ServerModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(ServerModule, {
+    logger:
+      process.env.NODE_ENV === 'production'
+        ? ['fatal', 'error', 'warn', 'log']
+        : ['fatal', 'error', 'warn', 'log', 'debug'],
+  });
   const configService = app.get(ConfigService);
-  const port = configService.getOrThrow('APP_PORT')
+  const port = configService.getOrThrow('APP_PORT');
   await app.listen(port);
 }
 bootstrap();
