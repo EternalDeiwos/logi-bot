@@ -18,7 +18,7 @@ import { War } from 'src/game/war/war.entity';
 @Unique('uk_poi_war_name', ['poiId', 'warNumber', 'name'])
 export class Stockpile {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_stockpile_id' })
-  id: number;
+  id: string;
 
   @Column({ name: 'guild_id', type: 'int8' })
   @RelationId((stockpile: Stockpile) => stockpile.guild)

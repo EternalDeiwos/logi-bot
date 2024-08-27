@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, IsNull, Repository } from 'typeorm';
+import { CommonRepository } from 'src/database/util';
 import { CurrentRegion, Region } from './region.entity';
 import { CurrentRegionLog } from './region-log.entity';
 
@@ -11,7 +12,7 @@ export type RegionLogMetadata = {
 };
 
 @Injectable()
-export class RegionRepository extends Repository<Region> {
+export class RegionRepository extends CommonRepository<Region> {
   constructor(private readonly dataSource: DataSource) {
     super(Region, dataSource.createEntityManager());
   }

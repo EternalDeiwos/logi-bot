@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, IsNull, Repository } from 'typeorm';
+import { CommonRepository } from 'src/database/util';
 import { RegionLog } from 'src/game/region/region-log.entity';
 import { CurrentPoi, Poi } from './poi.entity';
 
 @Injectable()
-export class PoiRepository extends Repository<Poi> {
+export class PoiRepository extends CommonRepository<Poi> {
   constructor(private readonly dataSource: DataSource) {
     super(Poi, dataSource.createEntityManager());
   }

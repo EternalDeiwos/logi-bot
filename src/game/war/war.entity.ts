@@ -10,7 +10,7 @@ export enum WarFaction {
 @Unique('uk_clapfoot_id_war', ['id'])
 export class War {
   @PrimaryColumn({ name: 'war_number', type: 'int8', primaryKeyConstraintName: 'pk_war_number' })
-  warNumber: number;
+  warNumber: string;
 
   @Column({ type: 'enum', enumName: 'faction', enum: WarFaction, default: WarFaction.None })
   winner: WarFaction;

@@ -13,7 +13,7 @@ import { WarFaction } from 'src/game/war/war.entity';
 @Unique('uk_foxhole_catalog_name', ['gameVersion', 'catalogVersion', 'name'])
 export class Catalog {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_catalog_id' })
-  id: number;
+  id: string;
 
   @Column({ name: 'foxhole_version' })
   gameVersion: string;
@@ -133,7 +133,7 @@ export class Catalog {
 })
 export class ExpandedCatalog {
   @ViewColumn()
-  id: number;
+  id: string;
 
   @ViewColumn({ name: 'foxhole_version' })
   gameVersion: string;

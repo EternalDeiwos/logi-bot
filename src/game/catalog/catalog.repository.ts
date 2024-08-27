@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DataSource, Repository } from 'typeorm';
 import { Catalog, ExpandedCatalog } from './catalog.entity';
-import { ConfigService } from '@nestjs/config';
+import { CommonRepository } from 'src/database/util';
 
 @Injectable()
-export class CatalogRepository extends Repository<Catalog> {
+export class CatalogRepository extends CommonRepository<Catalog> {
   constructor(private readonly dataSource: DataSource) {
     super(Catalog, dataSource.createEntityManager());
   }

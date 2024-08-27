@@ -16,7 +16,7 @@ type HexData = {
 };
 
 type StaticMapData = {
-  regionId: number;
+  regionId: string;
   mapTextItems: { text: string; x: number; y: number; mapMarkerType: string }[];
 };
 
@@ -237,7 +237,7 @@ export class RegionService {
           this.logger.log(`Update for ${meta.map_name} version ${version}`);
 
           return this.logRepo.create({
-            hexId: parseInt(meta.hex_id),
+            hexId: meta.hex_id,
             version,
             warNumber: war.warNumber,
             updatedAt: DateTime.fromMillis(updatedAt).toJSDate(),

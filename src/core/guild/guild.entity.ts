@@ -6,20 +6,26 @@ import {
   DeleteDateColumn,
   Unique,
   DeepPartial,
+  OneToMany,
 } from 'typeorm';
+import { CrewShare } from '../crew/crew-share.entity';
 
 export type InsertGuild = DeepPartial<Omit<Guild, 'createdAt' | 'deletedAt'>>;
-export type SelectGuild = DeepPartial<Pick<Guild, 'id' | 'guildId'>>;
-export type GuildConfig = {};
+export type SelectGuild = DeepPartial<Pick<Guild, 'id' | 'guildSf'>>;
+export type GuildConfig = {
+  crewAuditChannel?: string;
+  globalLogChannel?: string;
+  ticketTriageCrew?: string;
+};
 
 @Entity()
-@Unique('uk_guild_sf_deleted_at', ['guildId', 'deletedAt'])
+@Unique('uk_guild_sf_deleted_at', ['guildSf', 'deletedAt'])
 export class Guild {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_guild_id' })
-  id: number;
+  id: string;
 
   @Column({ name: 'guild_sf', type: 'int8' })
-  guildId: string;
+  guildSf: string;
 
   @Column({ name: 'name' })
   name: string;
@@ -32,6 +38,9 @@ export class Guild {
 
   @Column({ type: 'jsonb', default: {} })
   config: GuildConfig;
+
+  @OneToMany(() => CrewShare, (share) => share.guild)
+  shared: Promise<CrewShare[]>;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

@@ -16,7 +16,7 @@ import { StockpileLog } from './stockpile-log.entity';
 @Entity()
 export class StockpileEntry {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_stockpile_entry_id' })
-  id: number;
+  id: string;
 
   @Column({ name: 'guild_id', type: 'int8' })
   @RelationId((entry: StockpileEntry) => entry.guild)

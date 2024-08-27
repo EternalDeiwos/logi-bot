@@ -72,7 +72,7 @@ export class GuildCommand {
     const payload = {
       interaction: interaction.toJSON() as DiscordAPIInteraction,
       guild: {
-        guildId: interaction.guild.id,
+        guildSf: interaction.guild.id,
         name,
         shortName,
         icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),

@@ -6,7 +6,7 @@ import { WarRepository } from './war.repository';
 import { WarFaction } from './war.entity';
 
 type WarData = {
-  warNumber: number;
+  warNumber: string;
   warId: string;
   winner: string;
   conquestStartTime: number;

@@ -23,8 +23,8 @@ export class GuildService {
   ) {}
 
   async registerGuild(guild: InsertGuild) {
-    if (!guild.guildId) {
-      throw new ValidationError('MALFORMED_INPUT', { guildId: guild.guildId });
+    if (!guild.guildSf) {
+      throw new ValidationError('MALFORMED_INPUT', { guildId: guild.guildSf });
     }
 
     try {
@@ -62,16 +62,16 @@ export class GuildService {
     }
   }
 
-  async isGuildAdmin(guild: DiscordGuild, user: User);
-  async isGuildAdmin(guild: DiscordGuild, userId: Snowflake);
-  async isGuildAdmin(guildId: Snowflake, user: User);
-  async isGuildAdmin(guildId: Snowflake, userId: Snowflake);
-  async isGuildAdmin(member: GuildMember);
-  async isGuildAdmin(interaction: DiscordAPIInteraction);
+  async isGuildAdmin(guild: DiscordGuild, user: User): Promise<boolean>;
+  async isGuildAdmin(guild: DiscordGuild, userId: Snowflake): Promise<boolean>;
+  async isGuildAdmin(guildId: Snowflake, user: User): Promise<boolean>;
+  async isGuildAdmin(guildId: Snowflake, userId: Snowflake): Promise<boolean>;
+  async isGuildAdmin(member: GuildMember): Promise<boolean>;
+  async isGuildAdmin(interaction: DiscordAPIInteraction): Promise<boolean>;
   async isGuildAdmin(
     maybeMember: Snowflake | DiscordGuild | GuildMember | DiscordAPIInteraction,
     user?: Snowflake | User,
-  ) {
+  ): Promise<boolean> {
     try {
       let interaction: DiscordAPIInteraction;
       let member: GuildMember;

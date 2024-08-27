@@ -17,7 +17,7 @@ import { Region } from 'src/game/region/region.entity';
 @Entity()
 export class Poi {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_poi_id' })
-  id: number;
+  id: string;
 
   @ManyToOne(() => Region, { onDelete: 'RESTRICT', lazy: true })
   @JoinColumn({
@@ -30,7 +30,7 @@ export class Poi {
   @Column({ name: 'region_id', type: 'int8' })
   @RelationId((poi: Poi) => poi.region)
   @Index('region_idx_poi')
-  regionId: number;
+  regionId: string;
 
   @ManyToOne(() => War, { onDelete: 'RESTRICT', lazy: true })
   @JoinColumn({
@@ -43,7 +43,7 @@ export class Poi {
   @Column({ name: 'war_number', type: 'int8' })
   @RelationId((poi: Poi) => poi.war)
   @Index('war_number_idx_poi')
-  warNumber: number;
+  warNumber: string;
 
   @Column({ name: 'marker_type', type: 'int4' })
   @Index('marker_type_idx_poi')
@@ -85,13 +85,13 @@ export class Poi {
 })
 export class CurrentPoi {
   @ViewColumn()
-  id: number;
+  id: string;
 
   @ViewColumn({ name: 'hex_id' })
-  hexId: number;
+  hexId: string;
 
   @ViewColumn({ name: 'region_id' })
-  regionId: number;
+  regionId: string;
 
   @ManyToOne(() => Region)
   @JoinColumn({ name: 'region_id', referencedColumnName: 'id' })
@@ -102,7 +102,7 @@ export class CurrentPoi {
   war: Promise<War>;
 
   @ViewColumn({ name: 'war_number' })
-  warNumber: number;
+  warNumber: string;
 
   @ViewColumn()
   x: number;

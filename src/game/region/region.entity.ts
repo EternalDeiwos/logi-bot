@@ -14,11 +14,11 @@ import {
 @Unique('uk_hex_major_minor_deleted_at', ['hexId', 'majorName', 'minorName', 'deletedAt'])
 export class Region {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_region_id' })
-  id: number;
+  id: string;
 
   @Column({ name: 'hex_id', type: 'int8' })
   @Index('hex_idx_region')
-  hexId: number;
+  hexId: string;
 
   @Column({ name: 'map_name' })
   mapName: string;
@@ -52,10 +52,10 @@ export class Region {
 })
 export class CurrentRegion {
   @ViewColumn()
-  id: number;
+  id: string;
 
   @ViewColumn({ name: 'hex_id' })
-  hexId: number;
+  hexId: string;
 
   @ViewColumn({ name: 'map_name' })
   mapName: string;

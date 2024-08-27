@@ -23,14 +23,14 @@ export type DynamicMapData = {
 @Entity()
 export class RegionLog {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_region_log_id' })
-  id: number;
+  id: string;
 
   @Column({ name: 'hex_id', type: 'int8' })
   @Index('hex_idx_region_log')
-  hexId: number;
+  hexId: string;
 
   @Column({ name: 'version', type: 'int8' })
-  version: number;
+  version: string;
 
   @ManyToOne(() => War, { onDelete: 'RESTRICT', lazy: true })
   @JoinColumn({
@@ -43,7 +43,7 @@ export class RegionLog {
   @Column({ name: 'war_number', type: 'int8' })
   @RelationId((update: RegionLog) => update.war)
   @Index('war_number_idx_region_log')
-  warNumber: number;
+  warNumber: string;
 
   @Column('jsonb')
   data: DynamicMapData;
@@ -66,13 +66,13 @@ export class RegionLog {
 })
 export class CurrentRegionLog {
   @ViewColumn()
-  id: number;
+  id: string;
 
   @ViewColumn({ name: 'hex_id' })
-  hexId: number;
+  hexId: string;
 
   @ViewColumn({ name: 'version' })
-  version: number;
+  version: string;
 
   @ManyToOne(() => War)
   @JoinColumn({
@@ -83,7 +83,7 @@ export class CurrentRegionLog {
   war: Promise<War>;
 
   @ViewColumn({ name: 'war_number' })
-  warNumber: number;
+  warNumber: string;
 
   @ViewColumn()
   data: DynamicMapData;

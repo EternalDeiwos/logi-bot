@@ -24,10 +24,10 @@ export class GuildConsumer {
     },
   })
   public async registerGuildHandler(payload: RegisterGuildHandlerPayload) {
-    const { guild } = payload;
+    const { guild, interaction } = payload;
 
-    if (!(await this.guildService.isGuildAdmin(payload.interaction))) {
-      throw new AuthError('FORBIDDEN', payload.interaction);
+    if (!(await this.guildService.isGuildAdmin(interaction))) {
+      throw new AuthError('FORBIDDEN', interaction);
     }
 
     const result = await this.guildService.registerGuild(guild);
@@ -44,13 +44,13 @@ export class GuildConsumer {
     },
   })
   public async deregisterGuildHandler(payload: DeregisterGuildHandlerPayload) {
-    const { guild } = payload;
-    if (!guild.id && !guild.guildId) {
+    const { guild, interaction } = payload;
+    if (!guild.id && !guild.guildSf) {
       throw new ValidationError('MALFORMED_INPUT', payload);
     }
 
-    if (!(await this.guildService.isGuildAdmin(payload.interaction))) {
-      throw new AuthError('FORBIDDEN', payload.interaction);
+    if (!(await this.guildService.isGuildAdmin(interaction))) {
+      throw new AuthError('FORBIDDEN', interaction);
     }
 
     const result = await this.guildService.deleteGuild(guild);
