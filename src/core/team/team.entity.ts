@@ -4,10 +4,12 @@ import {
   Index,
   OneToMany,
   CreateDateColumn,
-  PrimaryColumn,
   DeleteDateColumn,
   ManyToOne,
   JoinColumn,
+  DeepPartial,
+  PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { TicketTag } from 'src/types';
@@ -15,9 +17,27 @@ import { ForumTag } from 'src/core/tag/tag.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
+export type InsertTeam = DeepPartial<
+  Omit<
+    Team,
+    | 'createdAt'
+    | 'deletedAt'
+    | 'guild'
+    | 'tags'
+    | 'crews'
+    | 'resolveSnowflakeFromTag'
+    | 'resolveNameFromSnowflake'
+    | 'getTagMap'
+    | 'getSnowflakeMap'
+    | 'getDefaultTags'
+  >
+>;
+export type SelectTeam = DeepPartial<Pick<Team, 'id'>>;
+
 @Entity()
+@Unique('uk_name_guild_id_team', ['name', 'guildId'])
 export class Team {
-  @PrimaryColumn({ type: 'int8', primaryKeyConstraintName: 'pk_team_id' })
+  @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_team_id' })
   id: string;
 
   @Column()
