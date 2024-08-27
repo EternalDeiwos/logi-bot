@@ -1,13 +1,18 @@
 import { Injectable, Logger, UseFilters } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
+import { ChannelType, GuildChannel } from 'discord.js';
+import {
+  ChannelOption,
+  Context,
+  Options,
+  SlashCommandContext,
+  StringOption,
+  Subcommand,
+} from 'necord';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { EchoCommand } from 'src/core/core.command-group';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
 import { ValidationError } from 'src/errors';
-import { ConsumerResponsePayload, DiscordAPIInteraction } from 'src/types';
 import { GuildService } from './guild.service';
 
 export class EditGuildCommandParams {
@@ -36,6 +41,16 @@ export class SelectGuildCommandParams {
   guild: string;
 }
 
+export class SetAuditChannelCommandParams {
+  @ChannelOption({
+    name: 'audit',
+    description: 'A channel where crew control messages will be displayed.',
+    channel_types: [ChannelType.GuildText],
+    required: true,
+  })
+  audit: GuildChannel;
+}
+
 @Injectable()
 @EchoCommand({
   name: 'guild',
@@ -46,10 +61,8 @@ export class GuildCommand {
   private readonly logger = new Logger(GuildCommand.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly botService: BotService,
     private readonly guildService: GuildService,
-    private readonly rmq: AmqpConnection,
   ) {}
 
   @Subcommand({
@@ -61,7 +74,6 @@ export class GuildCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: EditGuildCommandParams,
   ) {
-    await interaction.deferReply({ ephemeral: true });
     const name = data.name ?? interaction.guild.name;
     const shortName = data.shortName ?? interaction.guild.nameAcronym;
 
@@ -69,40 +81,57 @@ export class GuildCommand {
       throw new ValidationError('MALFORMED_INPUT', { name, shortName });
     }
 
-    const payload = {
-      interaction: interaction.toJSON() as DiscordAPIInteraction,
-      guild: {
-        guildSf: interaction.guild.id,
-        name,
-        shortName,
-        icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),
+    const { content, error } = await this.botService.request<number>(
+      interaction,
+      'discord',
+      'discord.rpc.guild.register',
+      {
+        guild: {
+          guildSf: interaction.guild.id,
+          name,
+          shortName,
+          icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),
+        },
       },
-    };
+    );
 
-    const expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
-
-    const { error: handlingError, content } = await this.rmq.request<
-      ConsumerResponsePayload<number>
-    >({
-      exchange: 'discord',
-      routingKey: 'discord.rpc.guild.register',
-      correlationId: interaction.id,
-      expiration,
-      payload,
-    });
-
-    if (handlingError) {
-      return this.botService.reportCommandError(interaction, handlingError);
+    if (error) {
+      return this.botService.reportCommandError(interaction, error);
     }
 
     if (content) {
-      return interaction.followUp({
+      await interaction.followUp({
         embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Guild registered')],
       });
     } else {
-      return interaction.followUp({
+      await interaction.followUp({
         embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Guild already registered')],
       });
     }
+  }
+
+  @Subcommand({
+    name: 'set_audit',
+    description: 'Set the audit channel for this guild. Guild Admin only',
+    dmPermission: false,
+  })
+  async onTeamSetAuditChannel(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() { audit }: SetAuditChannelCommandParams,
+  ) {
+    if (!audit) {
+      throw new ValidationError('MALFORMED_INPUT', { audit });
+    }
+
+    await this.guildService.setConfig(
+      { guildSf: interaction.guildId },
+      'crewAuditChannel',
+      audit.id,
+    );
+
+    await interaction.reply({
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Configuration updated')],
+      ephemeral: true,
+    });
   }
 }

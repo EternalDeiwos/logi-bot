@@ -24,17 +24,25 @@ export class GuildService {
 
   async registerGuild(guild: InsertGuild) {
     if (!guild.guildSf) {
-      throw new ValidationError('MALFORMED_INPUT', { guildId: guild.guildSf });
+      throw new ValidationError('MALFORMED_INPUT', { guildSf: guild.guildSf });
     }
 
     try {
-      const result = await this.guildRepo.upsert(guild, ['guildId', 'deletedAt']);
+      const result = await this.guildRepo.upsert(guild, ['guildSf', 'deletedAt']);
       if (result.identifiers.length) {
         this.logger.log(`Registered guild ${guild.name}`);
       }
       return result;
     } catch (err) {
       throw new DatabaseError('QUERY_FAILED', 'Failed to register guild', err);
+    }
+  }
+
+  async getGuild(guild: SelectGuild) {
+    try {
+      return this.guildRepo.findOne({ where: guild });
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to fetch guild', err);
     }
   }
 
@@ -52,13 +60,30 @@ export class GuildService {
         { ...criteria, deletedAt: IsNull() },
         { deletedAt: new Date() },
       );
-      const guild = (result?.raw as Guild[]).pop();
+
       if (result?.affected) {
+        const guild = (result?.raw as Guild[]).pop();
         this.logger.log(`Deregistered guild ${guild.name}`);
       }
+
       return result;
     } catch (err) {
       throw new DatabaseError('QUERY_FAILED', 'Failed to deregister guild', err);
+    }
+  }
+
+  async setConfig(...args: Parameters<GuildRepository['setConfig']>) {
+    try {
+      const result = await this.guildRepo.setConfig(...args);
+
+      if (result?.affected) {
+        const guild = (result?.raw as Guild[]).pop();
+        this.logger.log(`Update guild config for ${guild.name}`);
+      }
+
+      return result;
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to update guild config', err);
     }
   }
 

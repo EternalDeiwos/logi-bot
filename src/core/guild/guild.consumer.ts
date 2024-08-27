@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RabbitRPC } from '@golevelup/nestjs-rabbitmq';
-import { DiscordCommandHandlerPayload } from 'src/types';
+import { ConsumerResponsePayload, DiscordCommandHandlerPayload } from 'src/types';
 import { AuthError, ValidationError } from 'src/errors';
 import { GuildService } from './guild.service';
 import { InsertGuild, SelectGuild } from './guild.entity';
@@ -23,7 +23,9 @@ export class GuildConsumer {
       durable: true,
     },
   })
-  public async registerGuildHandler(payload: RegisterGuildHandlerPayload) {
+  public async registerGuildHandler(
+    payload: RegisterGuildHandlerPayload,
+  ): Promise<ConsumerResponsePayload> {
     const { guild, interaction } = payload;
 
     if (!(await this.guildService.isGuildAdmin(interaction))) {
@@ -31,7 +33,7 @@ export class GuildConsumer {
     }
 
     const result = await this.guildService.registerGuild(guild);
-    return result?.identifiers?.length;
+    return { content: result?.identifiers?.length };
   }
 
   @RabbitRPC({
@@ -43,7 +45,9 @@ export class GuildConsumer {
       durable: true,
     },
   })
-  public async deregisterGuildHandler(payload: DeregisterGuildHandlerPayload) {
+  public async deregisterGuildHandler(
+    payload: DeregisterGuildHandlerPayload,
+  ): Promise<ConsumerResponsePayload> {
     const { guild, interaction } = payload;
     if (!guild.id && !guild.guildSf) {
       throw new ValidationError('MALFORMED_INPUT', payload);
@@ -54,6 +58,6 @@ export class GuildConsumer {
     }
 
     const result = await this.guildService.deleteGuild(guild);
-    return result?.affected;
+    return { content: result?.affected };
   }
 }
