@@ -3,11 +3,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NecordPaginationModule } from '@necord/pagination';
 import { NecordModule } from 'necord';
 import { IntentsBitField } from 'discord.js';
+import { RMQModule } from 'src/rmq/rmq.module';
 import { DiscordExceptionFilter } from './bot-exception.filter';
 import { BotService } from './bot.service';
 
 @Module({
   imports: [
+    RMQModule,
     NecordModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

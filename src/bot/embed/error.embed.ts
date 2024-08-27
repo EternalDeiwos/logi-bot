@@ -1,4 +1,4 @@
-import { APIEmbedField } from 'discord.js';
+import { APIEmbedField, Colors } from 'discord.js';
 import { BaseEmbed } from './factory/embed.factory';
 
 export const HowReportBugField: APIEmbedField = {
@@ -15,6 +15,7 @@ export const ErrorEmbed = BaseEmbed.factory({
   INTERNAL_SERVER_ERROR: {
     title: '⚠️🔥 Internal Server Error',
     description: `Something went wrong on our side.`,
+    color: Colors.DarkRed,
     fields: [
       {
         name: 'What happened?',
@@ -30,6 +31,7 @@ export const ErrorEmbed = BaseEmbed.factory({
   OFFLINE_ERROR: {
     title: '🛠️ Bot Offline',
     description: `At least part of our service is offline.`,
+    color: Colors.DarkRed,
     fields: [
       {
         name: 'What can I do?',
@@ -43,11 +45,13 @@ export const ErrorEmbed = BaseEmbed.factory({
   TEST_ERROR: {
     title: '🧪 Testing',
     description: `If you weren't expecting to see this then please report it.`,
+    color: Colors.DarkRed,
     fields: [HowReportBugField],
   },
   FORBIDDEN: {
     title: '🔒 Access Denied',
     description: 'You do not have access.',
+    color: Colors.DarkRed,
     fields: [
       {
         name: `I should be able to access this!`,
@@ -59,6 +63,7 @@ export const ErrorEmbed = BaseEmbed.factory({
   MALFORMED_INPUT: {
     title: '📝 Input Missing',
     description: 'One or more required fields are missing.',
+    color: Colors.DarkRed,
     fields: [
       {
         name: 'Troubleshooting',
@@ -67,5 +72,9 @@ export const ErrorEmbed = BaseEmbed.factory({
       OptionSelectHelpField,
       HowReportBugField,
     ],
+  },
+  ERROR_GENERIC: {
+    titlePrefix: '🚫',
+    color: Colors.DarkRed,
   },
 });

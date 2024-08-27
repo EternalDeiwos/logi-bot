@@ -16,11 +16,6 @@ export class DiscordExceptionFilter
     exception: ErrorBase | DisplayError<DisplayErrorKey>,
     host: NecordArgumentsHost,
   ): Promise<void> {
-    const displayable: DisplayError<DisplayErrorKey> =
-      exception instanceof DisplayError
-        ? exception
-        : new InternalError('INTERNAL_SERVER_ERROR', exception);
-
     if (host.getType<NecordContextType>() !== 'necord') {
       this.logger.error(
         'Filter can only be used for Discord command handlers',
@@ -29,9 +24,9 @@ export class DiscordExceptionFilter
       throw exception;
     }
 
-    const pickCause = displayable.cause?.stack ?? displayable.cause ?? displayable.stack;
+    const pickCause = exception.cause?.stack ?? exception.cause ?? exception.stack;
     const cause = typeof pickCause === 'string' ? pickCause : JSON.stringify(pickCause);
-    this.logger.error(displayable, cause);
+    this.logger.error(exception, cause);
 
     const discovery: NecordBaseDiscovery<any> = host.getArgByIndex(1);
 
@@ -40,7 +35,12 @@ export class DiscordExceptionFilter
       return this.logger.error(err, err.stack);
     }
 
-    this.botService.reportCommandError(host.getArgByIndex(0), {
+    const displayable: DisplayError<DisplayErrorKey> =
+      exception instanceof DisplayError
+        ? exception
+        : new InternalError('INTERNAL_SERVER_ERROR', exception);
+
+    await this.botService.reportCommandError(host.getArgByIndex(0), {
       code: displayable.name,
       message: displayable.message,
       cause,

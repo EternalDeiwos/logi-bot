@@ -21,6 +21,9 @@ export const ApiError = ErrorBase.factory({
   DISCORD_ERROR: 'Rejected',
 });
 
+export type GenericDisplayErrorCodes = 'ERROR_GENERIC';
+export class GenericDisplayError extends DisplayError<GenericDisplayErrorCodes> {}
+
 export type DatabaseErrorCodes = 'QUERY_FAILED';
 export class DatabaseError extends ErrorBase<DatabaseErrorCodes> {}
 
@@ -28,12 +31,14 @@ export const DisplayErrors = {
   InternalError,
   AuthError,
   ValidationError,
+  GenericDisplayError,
 };
 
 export const Errors = {
   InternalError,
   AuthError,
   ValidationError,
+  GenericDisplayError,
   ApiError,
   DatabaseError,
 };
