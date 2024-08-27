@@ -1,6 +1,23 @@
 import { LocaleString, Snowflake } from 'discord.js';
 import { ErrorKey } from 'src/errors';
 
+export enum CrewMemberAccess {
+  OWNER = 0,
+  ADMIN = 1,
+  MEMBER = 10,
+}
+
+export enum TicketTag {
+  TRIAGE = 'Triage',
+  ACCEPTED = 'Accepted',
+  DECLINED = 'Declined',
+  REPEATABLE = 'Repeatable',
+  IN_PROGRESS = 'In Progress',
+  DONE = 'Done',
+  MOVED = 'Moved',
+  ABANDONED = 'Abandoned',
+}
+
 export type ArrayElement<A> = A extends readonly (infer T)[] ? T : never;
 
 export type DiscordAPIWebhook = {
@@ -8,6 +25,7 @@ export type DiscordAPIWebhook = {
   token: string;
   url: string;
 };
+
 export type DiscordAPIInteractionOptions = {};
 export type DiscordAPIInteraction = {
   type: number;
@@ -32,7 +50,28 @@ export type DiscordAPIInteraction = {
   webhook: DiscordAPIWebhook;
   options: DiscordAPIInteractionOptions;
 };
-export type DiscordCommandHandlerPayload = { interaction: DiscordAPIInteraction };
+
+export enum MoveTicketBehaviour {
+  DELETE = 'delete',
+  ARCHIVE = 'archive',
+}
+
+export type MoveTicketOptions = {
+  moveTicketMode: MoveTicketBehaviour;
+};
+
+export type SkipAccessControlOptions = {
+  skipAccessControl: boolean;
+};
+
+export type ArchiveOptions = {
+  archiveTargetRef: Snowflake;
+  archiveTag: string;
+};
+
+export type DiscordCommandHandlerPayload = {
+  interaction: DiscordAPIInteraction;
+};
 
 // Useful helper for correctly assigning type of a serialized Discord Interaction on the consumer side
 export function isDiscordAPIInteraction(interaction: any): interaction is DiscordAPIInteraction {
