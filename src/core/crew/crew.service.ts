@@ -23,12 +23,12 @@ import {
 import { ConfigService } from 'src/config';
 import { ArchiveOptions, DeleteOptions } from 'src/types';
 import { OperationStatus, toSlug } from 'src/util';
-import { TeamService } from 'src/bot/team/team.service';
-import { TeamRepository } from 'src/bot/team/team.repository';
-import { TagService, TicketTag } from 'src/bot/tag/tag.service';
-import { TagTemplateRepository } from 'src/bot/tag/tag-template.repository';
-import { TicketService } from 'src/bot/ticket/ticket.service';
-import { TicketRepository } from 'src/bot/ticket/ticket.repository';
+import { TeamService } from 'src/core/team/team.service';
+import { TeamRepository } from 'src/core/team/team.repository';
+import { TagService, TicketTag } from 'src/core/tag/tag.service';
+import { TagTemplateRepository } from 'src/core/tag/tag-template.repository';
+import { TicketService } from 'src/core/ticket/ticket.service';
+import { TicketRepository } from 'src/core/ticket/ticket.repository';
 import { Crew } from './crew.entity';
 import { CrewRepository } from './crew.repository';
 import { CrewMember, CrewMemberAccess } from './member/crew-member.entity';

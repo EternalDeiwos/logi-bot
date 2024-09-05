@@ -8,7 +8,7 @@ import {
   RelationId,
   CreateDateColumn,
 } from 'typeorm';
-import { Crew } from 'src/bot/crew/crew.entity';
+import { Crew } from 'src/core/crew/crew.entity';
 import { Snowflake } from 'discord.js';
 import { AdminOverrideOptions, DeleteOptions, SkipAccessControlOptions } from 'src/types';
 

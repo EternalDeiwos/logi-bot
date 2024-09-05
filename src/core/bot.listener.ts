@@ -3,7 +3,7 @@ import { Context, ContextOf, On } from 'necord';
 import { Config, ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
 import { MoveTicketBehaviour } from 'src/types';
-import { TagService, TicketTag } from 'src/bot/tag/tag.service';
+import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { TicketService } from './ticket/ticket.service';
 import { TicketRepository } from './ticket/ticket.repository';
 import { CrewRepository } from './crew/crew.repository';

@@ -1,9 +1,8 @@
 import { Inject, Logger, Module, OnApplicationBootstrap } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bullmq';
 import { DataSource } from 'typeorm';
 import { Config, ConfigModule, ConfigService } from 'src/config';
-import { BotModule } from 'src/bot';
+import { BotModule } from 'src/core/bot.module';
 import { AppController } from './app.controller';
 import { PermissionsService } from './permissions.service';
 
@@ -24,19 +23,6 @@ import { PermissionsService } from './permissions.service';
         autoLoadEntities: true,
         synchronize: configService.getOrThrow<string>(Config.NODE_ENV) !== 'production',
       }),
-    }),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        return {
-          connection: {
-            host: configService.getOrThrow<string>(Config.REDIS_HOST),
-            port: configService.getOrThrow<number>(Config.REDIS_PORT),
-            db: configService.getOrThrow<number>(Config.REDIS_QUEUE_DB),
-          },
-        };
-      },
     }),
     BotModule,
   ],

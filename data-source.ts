@@ -1,14 +1,14 @@
 import { DataSource } from 'typeorm';
 import * as migrations from './migrations';
-import { Team } from 'src/bot/team/team.entity';
-import { Crew } from 'src/bot/crew/crew.entity';
-import { CrewMember } from 'src/bot/crew/member/crew-member.entity';
-import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
-import { ForumTag } from 'src/bot/tag/tag.entity';
-import { Ticket } from 'src/bot/ticket/ticket.entity';
-import { CrewLog } from 'src/bot/crew/log/crew-log.entity';
-import { Guild } from 'src/bot/guild/guild.entity';
-import { CrewShare } from 'src/bot/crew/share/crew-share.entity';
+import { Team } from 'src/core/team/team.entity';
+import { Crew } from 'src/core/crew/crew.entity';
+import { CrewMember } from 'src/core/crew/member/crew-member.entity';
+import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
+import { ForumTag } from 'src/core/tag/tag.entity';
+import { Ticket } from 'src/core/ticket/ticket.entity';
+import { CrewLog } from 'src/core/crew/log/crew-log.entity';
+import { Guild } from 'src/core/guild/guild.entity';
+import { CrewShare } from 'src/core/crew/share/crew-share.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',

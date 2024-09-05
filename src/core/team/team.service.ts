@@ -14,9 +14,9 @@ import {
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
-import { TagService } from 'src/bot/tag/tag.service';
-import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
-import { TagTemplateRepository } from 'src/bot/tag/tag-template.repository';
+import { TagService } from 'src/core/tag/tag.service';
+import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
+import { TagTemplateRepository } from 'src/core/tag/tag-template.repository';
 import { TeamRepository } from './team.repository';
 import { Team } from './team.entity';
 

@@ -10,7 +10,7 @@ import {
   Subcommand,
 } from 'necord';
 import { ChannelType, GuildChannel, GuildMember, Role, Snowflake, User } from 'discord.js';
-import { EchoCommand } from 'src/bot/echo.command-group';
+import { EchoCommand } from 'src/core/echo.command-group';
 import { ConfigService } from 'src/config';
 import { TeamSelectAutocompleteInterceptor } from './team-select.interceptor';
 import { TeamService } from './team.service';

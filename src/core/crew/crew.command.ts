@@ -30,9 +30,9 @@ import {
 } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
-import { EchoCommand } from 'src/bot/echo.command-group';
-import { TeamService } from 'src/bot/team/team.service';
-import { TeamSelectAutocompleteInterceptor } from 'src/bot/team/team-select.interceptor';
+import { EchoCommand } from 'src/core/echo.command-group';
+import { TeamService } from 'src/core/team/team.service';
+import { TeamSelectAutocompleteInterceptor } from 'src/core/team/team-select.interceptor';
 import { CrewService } from './crew.service';
 import { CrewRepository } from './crew.repository';
 import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';

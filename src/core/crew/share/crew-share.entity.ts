@@ -10,8 +10,8 @@ import {
   DeleteDateColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Guild } from 'src/bot/guild/guild.entity';
-import { Crew } from 'src/bot/crew/crew.entity';
+import { Guild } from 'src/core/guild/guild.entity';
+import { Crew } from 'src/core/crew/crew.entity';
 
 @Entity({ name: 'crew_share' })
 @Index('crew_share_unique', ['target', 'channel'], { unique: true })

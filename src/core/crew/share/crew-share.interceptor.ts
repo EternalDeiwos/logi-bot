@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AutocompleteInteraction } from 'discord.js';
 import { AutocompleteInterceptor } from 'necord';
-import { GuildService } from 'src/bot/guild/guild.service';
-import { CrewRepository } from 'src/bot/crew/crew.repository';
+import { GuildService } from 'src/core/guild/guild.service';
+import { CrewRepository } from 'src/core/crew/crew.repository';
 
 @Injectable()
 export class CrewShareAutocompleteInterceptor extends AutocompleteInterceptor {

@@ -10,8 +10,8 @@ import {
   Subcommand,
 } from 'necord';
 import { ConfigService } from 'src/config';
-import { EchoCommand } from 'src/bot/echo.command-group';
-import { TeamService } from 'src/bot/team/team.service';
+import { EchoCommand } from 'src/core/echo.command-group';
+import { TeamService } from 'src/core/team/team.service';
 import { TagService } from './tag.service';
 import { TagSelectAutocompleteInterceptor } from './tag-select.interceptor';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';

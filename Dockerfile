@@ -1,9 +1,6 @@
 # https://hub.docker.com/_/node
 FROM node:22-slim as builder
 
-# Specify which app is being built
-# ARG APP
-
 # Create and change to the app directory.
 WORKDIR /usr/src/app
 

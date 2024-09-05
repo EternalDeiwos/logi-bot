@@ -12,9 +12,9 @@ import {
   DeleteDateColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { ForumTagTemplate } from 'src/bot/tag/tag-template.entity';
-import { Ticket } from 'src/bot/ticket/ticket.entity';
-import { Team } from 'src/bot/team/team.entity';
+import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
+import { Ticket } from 'src/core/ticket/ticket.entity';
+import { Team } from 'src/core/team/team.entity';
 import { CrewMember, CrewMemberAccess } from './member/crew-member.entity';
 import { CrewLog } from './log/crew-log.entity';
 import { CrewShare } from './share/crew-share.entity';

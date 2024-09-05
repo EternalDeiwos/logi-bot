@@ -31,11 +31,11 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { ConfigService } from 'src/config';
-import { EchoCommand } from 'src/bot/echo.command-group';
-import { CrewRepository } from 'src/bot/crew/crew.repository';
-import { TicketTag } from 'src/bot/tag/tag.service';
-import { SelectCrewCommandParams } from 'src/bot/crew/crew.command';
-import { CrewSelectAutocompleteInterceptor } from 'src/bot/crew/crew-select.interceptor';
+import { EchoCommand } from 'src/core/echo.command-group';
+import { CrewRepository } from 'src/core/crew/crew.repository';
+import { TicketTag } from 'src/core/tag/tag.service';
+import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
+import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
 import { TicketRepository } from './ticket.repository';
 import {

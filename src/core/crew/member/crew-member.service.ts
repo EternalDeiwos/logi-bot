@@ -3,9 +3,9 @@ import { DeepPartial, Equal } from 'typeorm';
 import { GuildMember, PermissionsBitField, Snowflake, roleMention, userMention } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
-import { Crew } from 'src/bot/crew/crew.entity';
-import { CrewService } from 'src/bot/crew/crew.service';
-import { CrewRepository } from 'src/bot/crew/crew.repository';
+import { Crew } from 'src/core/crew/crew.entity';
+import { CrewService } from 'src/core/crew/crew.service';
+import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewMemberRepository } from './crew-member.repository';
 import { CrewMember, CrewMemberAccess } from './crew-member.entity';
 

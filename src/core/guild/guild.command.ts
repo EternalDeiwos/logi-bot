@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
-import { EchoCommand } from 'src/bot/echo.command-group';
+import { EchoCommand } from 'src/core/echo.command-group';
 import { ConfigService } from 'src/config';
 import { GuildService } from './guild.service';
 

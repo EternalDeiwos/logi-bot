@@ -3,11 +3,11 @@ import { EmbedBuilder, Snowflake, roleMention } from 'discord.js';
 import { DeepPartial } from 'typeorm';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
-import { CrewRepository } from 'src/bot/crew/crew.repository';
-import { CrewService } from 'src/bot/crew/crew.service';
-import { CrewMemberRepository } from 'src/bot/crew/member/crew-member.repository';
-import { CrewMemberService } from 'src/bot/crew/member/crew-member.service';
-import { CrewMemberAccess } from 'src/bot/crew/member/crew-member.entity';
+import { CrewRepository } from 'src/core/crew/crew.repository';
+import { CrewService } from 'src/core/crew/crew.service';
+import { CrewMemberRepository } from 'src/core/crew/member/crew-member.repository';
+import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
+import { CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
 import { CrewLogRepository } from './crew-log.repository';
 import { CrewLog } from './crew-log.entity';
 

@@ -1,8 +1,8 @@
 import { Entity, Column, Index, OneToMany, CreateDateColumn, PrimaryColumn } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { ForumTag } from 'src/bot/tag/tag.entity';
-import { TicketTag } from 'src/bot/tag/tag.service';
-import { Crew } from 'src/bot/crew/crew.entity';
+import { ForumTag } from 'src/core/tag/tag.entity';
+import { TicketTag } from 'src/core/tag/tag.service';
+import { Crew } from 'src/core/crew/crew.entity';
 
 @Entity({ name: 'team' })
 export class Team {

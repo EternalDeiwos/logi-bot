@@ -10,7 +10,7 @@ import {
   Unique,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Team } from 'src/bot/team/team.entity';
+import { Team } from 'src/core/team/team.entity';
 import { ForumTagTemplate } from './tag-template.entity';
 
 @Entity({ name: 'tag' })

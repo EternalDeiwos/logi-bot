@@ -11,7 +11,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Crew } from 'src/bot/crew/crew.entity';
+import { Crew } from 'src/core/crew/crew.entity';
 
 @Entity({ name: 'ticket' })
 export class Ticket {

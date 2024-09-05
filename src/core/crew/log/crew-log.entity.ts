@@ -10,7 +10,7 @@ import {
   DeleteDateColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Crew } from 'src/bot/crew/crew.entity';
+import { Crew } from 'src/core/crew/crew.entity';
 
 @Entity({ name: 'crew_log' })
 export class CrewLog {

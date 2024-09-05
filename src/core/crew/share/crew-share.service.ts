@@ -2,10 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Snowflake } from 'discord.js';
 import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
-import { CrewRepository } from 'src/bot/crew/crew.repository';
-import { CrewService } from 'src/bot/crew/crew.service';
-import { CrewMemberRepository } from 'src/bot/crew/member/crew-member.repository';
-import { CrewMemberAccess } from 'src/bot/crew/member/crew-member.entity';
+import { CrewRepository } from 'src/core/crew/crew.repository';
+import { CrewService } from 'src/core/crew/crew.service';
+import { CrewMemberRepository } from 'src/core/crew/member/crew-member.repository';
+import { CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
 import { CrewShareRepository } from './crew-share.repository';
 import { AdminOverrideOptions, SkipAccessControlOptions } from 'src/types';
 
