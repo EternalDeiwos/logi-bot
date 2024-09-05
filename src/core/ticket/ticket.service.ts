@@ -17,7 +17,6 @@ import {
   channelMention,
   userMention,
 } from 'discord.js';
-import { ConfigService } from 'src/config';
 import { DeleteOptions } from 'src/types';
 import { OperationStatus } from 'src/util';
 import { TicketTag } from 'src/core/tag/tag.service';
@@ -108,7 +107,6 @@ export class TicketService {
   private readonly logger = new Logger(TicketService.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly guildManager: GuildManager,
     private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,

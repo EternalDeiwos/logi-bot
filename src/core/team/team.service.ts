@@ -12,7 +12,6 @@ import {
   ThreadOnlyChannel,
   User,
 } from 'discord.js';
-import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
 import { TagService } from 'src/core/tag/tag.service';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
@@ -25,7 +24,6 @@ export class TeamService {
   private readonly logger = new Logger(TeamService.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly guildManager: GuildManager,
     private readonly tagService: TagService,
     private readonly templateRepo: TagTemplateRepository,

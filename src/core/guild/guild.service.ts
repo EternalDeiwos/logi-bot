@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DeepPartial } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
 import { GuildRepository } from './guild.repository';
 import { Guild } from './guild.entity';
@@ -10,10 +9,7 @@ import { Guild } from './guild.entity';
 export class GuildService {
   private readonly logger = new Logger(GuildService.name);
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly guildRepo: GuildRepository,
-  ) {}
+  constructor(private readonly guildRepo: GuildRepository) {}
 
   async registerGuild(guild: Omit<Guild, 'createdAt'>) {
     if (await this.existsGuild(guild.guild)) {

@@ -1,5 +1,4 @@
 import { DataSource } from 'typeorm';
-import * as migrations from './migrations';
 import { Team } from 'src/core/team/team.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 import { CrewMember } from 'src/core/crew/member/crew-member.entity';
@@ -9,6 +8,7 @@ import { Ticket } from 'src/core/ticket/ticket.entity';
 import { CrewLog } from 'src/core/crew/log/crew-log.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { CrewShare } from 'src/core/crew/share/crew-share.entity';
+import * as migrations from 'src/database/migrations';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',

@@ -8,10 +8,14 @@ import {
   JoinColumn,
   RelationId,
   Unique,
+  DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Team } from 'src/core/team/team.entity';
 import { ForumTagTemplate } from './tag-template.entity';
+
+export type InsertTag = DeepPartial<Omit<ForumTag, 'guild' | 'team' | 'template' | 'createdAt'>>;
+export type SelectTag = DeepPartial<Pick<ForumTag, 'tag'>>;
 
 @Entity({ name: 'tag' })
 @Unique('unique_forum_tag_template', ['templateId', 'forum'])

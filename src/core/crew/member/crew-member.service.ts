@@ -1,7 +1,6 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { DeepPartial, Equal } from 'typeorm';
 import { GuildMember, PermissionsBitField, Snowflake, roleMention, userMention } from 'discord.js';
-import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
 import { Crew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
@@ -14,7 +13,6 @@ export class CrewMemberService {
   private readonly logger = new Logger(CrewMemberService.name);
 
   constructor(
-    private readonly configService: ConfigService,
     @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
     private readonly memberRepo: CrewMemberRepository,

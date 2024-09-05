@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmbedBuilder, Snowflake, roleMention } from 'discord.js';
 import { DeepPartial } from 'typeorm';
-import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewService } from 'src/core/crew/crew.service';
@@ -16,7 +15,6 @@ export class CrewLogService {
   private readonly logger = new Logger(CrewLogService.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
     private readonly memberRepo: CrewMemberRepository,

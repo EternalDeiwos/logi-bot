@@ -20,7 +20,6 @@ import {
   roleMention,
   userMention,
 } from 'discord.js';
-import { ConfigService } from 'src/config';
 import { ArchiveOptions, DeleteOptions } from 'src/types';
 import { OperationStatus, toSlug } from 'src/util';
 import { TeamService } from 'src/core/team/team.service';
@@ -41,7 +40,6 @@ export class CrewService {
   private readonly logger = new Logger(CrewService.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly guildManager: GuildManager,
     private readonly teamService: TeamService,
     private readonly teamRepo: TeamRepository,

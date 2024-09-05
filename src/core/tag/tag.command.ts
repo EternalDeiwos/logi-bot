@@ -2,14 +2,12 @@ import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
 import {
   Button,
   ButtonContext,
-  ComponentParam,
   Context,
   Options,
   SlashCommandContext,
   StringOption,
   Subcommand,
 } from 'necord';
-import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { TeamService } from 'src/core/team/team.service';
 import { TagService } from './tag.service';
@@ -44,7 +42,6 @@ export class TagCommand {
   private readonly logger = new Logger(TagCommand.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly teamService: TeamService,
     private readonly tagService: TagService,
   ) {}

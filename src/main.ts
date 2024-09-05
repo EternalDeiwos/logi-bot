@@ -1,15 +1,17 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { Config, ConfigService } from './config';
+import { ConfigService } from '@nestjs/config';
+import { ServerModule } from './app.module';
+import { ConfigKey } from './app.config';
 
 async function bootstrap() {
-  if (!process.env['NODE_ENV']) {
-    process.env['NODE_ENV'] = 'production';
-  }
-
-  const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
-  const port = configService.getOrThrow<number>(Config.APP_PORT);
+  const app = await NestFactory.create(ServerModule, {
+    logger:
+      process.env.NODE_ENV === 'production'
+        ? ['fatal', 'error', 'warn', 'log']
+        : ['fatal', 'error', 'warn', 'log', 'debug'],
+  });
+  const configService = app.get(ConfigService<Record<ConfigKey, unknown>>);
+  const port = configService.getOrThrow('APP_PORT');
   await app.listen(port);
 }
 bootstrap();

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Context, ContextOf, On } from 'necord';
-import { Config, ConfigService } from 'src/config';
+import { ConfigKey } from 'src/app.config';
 import { OperationStatus } from 'src/util';
 import { MoveTicketBehaviour } from 'src/types';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
@@ -15,7 +16,7 @@ export class BotEventListener {
   private readonly logger = new Logger(BotEventListener.name);
 
   constructor(
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<Record<ConfigKey, unknown>>,
     private readonly tagService: TagService,
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,
@@ -95,7 +96,7 @@ export class BotEventListener {
     if (toDeleteFlag && !deletedFlag) {
       this.logger.log(`Deleting ticket ${ticket.name}`);
       const softDelete =
-        (await this.configService.get<string>(Config.APP_TICKETS_MOVE_ACTION)) ===
+        (await this.configService.get<string>('APP_TICKETS_MOVE_ACTION')) ===
         MoveTicketBehaviour.ARCHIVE;
       await this.ticketService.deleteTicket(newThread.id, member, {
         softDelete,

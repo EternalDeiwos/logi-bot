@@ -30,7 +30,6 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
-import { ConfigService } from 'src/config';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { TicketTag } from 'src/core/tag/tag.service';
@@ -75,7 +74,6 @@ export class TicketCommand {
   private readonly logger = new Logger(TicketCommand.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly crewRepo: CrewRepository,
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,

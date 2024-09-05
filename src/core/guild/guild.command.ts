@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
 import { EchoCommand } from 'src/core/echo.command-group';
-import { ConfigService } from 'src/config';
 import { GuildService } from './guild.service';
 
 export class EditGuildCommandParams {
@@ -38,10 +37,7 @@ export class SelectGuildCommandParams {
 export class GuildCommand {
   private readonly logger = new Logger(GuildCommand.name);
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly guildService: GuildService,
-  ) {}
+  constructor(private readonly guildService: GuildService) {}
 
   @Subcommand({
     name: 'register',

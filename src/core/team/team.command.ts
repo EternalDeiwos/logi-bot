@@ -11,7 +11,6 @@ import {
 } from 'necord';
 import { ChannelType, GuildChannel, GuildMember, Role, Snowflake, User } from 'discord.js';
 import { EchoCommand } from 'src/core/echo.command-group';
-import { ConfigService } from 'src/config';
 import { TeamSelectAutocompleteInterceptor } from './team-select.interceptor';
 import { TeamService } from './team.service';
 
@@ -76,10 +75,7 @@ export class SetAuditTeamCommandParams {
 export class TeamCommand {
   private readonly logger = new Logger(TeamCommand.name);
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly teamService: TeamService,
-  ) {}
+  constructor(private readonly teamService: TeamService) {}
 
   @Subcommand({
     name: 'add',

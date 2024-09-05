@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Guild, GuildMember, GuildForumTag, Snowflake } from 'discord.js';
-import { ConfigService } from 'src/config';
+import { Guild, GuildMember, GuildForumTag } from 'discord.js';
 import { OperationStatus } from 'src/util';
 import { Crew } from 'src/core/crew/crew.entity';
 import { Team } from 'src/core/team/team.entity';
@@ -25,7 +24,6 @@ export class TagService {
   private readonly logger = new Logger(TagService.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly tagRepo: TagRepository,
     private readonly templateRepo: TagTemplateRepository,
   ) {}

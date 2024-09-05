@@ -26,9 +26,7 @@ import {
   Snowflake,
   TextInputBuilder,
   TextInputStyle,
-  userMention,
 } from 'discord.js';
-import { ConfigService } from 'src/config';
 import { OperationStatus } from 'src/util';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { TeamService } from 'src/core/team/team.service';
@@ -189,7 +187,6 @@ export class CrewCommand {
   private readonly logger = new Logger(CrewCommand.name);
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly teamService: TeamService,
     private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
