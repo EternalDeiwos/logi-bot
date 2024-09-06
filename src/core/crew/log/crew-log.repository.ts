@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
-import { CrewLog } from './crew-log.entity';
+import { DataSource } from 'typeorm';
 import { Snowflake } from 'discord.js';
+import { CommonRepository } from 'src/database/util';
+import { CrewLog } from './crew-log.entity';
 
 @Injectable()
-export class CrewLogRepository extends Repository<CrewLog> {
+export class CrewLogRepository extends CommonRepository<CrewLog> {
   constructor(private readonly dataSource: DataSource) {
     super(CrewLog, dataSource.createEntityManager());
   }

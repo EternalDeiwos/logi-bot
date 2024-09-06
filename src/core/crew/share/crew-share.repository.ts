@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
+import { CommonRepository } from 'src/database/util';
 import { CrewShare } from './crew-share.entity';
 
 @Injectable()
-export class CrewShareRepository extends Repository<CrewShare> {
+export class CrewShareRepository extends CommonRepository<CrewShare> {
   constructor(private readonly dataSource: DataSource) {
     super(CrewShare, dataSource.createEntityManager());
   }
