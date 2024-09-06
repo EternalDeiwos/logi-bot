@@ -7,7 +7,7 @@ import {
   CategoryChannel,
   ChannelType,
   EmbedBuilder,
-  Guild,
+  GuildBasedChannel,
   GuildManager,
   GuildMember,
   GuildTextBasedChannel,
@@ -22,6 +22,7 @@ import {
 } from 'discord.js';
 import { ArchiveOptions, DeleteOptions } from 'src/types';
 import { OperationStatus, toSlug } from 'src/util';
+import { AuthError, DatabaseError, ExternalError, InternalError } from 'src/errors';
 import { TeamService } from 'src/core/team/team.service';
 import { TeamRepository } from 'src/core/team/team.repository';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
@@ -52,83 +53,49 @@ export class CrewService {
     private readonly memberRepo: CrewMemberRepository,
   ) {}
 
-  async resolveCrewGuild(crew: Crew): Promise<OperationStatus<Guild>> {
+  async resolveCrewGuild(crew: Crew) {
     try {
-      const guild = await this.guildManager.fetch(crew.parent.guild);
-
-      if (guild) {
-        return new OperationStatus({ success: true, message: 'Done', data: guild });
-      }
-
-      return new OperationStatus({
-        success: false,
-        message: `Failed to resolve guild ${guild.name}`,
-      });
+      return await this.guildManager.fetch(crew.parent.guild);
     } catch (err) {
-      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
-      return new OperationStatus({
-        success: false,
-        message: 'Guild is improperly registered. Please report this incident.',
-      });
+      throw new ExternalError(
+        'DISCORD_API_ERROR',
+        `Failed to retrieve guild for ${crew.name}`,
+        err,
+      );
     }
   }
 
-  async resolveCrewChannel(crew: Crew): Promise<OperationStatus<GuildTextBasedChannel>> {
-    const { data: guild, ...guildResult } = await this.resolveCrewGuild(crew);
-
-    if (!guildResult.success) {
-      return guildResult;
-    }
+  async resolveCrewTextChannel(crew: Crew) {
+    const guild = await this.resolveCrewGuild(crew);
+    let channel: GuildBasedChannel;
 
     try {
-      const channel = await guild.channels.fetch(crew.channel);
-
-      if (!channel) {
-        return new OperationStatus({
-          success: false,
-          message: `Failed to resolve channel ${channelMention(crew.channel)}`,
-        });
-      }
-
-      if (!channel.isTextBased()) {
-        return new OperationStatus({
-          success: false,
-          message: `${channelMention(crew.channel)} is not a text channel`,
-        });
-      }
-
-      return new OperationStatus({ success: true, message: 'Done', data: channel });
+      channel = await guild.channels.fetch(crew.channel);
     } catch (err) {
-      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
-      return new OperationStatus({
-        success: false,
-        message: 'Guild is improperly registered. Please report this incident.',
-      });
+      throw new ExternalError(
+        'DISCORD_API_ERROR',
+        `Failed to retrieve channel for ${crew.name}`,
+        err,
+      );
     }
+
+    if (!channel || !channel.isTextBased()) {
+      throw new InternalError(
+        'INTERNAL_SERVER_ERROR',
+        `${crew.name} does not have a valid text channel`,
+      );
+    }
+
+    return channel;
   }
 
-  async resolveCrewRole(crew: Crew): Promise<OperationStatus<Role>> {
-    const { data: guild, ...guildResult } = await this.resolveCrewGuild(crew);
-
-    if (!guildResult.success) {
-      return guildResult;
-    }
+  async resolveCrewRole(crew: Crew) {
+    const guild = await this.resolveCrewGuild(crew);
 
     try {
-      const role = await guild.roles.fetch(crew.role);
-      if (role) {
-        return new OperationStatus({ success: true, message: 'Done', data: role });
-      }
-      return new OperationStatus({
-        success: false,
-        message: `Failed to resolve role ${roleMention(crew.role)}`,
-      });
+      return await guild.roles.fetch(crew.role);
     } catch (err) {
-      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
-      return new OperationStatus({
-        success: false,
-        message: 'Guild is improperly registered. Please report this incident.',
-      });
+      throw new ExternalError('DISCORD_API_ERROR', `Failed to retrieve role for ${crew.name}`, err);
     }
   }
 
@@ -235,8 +202,12 @@ export class CrewService {
       }),
     );
 
-    await this.crewRepo.insert(crew);
-    crew.team = team;
+    try {
+      await this.crewRepo.upsert(crew, ['guild', 'channel']);
+      crew.team = team;
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to insert crew', err);
+    }
 
     const tagResult = await this.tagService.createTagForCrew(crew);
 
@@ -244,17 +215,14 @@ export class CrewService {
       return tagResult;
     }
 
-    const registerResult = await this.memberService.registerCrewMember(
-      crew,
-      memberRef,
-      CrewMemberAccess.OWNER,
-    );
-
-    if (!registerResult.success) {
-      return new OperationStatus({
-        success: false,
-        message: `Crew was created successfully but failed to register crew member: ${registerResult.message}`,
-      });
+    try {
+      await this.memberService.registerCrewMember(channel.id, memberRef, CrewMemberAccess.OWNER);
+    } catch (err) {
+      throw new InternalError(
+        'INTERNAL_SERVER_ERROR',
+        `Crew was created successfully but failed to register crew member: ${err.message}`,
+        err,
+      );
     }
 
     await this.crewJoinPrompt(crew, channel);
@@ -305,11 +273,7 @@ export class CrewService {
       return new OperationStatus({ success: false, message: 'Invalid channel' });
     }
 
-    const { data: guild, ...guildResult } = await this.resolveCrewGuild(crew);
-
-    if (!guildResult.success) {
-      return guildResult;
-    }
+    const guild = await this.resolveCrewGuild(crew);
 
     const crewMember = await this.memberRepo.findOne({
       where: { channel: channelRef, member: memberRef },
@@ -334,13 +298,7 @@ export class CrewService {
           });
         }
       } else {
-        const { data, ...memberResult } = await this.memberService.resolveGuildMember(crewMember);
-
-        if (!memberResult.success) {
-          return memberResult;
-        }
-
-        member = data;
+        member = await this.memberService.resolveGuildMember(crewMember);
       }
     }
 
@@ -349,13 +307,7 @@ export class CrewService {
     const ticketResults = OperationStatus.collect(
       await Promise.all(
         tickets.map(async (ticket) => {
-          const { data: thread, ...threadResult } =
-            await this.ticketService.resolveTicketThread(ticket);
-
-          if (!threadResult.success) {
-            return threadResult;
-          }
-
+          const thread = await this.ticketService.resolveTicketThread(ticket);
           const triageSnowflake = await crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE);
 
           if (thread.appliedTags.includes(triageSnowflake)) {
@@ -382,8 +334,8 @@ export class CrewService {
     }
 
     const reason = `Team archived by ${userMention(memberRef)}`;
-    const { data: discussion, ...channelResult } = await this.resolveCrewChannel(crew);
-    const { data: role, ...roleResult } = await this.resolveCrewRole(crew);
+    const discussion = await this.resolveCrewTextChannel(crew);
+    const role = await this.resolveCrewRole(crew);
 
     if (options.archiveTargetRef) {
       let archiveTargetCategory;
@@ -397,7 +349,7 @@ export class CrewService {
         );
       }
 
-      if (archiveTargetCategory && channelResult.success && roleResult.success) {
+      if (archiveTargetCategory) {
         await Promise.all([
           discussion.edit({
             name: options.archiveTag
@@ -428,48 +380,14 @@ export class CrewService {
   }
 
   public async updateCrew(
-    crew: Crew,
-    crewMember: CrewMember,
+    channelRef: Snowflake,
     update: DeepPartial<Pick<Crew, 'movePrompt' | 'permanent'>>,
   ) {
-    if (!crew || !(crew instanceof Crew)) {
-      return new OperationStatus({ success: false, message: 'Invalid crew' });
+    try {
+      return await this.crewRepo.update({ channel: channelRef }, update);
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to update crew', err);
     }
-
-    crewMember =
-      typeof crewMember === 'string'
-        ? await this.memberRepo.findOne({
-            where: { channel: crew.channel, member: crewMember },
-          })
-        : crewMember;
-
-    if (!crewMember || !(crewMember instanceof CrewMember)) {
-      return new OperationStatus({ success: false, message: 'You are not a member of this crew' });
-    }
-
-    const { data: member, ...memberResult } =
-      await this.memberService.resolveGuildMember(crewMember);
-
-    if (!memberResult.success) {
-      return memberResult;
-    }
-
-    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
-
-    if (!adminResult.success) {
-      return adminResult;
-    }
-
-    if (!isAdmin && !crewMember.requireAccess(CrewMemberAccess.ADMIN)) {
-      return new OperationStatus({
-        success: false,
-        message: 'Only an administrator can perform this action',
-      });
-    }
-
-    await this.crewRepo.update({ channel: crew.channel }, update);
-
-    return OperationStatus.SUCCESS;
   }
 
   public async sendIndividualStatus(
@@ -597,14 +515,7 @@ export class CrewService {
       return new OperationStatus({ success: false, message: 'Invalid channel' });
     }
 
-    if (!channel) {
-      const { data, ...channelResult } = await this.resolveCrewChannel(crew);
-      channel = data;
-
-      if (!channelResult.success) {
-        return channelResult;
-      }
-    }
+    channel = channel ?? (await this.resolveCrewTextChannel(crew));
 
     const owner = await crew.getCrewOwner();
     const embed = new EmbedBuilder()

@@ -4,6 +4,10 @@ import { QueryFailedError } from 'typeorm';
 
 export * from './base.error';
 
+type InternalErrorConfig = {
+  INTERNAL_SERVER_ERROR: undefined;
+};
+
 type ExternalErrorConfig = {
   DISCORD_API_ERROR: DiscordAPIError;
   CLAPFOOT_API_ERROR: Error;
@@ -25,6 +29,11 @@ type ValidationErrorConfig = {
 type AuthErrorConfig = {
   FORBIDDEN: any;
 };
+
+export class InternalError<K extends keyof InternalErrorConfig> extends BaseError<
+  K,
+  InternalErrorConfig[K]
+> {}
 
 export class ExternalError<K extends keyof ExternalErrorConfig> extends BaseError<
   K,

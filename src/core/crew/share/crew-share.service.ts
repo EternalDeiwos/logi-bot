@@ -31,11 +31,7 @@ export class CrewShareService {
       return { success: false, message: 'Invalid channel' };
     }
 
-    const { data: channel, ...channelResult } = await this.crewService.resolveCrewChannel(crew);
-
-    if (!channelResult.success) {
-      return channelResult;
-    }
+    const channel = await this.crewService.resolveCrewTextChannel(crew);
 
     const crewMember = await this.memberRepo.findOne({
       where: { channel: channelRef, member: memberRef },

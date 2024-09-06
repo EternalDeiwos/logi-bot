@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UseFilters } from '@nestjs/common';
 import { Context, Options, SlashCommandContext, StringOption, Subcommand } from 'necord';
 import { EchoCommand } from 'src/core/echo.command-group';
+import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from './guild.service';
 
 export class EditGuildCommandParams {
@@ -34,6 +35,7 @@ export class SelectGuildCommandParams {
   name: 'guild',
   description: 'Manage guilds',
 })
+@UseFilters(DiscordExceptionFilter)
 export class GuildCommand {
   private readonly logger = new Logger(GuildCommand.name);
 
@@ -50,12 +52,12 @@ export class GuildCommand {
   ) {
     const name = data.name ?? interaction.guild.name;
     const shortName = data.shortName ?? interaction.guild.nameAcronym;
-    const result = await this.guildService.registerGuild({
+    await this.guildService.registerGuild({
       guild: interaction.guild.id,
       name,
       shortName,
       icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),
     });
-    return interaction.reply({ content: result.message, ephemeral: true });
+    return interaction.reply({ content: 'Done', ephemeral: true });
   }
 }

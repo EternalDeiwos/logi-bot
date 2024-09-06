@@ -1,4 +1,4 @@
-import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
+import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
 import {
   Button,
   ButtonContext,
@@ -31,6 +31,7 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { EchoCommand } from 'src/core/echo.command-group';
+import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
@@ -70,6 +71,7 @@ export class TicketDeclineReasonCommandParams {
   name: 'ticket',
   description: 'Manage tickets',
 })
+@UseFilters(DiscordExceptionFilter)
 export class TicketCommand {
   private readonly logger = new Logger(TicketCommand.name);
 

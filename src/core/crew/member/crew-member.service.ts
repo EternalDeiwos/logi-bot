@@ -1,7 +1,15 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { DeepPartial, Equal } from 'typeorm';
-import { GuildMember, PermissionsBitField, Snowflake, roleMention, userMention } from 'discord.js';
+import {
+  GuildBasedChannel,
+  GuildMember,
+  PermissionsBitField,
+  Snowflake,
+  roleMention,
+  userMention,
+} from 'discord.js';
 import { OperationStatus } from 'src/util';
+import { DatabaseError, ExternalError, InternalError } from 'src/errors';
 import { Crew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
@@ -18,195 +26,140 @@ export class CrewMemberService {
     private readonly memberRepo: CrewMemberRepository,
   ) {}
 
-  async resolveGuildMember(member: CrewMember): Promise<OperationStatus<GuildMember>>;
-  async resolveGuildMember(
-    memberRef: Snowflake,
-    channelRef: Snowflake,
-  ): Promise<OperationStatus<GuildMember>>;
+  async resolveGuildMember(member: CrewMember): Promise<GuildMember>;
+  async resolveGuildMember(memberRef: Snowflake, channelRef: Snowflake): Promise<GuildMember>;
   async resolveGuildMember(
     memberRef: Snowflake | CrewMember,
     channelRef?: Snowflake,
-  ): Promise<OperationStatus<GuildMember>> {
+  ): Promise<GuildMember> {
     if (typeof memberRef !== 'string' && memberRef instanceof CrewMember) {
       channelRef = memberRef.channel;
       memberRef = memberRef.member;
     }
 
     if (!memberRef) {
-      return new OperationStatus({ success: false, message: 'Invalid member reference' });
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid member reference');
     }
 
-    const crew = await this.crewRepo.findOne({
-      where: { channel: channelRef },
-      withDeleted: true,
-    });
-
-    if (!crew) {
-      return { success: false, message: `Unable to find crew ${channelRef}` };
+    let crew: Crew;
+    try {
+      crew = await this.crewRepo.findOneOrFail({
+        where: { channel: channelRef },
+        withDeleted: true,
+      });
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', `Unable to find crew ${channelRef}`, err);
     }
 
-    const { data: guild, ...guildResult } = await this.crewService.resolveCrewGuild(crew);
-
-    if (!guildResult.success) {
-      return guildResult;
-    }
+    const guild = await this.crewService.resolveCrewGuild(crew);
 
     try {
-      const guildMember = await guild.members.fetch(memberRef);
-
-      if (!guildMember || !(guildMember instanceof GuildMember)) {
-        this.logger.error(
-          `Unexpected type ${(guildMember as Object)?.constructor?.name}, was expecting GuildMember: ${JSON.stringify(guildMember)}`,
-          new Error().stack,
-        );
-        return new OperationStatus({
-          success: false,
-          message: `Failed to resolve member ${userMention(memberRef)}`,
-        });
-      }
-
-      return new OperationStatus({ success: true, message: 'Done', data: guildMember });
+      return await guild.members.fetch(memberRef);
     } catch (err) {
-      this.logger.error(`Failed to resolve member ${memberRef} in ${guild.name}`, err.stack);
-      return new OperationStatus({
-        success: false,
-        message: `Member ${memberRef} is not a member of ${guild.name}`,
-      });
-    }
-  }
-
-  async isAdmin(member: GuildMember): Promise<OperationStatus<boolean>>;
-  async isAdmin(member: CrewMember): Promise<OperationStatus<boolean>>;
-  async isAdmin(member: CrewMember | GuildMember): Promise<OperationStatus<boolean>> {
-    if (member instanceof CrewMember) {
-      const { data: guildMember, ...guildMemberResult } = await this.resolveGuildMember(member);
-
-      if (!guildMemberResult.success) {
-        return guildMemberResult;
-      }
-
-      member = guildMember;
-    }
-
-    if (!(member instanceof GuildMember)) {
-      this.logger.error(
-        `Unexpected type ${(member as Object)?.constructor?.name}, was expecting GuildMember: ${JSON.stringify(member)}`,
-        new Error().stack,
+      throw new ExternalError(
+        'DISCORD_API_ERROR',
+        `Failed to resolve member ${memberRef} in ${guild.name}`,
+        err,
       );
-      return new OperationStatus({ success: false, message: 'Failed to resolve guild member' });
     }
-
-    return new OperationStatus({
-      success: true,
-      message: 'Done',
-      data: member.permissions.has(PermissionsBitField.Flags.Administrator),
-    });
   }
 
   async registerCrewMember(
-    crew: Crew,
+    channelRef: Snowflake,
     memberRef: Snowflake,
     access: CrewMemberAccess = CrewMemberAccess.MEMBER,
-  ): Promise<OperationStatus> {
-    if (!crew) {
-      return new OperationStatus({ success: false, message: 'Invalid crew' });
+  ) {
+    let crew: Crew;
+    try {
+      crew = await this.crewRepo.findOneOrFail({ where: { channel: channelRef } });
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to fetch crew', err);
     }
 
-    const crewMember = await this.memberRepo.findOne({
-      where: { channel: crew.channel, member: memberRef },
-    });
+    const member = await this.resolveGuildMember(memberRef, crew.channel);
 
-    if (crewMember) {
-      // If the user would get more privileges then update the existing record instead
-      if (access < crewMember.access) {
-        return this.updateCrewMember(crewMember, { access });
+    try {
+      await member.roles.add(crew.role);
+    } catch (err) {
+      if (!member.roles.cache.has(crew.role)) {
+        throw new ExternalError('DISCORD_API_ERROR', 'Failed to remove member role', err);
       }
-
-      // Otherwise prevent an accidental loss of privilege
-      return new OperationStatus({
-        success: false,
-        message: `You are already a ${crewMember.access > CrewMemberAccess.MEMBER ? 'subscriber' : 'member'} of ${roleMention(crew.role)}`,
-      });
     }
 
-    const { data: member, ...memberResult } = await this.resolveGuildMember(
-      memberRef,
-      crew.channel,
-    );
-
-    if (!memberResult.success) {
-      return new OperationStatus({
-        success: false,
-        message: `User ${userMention(memberRef)} is not a part of the guild`,
-      });
+    try {
+      return await this.memberRepo.upsert(
+        {
+          member: member.id,
+          guild: crew.guild,
+          name: member.displayName,
+          icon:
+            member.avatarURL({ extension: 'png', forceStatic: true }) ??
+            member.user.avatarURL({ extension: 'png', forceStatic: true }),
+          access,
+          channel: crew.channel,
+        },
+        ['guild', 'member'],
+      );
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to insert crew member', err);
     }
-
-    await this.memberRepo.insert({
-      member: member.id,
-      guild: crew.guild,
-      name: member.displayName,
-      icon:
-        member.avatarURL({ extension: 'png', forceStatic: true }) ??
-        member.user.avatarURL({ extension: 'png', forceStatic: true }),
-      access,
-      channel: crew.channel,
-    });
-
-    await member.roles.add(crew.role);
-
-    return OperationStatus.SUCCESS;
   }
 
   async updateCrewMember(
     crewMember: CrewMember,
     data: DeepPartial<Pick<CrewMember, 'access' | 'name' | 'icon'>>,
   ) {
-    const result = await this.memberRepo.update(
-      { channel: Equal(crewMember.crew.channel), member: Equal(crewMember.member) },
-      data,
-    );
-
-    if (result.affected) {
-      return OperationStatus.SUCCESS;
+    try {
+      return await this.memberRepo.update(
+        { channel: Equal(crewMember.crew.channel), member: Equal(crewMember.member) },
+        data,
+      );
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to update crew member', err);
     }
-
-    return new OperationStatus({
-      success: false,
-      message: `Failed to update crew member record for ${crewMember.name}`,
-    });
   }
 
-  async removeCrewMember(crewMember: CrewMember): Promise<OperationStatus> {
-    if (!crewMember || !(crewMember instanceof CrewMember)) {
-      return new OperationStatus({ success: false, message: 'Invalid crew member' });
+  async removeCrewMember(channelRef: Snowflake, memberRef: Snowflake) {
+    let crew: Crew;
+    try {
+      crew = await this.crewRepo.findOneOrFail({ where: { channel: channelRef } });
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to fetch crew', err);
     }
 
-    const { data: member, ...memberResult } = await this.resolveGuildMember(
-      crewMember.member,
-      crewMember.channel,
-    );
-
-    if (!memberResult.success) {
-      return new OperationStatus({
-        success: false,
-        message: `User ${userMention(crewMember.member)} is not a part of the guild`,
-      });
-    }
+    const member = await this.resolveGuildMember(memberRef, channelRef);
 
     try {
-      await member.roles.remove(crewMember.crew.role);
+      await member.roles.remove(crew.role);
     } catch (err) {
-      if (member.roles.cache.has(crewMember.crew.role)) {
-        this.logger.error(
-          `Failed to remove crew role for ${crewMember.crew.name} from ${crewMember.name}: ${err.message}`,
-          err.stack,
-        );
-        return new OperationStatus({ success: false, message: 'Failed to remove member role' });
+      if (member.roles.cache.has(crew.role)) {
+        throw new ExternalError('DISCORD_API_ERROR', 'Failed to remove member role', err);
       }
     }
 
-    await this.memberRepo.delete({ member: crewMember.member, channel: crewMember.channel });
+    return await this.memberRepo.delete({ member: memberRef, channel: channelRef });
+  }
 
-    return OperationStatus.SUCCESS;
+  async requireCrewAccess(
+    channelRef: Snowflake,
+    memberRef: Snowflake,
+    access: CrewMemberAccess = CrewMemberAccess.MEMBER,
+  ) {
+    const member = await this.resolveGuildMember(memberRef, channelRef);
+
+    let crewMember: CrewMember;
+    try {
+      crewMember = await this.memberRepo.findOne({
+        where: { channel: channelRef, member: memberRef },
+      });
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', `Failed to fetch crew member`, err);
+    }
+
+    return (
+      member.permissions.has(PermissionsBitField.Flags.Administrator) ||
+      member.roles.highest.permissions.has(PermissionsBitField.Flags.Administrator) ||
+      (crewMember && crewMember.access <= access)
+    );
   }
 }

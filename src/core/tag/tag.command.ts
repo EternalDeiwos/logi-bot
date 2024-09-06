@@ -1,4 +1,4 @@
-import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
+import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
 import {
   Button,
   ButtonContext,
@@ -8,11 +8,12 @@ import {
   StringOption,
   Subcommand,
 } from 'necord';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { EchoCommand } from 'src/core/echo.command-group';
+import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { TeamService } from 'src/core/team/team.service';
 import { TagService } from './tag.service';
 import { TagSelectAutocompleteInterceptor } from './tag-select.interceptor';
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 export class CreateTagCommandParams {
   @StringOption({
@@ -38,6 +39,7 @@ export class SelectTagCommandParams {
   name: 'tag',
   description: 'Manage tags for forum posts (tickets)',
 })
+@UseFilters(DiscordExceptionFilter)
 export class TagCommand {
   private readonly logger = new Logger(TagCommand.name);
 

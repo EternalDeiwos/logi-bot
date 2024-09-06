@@ -23,6 +23,7 @@ export class BaseError<T extends string = string, C = any> extends Error {
     // Preserve root cause
     if (cause instanceof BaseError) {
       this.cause = cause.cause;
+      this.message = [this.message, cause.message].join('; ');
     } else {
       this.cause = cause;
     }

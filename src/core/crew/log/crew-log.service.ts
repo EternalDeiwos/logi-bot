@@ -9,6 +9,7 @@ import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
 import { CrewLogRepository } from './crew-log.repository';
 import { CrewLog } from './crew-log.entity';
+import { AuthError } from 'src/errors';
 
 @Injectable()
 export class CrewLogService {
@@ -17,7 +18,6 @@ export class CrewLogService {
   constructor(
     private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
-    private readonly memberRepo: CrewMemberRepository,
     private readonly memberService: CrewMemberService,
     private readonly logRepo: CrewLogRepository,
   ) {}
@@ -33,31 +33,11 @@ export class CrewLogService {
       return { success: false, message: 'Invalid channel' };
     }
 
-    const { data: channel, ...channelResult } = await this.crewService.resolveCrewChannel(crew);
+    const channel = await this.crewService.resolveCrewTextChannel(crew);
+    const member = await this.memberService.resolveGuildMember(channelRef, memberRef);
 
-    if (!channelResult.success) {
-      return channelResult;
-    }
-
-    const crewMember = await this.memberRepo.findOne({
-      where: { channel: channelRef, member: memberRef },
-    });
-
-    const { data: member, ...memberResult } =
-      await this.memberService.resolveGuildMember(crewMember);
-
-    if (!memberResult.success) {
-      return memberResult;
-    }
-
-    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
-
-    if (!adminResult.success) {
-      return adminResult;
-    }
-
-    if (!isAdmin && (!crewMember || !crewMember.requireAccess(CrewMemberAccess.MEMBER))) {
-      return { success: false, message: 'Not a member of this crew' };
+    if (!this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.MEMBER)) {
+      throw new AuthError('FORBIDDEN', 'Not a member of this crew');
     }
 
     const createdAt = new Date();
@@ -82,7 +62,7 @@ export class CrewLogService {
       discussion: crew.channel,
       content: data.content,
       createdAt,
-      createdBy: crewMember.member,
+      createdBy: memberRef,
     });
 
     return OperationStatus.SUCCESS;

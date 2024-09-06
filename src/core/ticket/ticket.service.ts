@@ -7,6 +7,7 @@ import {
   ButtonStyle,
   EmbedBuilder,
   Guild,
+  GuildBasedChannel,
   GuildManager,
   GuildMember,
   GuildTextBasedChannel,
@@ -19,10 +20,11 @@ import {
 } from 'discord.js';
 import { DeleteOptions } from 'src/types';
 import { OperationStatus } from 'src/util';
+import { AuthError, DatabaseError, ExternalError, InternalError } from 'src/errors';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
-import { CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
+import { CrewMember, CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { CrewMemberRepository } from 'src/core/crew/member/crew-member.repository';
 import { Crew } from 'src/core/crew/crew.entity';
@@ -116,47 +118,40 @@ export class TicketService {
     private readonly ticketRepo: TicketRepository,
   ) {}
 
-  async resolveTicketGuild(ticket: Ticket): Promise<OperationStatus<Guild>> {
+  async resolveTicketGuild(ticket: Ticket) {
     try {
-      const guild = await this.guildManager.fetch(ticket.guild);
-      return new OperationStatus({ success: true, message: 'Done', data: guild });
+      return await this.guildManager.fetch(ticket.guild);
     } catch (err) {
-      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
-      return {
-        success: false,
-        message: 'Guild is improperly registered. Please report this incident.',
-      };
+      throw new ExternalError(
+        'DISCORD_API_ERROR',
+        `Failed to resolve guild for ticket ${ticket.name}`,
+        err,
+      );
     }
   }
 
-  async resolveTicketThread(ticket: Ticket): Promise<OperationStatus<ThreadChannel>> {
-    const { data: guild, ...guildResult } = await this.resolveTicketGuild(ticket);
-
-    if (!guildResult.success) {
-      return guildResult;
-    }
+  async resolveTicketThread(ticket: Ticket) {
+    let thread: GuildBasedChannel;
 
     try {
-      const thread = await guild.channels.fetch(ticket.thread);
-
-      if (!thread || !thread.isThread()) {
-        return {
-          success: false,
-          message: `${ticket.name} does not have a thread. Please report this incident.`,
-        };
-      }
-
-      return new OperationStatus({ success: true, message: 'Done', data: thread });
+      const guild = await this.guildManager.fetch(ticket.guild);
+      thread = await guild.channels.fetch(ticket.thread);
     } catch (err) {
-      this.logger.error(
-        `Failed to fetch thread ${ticket.thread} for ${ticket.name} in ${guild.name}: ${err.message}`,
-        err.stack,
+      throw new ExternalError(
+        'DISCORD_API_ERROR',
+        `Failed to fetch thread for ${ticket.name}`,
+        err,
       );
-      return {
-        success: false,
-        message: `${ticket.name} does not have a thread. Please report this incident.`,
-      };
     }
+
+    if (!thread || !thread.isThread()) {
+      throw new InternalError(
+        'INTERNAL_SERVER_ERROR',
+        `${ticket.name} does not have a valid thread`,
+      );
+    }
+
+    return thread;
   }
 
   async createTicket(
@@ -170,11 +165,7 @@ export class TicketService {
       return { success: false, message: `Channel does not belong to a crew` };
     }
 
-    const { data: guild, ...crewResult } = await this.crewService.resolveCrewGuild(crew);
-
-    if (!crewResult.success) {
-      return crewResult;
-    }
+    const guild = await this.crewService.resolveCrewGuild(crew);
 
     // Resolve Crew Forum
     // TODO: DRY
@@ -339,36 +330,10 @@ export class TicketService {
       return { success: false, message: `Thread ${threadRef} is not a ticket` };
     }
 
-    const { data: guild, ...guildResult } = await this.resolveTicketGuild(ticket);
+    const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
 
-    if (!guildResult.success) {
-      return guildResult;
-    }
-
-    const { data: member, ...memberResult } = await this.memberService.resolveGuildMember(
-      memberRef,
-      channelRef,
-    );
-
-    if (!memberResult.success) {
-      return memberResult;
-    }
-
-    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
-
-    if (!adminResult.success) {
-      return adminResult;
-    }
-
-    let crewMember;
-    if (!isAdmin) {
-      crewMember = await this.memberRepo.findOne({
-        where: { channel: channelRef, member: memberRef },
-      });
-
-      if (!crewMember || !crewMember.requireAccess(CrewMemberAccess.MEMBER)) {
-        return { success: false, message: 'Only crew members can perform this action' };
-      }
+    if (!this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.MEMBER)) {
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action');
     }
 
     const { name, content, createdBy } = ticket;
@@ -404,11 +369,7 @@ export class TicketService {
       return { success: false, message: 'Only crew members can perform this action' };
     }
 
-    const { data: thread, ...threadResult } = await this.resolveTicketThread(ticket);
-
-    if (!threadResult.success) {
-      return threadResult;
-    }
+    const thread = await this.resolveTicketThread(ticket);
 
     const reason = `${guildMember} has triaged this ticket`;
     const now = new Date();
@@ -461,19 +422,9 @@ export class TicketService {
       return { success: false, message: `Thread ${threadRef} is not a ticket` };
     }
 
-    const { data: guild, ...guildResult } = await this.resolveTicketGuild(ticket);
+    const guild = await this.resolveTicketGuild(ticket);
 
-    if (!guildResult.success) {
-      return guildResult;
-    }
-
-    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
-
-    if (!adminResult.success) {
-      return adminResult;
-    }
-
-    return this._deleteTicket(ticket, guild, member, { ...options, isAdmin });
+    return this._deleteTicket(ticket, guild, member, { ...options });
   }
 
   getActiveTicketControls(
@@ -522,51 +473,29 @@ export class TicketService {
       return { success: false, message: `Thread ${threadRef} is not a ticket` };
     }
 
-    const { data: guild, ...guildResult } = await this.resolveTicketGuild(ticket);
+    const guild = await this.resolveTicketGuild(ticket);
+    const thread = await this.resolveTicketThread(ticket);
 
-    if (!guildResult.success) {
-      return guildResult;
-    }
-
-    const { data: isAdmin, ...adminResult } = await this.memberService.isAdmin(member);
-
-    if (!adminResult.success) {
-      return adminResult;
-    }
-
-    const { data: thread, ...threadResult } = await this.resolveTicketThread(ticket);
-
-    if (!threadResult.success) {
-      return threadResult;
-    }
-
-    const crewMember = await this.memberRepo.findOne({
-      where: { channel: ticket.crew.channel, member: member.id },
-    });
+    // let crewMember: CrewMember
+    // try {
+    //   crewMember = await this.memberRepo.findOneOrFail({
+    //     where: { channel: ticket.crew.channel, member: member.id },
+    //   });
+    // } catch (err) {
+    //   throw new DatabaseError('QUERY_FAILED', `Failed to fetch crew member`, err)
+    // }
 
     // RBAC for ticket lifecycle changes
-    if (tag === TicketTag.ABANDONED) {
-      // OP is allowed to close their own tickets
-      if (!crewMember && ticket.createdBy !== member.id && !isAdmin) {
-        return { success: false, message: 'Only crew members can perform this action' };
-      }
-
-      if (
-        crewMember &&
-        ticket.createdBy !== member.id &&
-        !crewMember.requireAccess(CrewMemberAccess.MEMBER) &&
-        !isAdmin
-      ) {
-        return { success: false, message: 'Only crew members can perform this action' };
-      }
-    } else {
-      if (!crewMember && !isAdmin) {
-        return { success: false, message: 'Only crew members can perform this action' };
-      }
-
-      if (crewMember && !crewMember.requireAccess(CrewMemberAccess.MEMBER) && !isAdmin) {
-        return { success: false, message: 'Only crew members can perform this action' };
-      }
+    if (
+      !this.memberService.requireCrewAccess(
+        ticket.crew.channel,
+        member.id,
+        CrewMemberAccess.MEMBER,
+      ) &&
+      tag !== TicketTag.ABANDONED &&
+      ticket.createdBy !== member.id
+    ) {
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action');
     }
 
     await this.ticketRepo.update(

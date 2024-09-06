@@ -1,4 +1,4 @@
-import { Injectable, Logger, UseInterceptors } from '@nestjs/common';
+import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
 import {
   ChannelOption,
   Context,
@@ -11,6 +11,7 @@ import {
 } from 'necord';
 import { ChannelType, GuildChannel, GuildMember, Role, Snowflake, User } from 'discord.js';
 import { EchoCommand } from 'src/core/echo.command-group';
+import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { TeamSelectAutocompleteInterceptor } from './team-select.interceptor';
 import { TeamService } from './team.service';
 
@@ -72,6 +73,7 @@ export class SetAuditTeamCommandParams {
   name: 'team',
   description: 'Manage teams',
 })
+@UseFilters(DiscordExceptionFilter)
 export class TeamCommand {
   private readonly logger = new Logger(TeamCommand.name);
 

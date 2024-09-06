@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BotModule } from 'src/bot/bot.module';
+import { RMQModule } from 'src/rmq/rmq.module';
 import { Team } from './team/team.entity';
 import { Crew } from './crew/crew.entity';
 import { CrewMember } from './crew/member/crew-member.entity';
@@ -32,8 +34,6 @@ import { TicketRepository } from './ticket/ticket.repository';
 import { GuildService } from './guild/guild.service';
 import { GuildCommand } from './guild/guild.command';
 import { GuildRepository } from './guild/guild.repository';
-import { BotModule } from 'src/bot/bot.module';
-import { RMQModule } from 'src/rmq/rmq.module';
 
 @Module({
   imports: [
