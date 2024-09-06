@@ -1,9 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { IntentsBitField } from 'discord.js';
-import { NecordModule } from 'necord';
-import { ConfigKey } from 'src/app.config';
 import { Team } from './team/team.entity';
 import { Crew } from './crew/crew.entity';
 import { CrewMember } from './crew/member/crew-member.entity';
@@ -36,19 +32,13 @@ import { TicketRepository } from './ticket/ticket.repository';
 import { GuildService } from './guild/guild.service';
 import { GuildCommand } from './guild/guild.command';
 import { GuildRepository } from './guild/guild.repository';
+import { BotModule } from 'src/bot/bot.module';
+import { RMQModule } from 'src/rmq/rmq.module';
 
 @Module({
   imports: [
-    ConfigModule,
-    NecordModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService<Record<ConfigKey, unknown>>) => ({
-        token: configService.getOrThrow<string>('DISCORD_BOT_TOKEN'),
-        development: configService.getOrThrow<string>('APP_GUILD_ID').split(','),
-        intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMembers],
-      }),
-    }),
+    RMQModule,
+    BotModule,
     TypeOrmModule.forFeature([
       Team,
       Crew,
