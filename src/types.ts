@@ -19,6 +19,7 @@ export enum TicketTag {
 }
 
 export type ArrayElement<A> = A extends readonly (infer T)[] ? T : never;
+export type ArrayOrElement<A> = A | A[];
 
 export type DiscordAPIWebhook = {
   id: Snowflake;

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CommonRepository } from 'src/database/util';
-import { Guild } from './guild.entity';
+import { Guild, GuildConfig, SelectGuild } from './guild.entity';
 
 @Injectable()
 export class GuildRepository extends CommonRepository<Guild> {
@@ -19,5 +19,17 @@ export class GuildRepository extends CommonRepository<Guild> {
     }
 
     return qb.getMany();
+  }
+
+  public setConfig<T extends keyof GuildConfig>(guild: SelectGuild, key: T, value: GuildConfig[T]) {
+    return this.createQueryBuilder('guild')
+      .update()
+      .set({
+        config: () => `config || '${JSON.stringify({ [key]: value })}'::jsonb`,
+      })
+      .where('guild_sf=:guildSf', guild)
+      .andWhere('deleted_at IS NULL')
+      .returning('*')
+      .execute();
   }
 }

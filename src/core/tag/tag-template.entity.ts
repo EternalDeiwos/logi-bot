@@ -30,18 +30,19 @@ export class ForumTagTemplate {
   default: boolean;
 
   @Column({ type: 'bigint', name: 'guild_sf' })
-  @Index()
+  @Index('guild_sf_idx_tag_template')
   guild: Snowflake;
 
   @Column({ type: 'bigint', name: 'crew_channel_sf', nullable: true })
   @RelationId((tag: ForumTagTemplate) => tag.crew)
-  @Index()
+  @Index('crew_channel_sf_idx_tag_template')
   channel: Snowflake;
 
   @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', nullable: true, eager: true })
   @JoinColumn({
     name: 'crew_channel_sf',
     referencedColumnName: 'channel',
+    foreignKeyConstraintName: 'fk_tag_template_crew',
   })
   crew: Crew;
 
@@ -49,7 +50,6 @@ export class ForumTagTemplate {
   tags: Promise<ForumTag[]>;
 
   @Column({ type: 'bigint', name: 'created_by_sf' })
-  @Index()
   createdBy: Snowflake;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

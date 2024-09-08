@@ -10,6 +10,8 @@ import {
 } from 'necord';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { EchoCommand } from 'src/core/echo.command-group';
+import { SuccessEmbed } from 'src/bot/embed';
+import { BotService } from 'src/bot/bot.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { TeamService } from 'src/core/team/team.service';
 import { TagService } from './tag.service';
@@ -44,6 +46,7 @@ export class TagCommand {
   private readonly logger = new Logger(TagCommand.name);
 
   constructor(
+    private readonly botService: BotService,
     private readonly teamService: TeamService,
     private readonly tagService: TagService,
   ) {}
@@ -58,14 +61,11 @@ export class TagCommand {
     @Options() data: CreateTagCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const createResult = await this.tagService.createTag(data.name, member);
-
-    if (!createResult.success) {
-      return interaction.reply({ content: createResult.message, ephemeral: true });
-    }
-
-    const result = await this.teamService.reconcileGuildForumTags(interaction.guildId);
-    return interaction.reply({ content: result.message, ephemeral: true });
+    const result = await this.tagService.createTag(data.name, member);
+    await this.teamService.reconcileGuildForumTags({ guild: interaction.guildId });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Tag registered')],
+    });
   }
 
   @Subcommand({
@@ -75,14 +75,11 @@ export class TagCommand {
   })
   async onSetupTags(@Context() [interaction]: SlashCommandContext) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const createResult = await this.tagService.createTicketTags(member);
-
-    if (!createResult.success) {
-      return interaction.reply({ content: createResult.message, ephemeral: true });
-    }
-
-    const result = await this.teamService.reconcileGuildForumTags(interaction.guildId);
-    return interaction.reply({ content: result.message, ephemeral: true });
+    const result = await this.tagService.createTicketTags(member);
+    await this.teamService.reconcileGuildForumTags({ guild: interaction.guildId });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Lifecycle tags registered')],
+    });
   }
 
   @Subcommand({
@@ -91,8 +88,10 @@ export class TagCommand {
     dmPermission: false,
   })
   async onRefreshTags(@Context() [interaction]: SlashCommandContext) {
-    const result = await this.teamService.reconcileGuildForumTags(interaction.guildId);
-    return interaction.reply({ content: result.message, ephemeral: true });
+    const result = await this.teamService.reconcileGuildForumTags({ guild: interaction.guildId });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Refresh scheduled')],
+    });
   }
 
   @UseInterceptors(TagSelectAutocompleteInterceptor)
@@ -121,28 +120,24 @@ export class TagCommand {
     }
 
     const member = await interaction.guild.members.fetch(interaction.user);
-    let result = await this.tagService.deleteTags(member, data.tag && [data.tag]);
+    const result = await this.tagService.deleteTags(member, data.tag && [data.tag]);
 
-    if (!result.success) {
-      return interaction.reply({ content: result.message, ephemeral: true });
-    }
+    await this.tagService.deleteTagTemplates(member, data.tag && [data.tag]);
 
-    result = await this.tagService.deleteTagTemplates(member, data.tag && [data.tag]);
-
-    return interaction.reply({ content: result.message, ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Tag(s) deleted')],
+    });
   }
 
   @Button('tags/destroy/all')
   async onTagsDeleteConfirm(@Context() [interaction]: ButtonContext) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    let result = await this.tagService.deleteTags(member);
+    const result = await this.tagService.deleteTags(member);
 
-    if (!result.success) {
-      return interaction.reply({ content: result.message, ephemeral: true });
-    }
+    await this.tagService.deleteTagTemplates(member);
 
-    result = await this.tagService.deleteTagTemplates(member);
-
-    return interaction.reply({ content: result.message, ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Tag(s) deleted')],
+    });
   }
 }

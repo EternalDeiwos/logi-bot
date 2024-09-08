@@ -1,40 +1,52 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DeepPartial } from 'typeorm';
+import { InsertResult } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { OperationStatus } from 'src/util';
 import { GuildRepository } from './guild.repository';
-import { Guild } from './guild.entity';
+import { Guild, InsertGuild, SelectGuild } from './guild.entity';
+
+export abstract class GuildService {
+  abstract getGuild(guild: SelectGuild): Promise<Guild>;
+  abstract registerGuild(guild: InsertGuild): Promise<InsertResult>;
+  abstract searchGuild(query: string, exclude?: string): Promise<Guild[]>;
+  abstract updateGuild(guildRef: Snowflake, guild: InsertGuild): Promise<Guild>;
+  abstract setConfig(...args: Parameters<GuildRepository['setConfig']>): Promise<Guild>;
+}
 
 @Injectable()
-export class GuildService {
+export class GuildServiceImpl extends GuildService {
   private readonly logger = new Logger(GuildService.name);
 
-  constructor(private readonly guildRepo: GuildRepository) {}
-
-  async registerGuild(guild: Omit<Guild, 'createdAt'>) {
-    if (await this.existsGuild(guild.guild)) {
-      return OperationStatus.SUCCESS;
-    }
-
-    await this.guildRepo.insert(guild);
-
-    return OperationStatus.SUCCESS;
+  constructor(private readonly guildRepo: GuildRepository) {
+    super();
   }
 
-  async existsGuild(guildRef: Snowflake) {
-    return this.guildRepo.exists({ where: { guild: guildRef } });
+  async getGuild(guild: SelectGuild) {
+    return this.guildRepo.findOneByOrFail(guild);
+  }
+
+  async registerGuild(guild: InsertGuild) {
+    return this.guildRepo.upsert(guild, ['guild']);
   }
 
   async searchGuild(query: string, exclude?: string) {
     return this.guildRepo.searchByName(query, exclude);
   }
 
-  async updateGuild(guildRef: Snowflake, guild: DeepPartial<Guild>) {
-    const result = await this.guildRepo.update({ guild: guildRef }, guild);
-    if (result.affected) {
-      return OperationStatus.SUCCESS;
+  async updateGuild(guildRef: Snowflake, guild: InsertGuild) {
+    const result = await this.guildRepo.updateReturning({ guild: guildRef }, guild);
+    if (result?.affected) {
+      const guild = (result?.raw as Guild[]).pop();
+      this.logger.log(`Update guild config for ${guild.name}`);
+      return guild;
     }
+  }
 
-    return { success: false, message: 'No change to guild' };
+  async setConfig(...args: Parameters<GuildRepository['setConfig']>) {
+    const result = await this.guildRepo.setConfig(...args);
+    if (result?.affected) {
+      const guild = (result?.raw as Guild[]).pop();
+      this.logger.log(`Update guild config for ${guild.name}`);
+      return guild;
+    }
   }
 }

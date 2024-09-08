@@ -1,4 +1,4 @@
-import { DiscordAPIError } from 'discord.js';
+import { DiscordAPIError, PermissionsString } from 'discord.js';
 import { BaseError } from 'src/errors';
 import { QueryFailedError } from 'typeorm';
 
@@ -9,7 +9,8 @@ type InternalErrorConfig = {
 };
 
 type ExternalErrorConfig = {
-  DISCORD_API_ERROR: DiscordAPIError;
+  INSUFFICIENT_PRIVILEGES: PermissionsString[];
+  DISCORD_API_ERROR: DiscordAPIError | DiscordAPIError[];
   CLAPFOOT_API_ERROR: Error;
   CATALOG_ERROR: Error;
 };

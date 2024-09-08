@@ -47,6 +47,9 @@ import {
   ticketPromptStatusInstructions,
   ticketPromptTriageHelp,
 } from './ticket.messages';
+import { InternalError } from 'src/errors';
+import { BotService } from 'src/bot/bot.service';
+import { PromptEmbed, SuccessEmbed } from 'src/bot/embed';
 
 export const TicketActionToTag: Record<string, TicketTag> = {
   accept: TicketTag.ACCEPTED,
@@ -76,6 +79,7 @@ export class TicketCommand {
   private readonly logger = new Logger(TicketCommand.name);
 
   constructor(
+    private readonly botService: BotService,
     private readonly crewRepo: CrewRepository,
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,
@@ -287,7 +291,10 @@ export class TicketCommand {
     @SelectedStrings() [selected]: string[],
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.ticketService.moveTicket(threadRef, selected, member.id);
+    const result = await this.ticketService.moveTicket(
+      { thread: threadRef },
+      { guild: interaction.guildId, discussion: selected, updatedBy: member.id },
+    );
     return interaction.reply({ content: result.message, ephemeral: true });
   }
 
@@ -313,11 +320,14 @@ export class TicketCommand {
       '',
     ].join('\n');
 
-    const result = await this.ticketService.createTicket(crewRef, member.id, {
-      name: title,
-      content,
-      createdBy: member.id,
-    });
+    const result = await this.ticketService.createTicket(
+      { channel: crewRef },
+      {
+        name: title,
+        content,
+        createdBy: member.id,
+      },
+    );
 
     return interaction.reply({ content: result.message, ephemeral: true });
   }
@@ -355,19 +365,18 @@ export class TicketCommand {
     const thread = await guild.channels.fetch(threadRef);
 
     if (!thread.isThread()) {
-      return interaction.reply({
-        content: 'Invalid ticket. Please report this incident',
-        ephemeral: true,
-      });
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid thread');
     }
 
     const result = await this.ticketService.updateTicket(
-      thread.id,
-      member,
+      { thread: thread.id, updatedBy: member.id },
       TicketTag.DECLINED,
       reason,
     );
-    await interaction.reply({ content: result.message, ephemeral: true });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket declined')],
+    });
   }
 
   @Subcommand({
@@ -387,9 +396,14 @@ export class TicketCommand {
       });
     }
 
-    const row = await this.ticketService.createMovePrompt(ticket, [ticket.discussion]);
+    const row = await this.ticketService.createMovePrompt(ticket, [
+      { channel: ticket.crew.channel },
+    ]);
 
-    return interaction.reply({ content: 'Select destination', components: [row], ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new PromptEmbed('PROMPT_GENERIC').setTitle('Select destination')],
+      components: [row],
+    });
   }
 
   @Subcommand({
@@ -400,21 +414,17 @@ export class TicketCommand {
   async onTicketTriagePrompt(@Context() [interaction]: SlashCommandContext) {
     const { channel } = interaction;
 
-    const ticket = await this.ticketRepo.findOne({
+    const ticket = await this.ticketRepo.findOneOrFail({
       where: { thread: channel.id },
       withDeleted: true,
     });
 
-    if (!ticket) {
-      return interaction.reply({
-        content: 'This command can only be used in a ticket',
-        ephemeral: true,
-      });
-    }
-
     const row = await this.ticketService.createTriageControl(ticket);
 
-    return interaction.reply({ content: 'Select action', components: [row], ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new PromptEmbed('PROMPT_GENERIC').setTitle('Select action')],
+      components: [row],
+    });
   }
 
   @Button('ticket/action/:action/:thread')
@@ -429,21 +439,21 @@ export class TicketCommand {
     const thread = await guild.channels.fetch(threadId);
 
     if (!thread.isThread()) {
-      return interaction.reply({
-        content: 'Invalid ticket. Please report this incident',
-        ephemeral: true,
-      });
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid ticket');
     }
 
     if (!tag) {
-      return interaction.reply({
-        content: 'Invalid ticket action. Please report this incident.',
-        ephemeral: true,
-      });
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid ticket tag');
     }
 
-    const result = await this.ticketService.updateTicket(thread.id, member, tag);
-    await interaction.reply({ content: result.message, ephemeral: true });
+    const result = await this.ticketService.updateTicket(
+      { thread: thread.id, updatedBy: member.id },
+      tag,
+    );
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket updated')],
+    });
   }
 
   async lifecycleCommand([interaction]: SlashCommandContext, tag: TicketTag, reason?: string) {
@@ -451,14 +461,18 @@ export class TicketCommand {
     const thread = interaction.channel;
 
     if (!thread.isThread()) {
-      return interaction.reply({
-        content: 'This command must be used inside a ticket thread.',
-      });
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid thread');
     }
 
-    const result = await this.ticketService.updateTicket(thread.id, member, tag, reason);
+    const result = await this.ticketService.updateTicket(
+      { thread: thread.id, updatedBy: member.id },
+      tag,
+      reason,
+    );
 
-    await interaction.reply({ content: result.message, ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket updated')],
+    });
   }
 
   @Subcommand({
@@ -529,28 +543,33 @@ export class TicketCommand {
     @Options() data: SelectCrewCommandParams,
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
-    let result;
 
     // Use specified crew
     if (data.crew) {
-      const crew = await this.crewRepo.findOne({ where: { channel: data.crew } });
-      result = await this.ticketService.sendIndividualStatus(interaction.channel, member, crew);
+      const crew = await this.crewRepo.findOneOrFail({ where: { channel: data.crew } });
+      await this.ticketService.sendIndividualStatus(
+        { channel: crew.channel },
+        interaction.channelId,
+      );
 
       // Try infer crew from current channel
     } else {
       const maybeCrew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
       if (maybeCrew) {
-        result = await this.ticketService.sendIndividualStatus(
-          interaction.channel,
-          member,
-          maybeCrew,
-        );
+        await this.ticketService.sendIndividualStatus(maybeCrew, interaction.channelId);
 
         // Send status for all crews
       } else {
-        result = await this.ticketService.sendAllStatus(interaction.channel, member);
+        await this.ticketService.sendAllStatus(
+          { guild: interaction.guildId },
+          interaction.channelId,
+          member.id,
+        );
       }
     }
-    return interaction.reply({ content: result.message, ephemeral: true });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Status update scheduled')],
+    });
   }
 }

@@ -1,16 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { uniq } from 'lodash';
-import { DeepPartial } from 'typeorm';
 import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-  Guild,
-  GuildBasedChannel,
   GuildManager,
-  GuildMember,
-  GuildTextBasedChannel,
   PermissionsBitField,
   Snowflake,
   StringSelectMenuBuilder,
@@ -18,20 +13,19 @@ import {
   channelMention,
   userMention,
 } from 'discord.js';
-import { DeleteOptions } from 'src/types';
-import { OperationStatus } from 'src/util';
-import { AuthError, DatabaseError, ExternalError, InternalError } from 'src/errors';
+import { InternalError, ValidationError } from 'src/errors';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
-import { CrewMember, CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
+import { CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { CrewMemberRepository } from 'src/core/crew/member/crew-member.repository';
-import { Crew } from 'src/core/crew/crew.entity';
+import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
 import { TeamService } from 'src/core/team/team.service';
-import { Ticket } from './ticket.entity';
+import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
+import { SelectGuild } from '../guild/guild.entity';
 
 export const ticketProperties = {
   [TicketTag.ACCEPTED]: {
@@ -104,8 +98,57 @@ export const ticketProperties = {
   },
 };
 
+export abstract class TicketService {
+  abstract createTicket(crewRef: SelectCrew, ticket?: InsertTicket);
+
+  // Move to Ticket Control
+  abstract addMovePromptToTicket(thread: ThreadChannel): Promise<void>;
+
+  // Move to Ticket Control
+  abstract createMovePrompt(
+    ticket: SelectTicket,
+    exclude?: SelectCrew[],
+  ): Promise<ActionRowBuilder<StringSelectMenuBuilder>>;
+
+  // Move to Ticket Control
+  abstract addTriageControlToThread(thread: ThreadChannel);
+
+  // Move to Ticket Control
+  abstract createTriageControl(
+    ticket: SelectTicket,
+    disabled?: { [K in 'accept' | 'decline' | 'close']?: boolean },
+  ): ActionRowBuilder<ButtonBuilder>;
+
+  abstract moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket);
+  abstract deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake);
+
+  // Move to Ticket Control
+  abstract getActiveTicketControls(
+    ticket: SelectTicket,
+    disabled?: { [K in 'active' | 'repeat' | 'done' | 'close']?: boolean },
+  ): ActionRowBuilder<ButtonBuilder>;
+
+  abstract updateTicket(ticket: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket>;
+
+  // Move to Ticket Control
+  abstract sendIndividualStatus(crewRef: SelectCrew, targetChannelRef: Snowflake): Promise<void>;
+
+  // Move to Ticket Control
+  abstract sendAllStatus(
+    guildRef: SelectGuild,
+    targetChannelRef: Snowflake,
+    memberRef: Snowflake,
+  ): Promise<void>;
+
+  // Move to Ticket Control
+  abstract createTicketButton(crewRef: Snowflake): ActionRowBuilder<ButtonBuilder>;
+
+  // Move to Ticket Control
+  abstract createCrewMenu(crews: Crew[]): ActionRowBuilder<StringSelectMenuBuilder>;
+}
+
 @Injectable()
-export class TicketService {
+export class TicketServiceImpl extends TicketService {
   private readonly logger = new Logger(TicketService.name);
 
   constructor(
@@ -116,75 +159,26 @@ export class TicketService {
     private readonly memberRepo: CrewMemberRepository,
     private readonly teamService: TeamService,
     private readonly ticketRepo: TicketRepository,
-  ) {}
-
-  async resolveTicketGuild(ticket: Ticket) {
-    try {
-      return await this.guildManager.fetch(ticket.guild);
-    } catch (err) {
-      throw new ExternalError(
-        'DISCORD_API_ERROR',
-        `Failed to resolve guild for ticket ${ticket.name}`,
-        err,
-      );
-    }
+  ) {
+    super();
   }
 
-  async resolveTicketThread(ticket: Ticket) {
-    let thread: GuildBasedChannel;
+  async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
+    const crew = await this.crewRepo.findOneOrFail({ where: crewRef, withDeleted: true });
+    const guild = await this.guildManager.fetch(crew.guild);
+    const forum = await guild.channels.fetch(crew.forum);
 
-    try {
-      const guild = await this.guildManager.fetch(ticket.guild);
-      thread = await guild.channels.fetch(ticket.thread);
-    } catch (err) {
-      throw new ExternalError(
-        'DISCORD_API_ERROR',
-        `Failed to fetch thread for ${ticket.name}`,
-        err,
-      );
-    }
-
-    if (!thread || !thread.isThread()) {
-      throw new InternalError(
-        'INTERNAL_SERVER_ERROR',
-        `${ticket.name} does not have a valid thread`,
-      );
-    }
-
-    return thread;
-  }
-
-  async createTicket(
-    crewRef: Snowflake,
-    memberRef: Snowflake,
-    ticket: DeepPartial<Pick<Ticket, 'name' | 'content' | 'createdBy'>> = {},
-  ): Promise<OperationStatus> {
-    const crew = await this.crewRepo.findOne({ where: { channel: crewRef }, withDeleted: true });
-
-    if (!crew) {
-      return { success: false, message: `Channel does not belong to a crew` };
-    }
-
-    const guild = await this.crewService.resolveCrewGuild(crew);
-
-    // Resolve Crew Forum
-    // TODO: DRY
-    const { data: forum, ...forumResult } = await this.teamService.resolveTeamForum(crew.team);
-
-    if (!forumResult.success) {
-      return forumResult;
+    if (!forum || !forum.isThreadOnly()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
     }
 
     if (!ticket?.name || !ticket.content || !ticket.createdBy) {
-      this.logger.debug(
-        `Invalid ticket submitted for channel ${crewRef} in ${guild.name} by ${ticket?.createdBy ?? memberRef}`,
-        ticket,
-      );
-      return { success: false, message: 'Invalid ticket' };
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid ticket').asDisplayable();
     }
 
     const triageTag = await crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE);
-    const crewTag = await crew.getCrewTag();
+    const tags = await crew.team.tags;
+    const crewTag = tags.find((tag) => tag.name === crew.shortName);
     const appliedTags: string[] = [];
 
     if (triageTag) {
@@ -213,43 +207,38 @@ export class TicketService {
       appliedTags,
     });
 
-    await this.ticketRepo.insert({
+    const result = await this.ticketRepo.insert({
       ...ticket,
       thread: thread.id,
-      guild: guild.id,
-      discussion: crew.channel,
-      updatedBy: memberRef,
     });
 
     if (crew.movePrompt) {
       await this.addMovePromptToTicket(thread);
     }
 
-    return OperationStatus.SUCCESS;
+    return result;
   }
 
   async addMovePromptToTicket(thread: ThreadChannel) {
-    const ticket = await this.ticketRepo.findOne({
+    const ticket = await this.ticketRepo.findOneOrFail({
       where: { thread: thread.id },
       withDeleted: true,
     });
 
-    if (!ticket) {
-      return { success: false, message: `${thread.name} is not a ticket` };
-    }
-
     const message = await thread.fetchStarterMessage();
     await message.edit({
       components: [
-        await this.createMovePrompt(ticket, [ticket.crew.channel]),
+        await this.createMovePrompt(ticket, [{ channel: ticket.crew.channel }]),
         this.createTriageControl(ticket, { accept: true }),
       ],
     });
   }
 
-  async createMovePrompt(ticket: Ticket, exclude: Snowflake[] = []) {
+  async createMovePrompt(ticketRef: SelectTicket, exclude: SelectCrew[] = []) {
+    const ticket = await this.ticketRepo.findOneOrFail({ where: ticketRef, withDeleted: true });
+    const excludedCrewChannels = exclude.map((e) => e.channel);
     const crews = (await this.crewRepo.getShared(ticket.guild, true).getMany()).filter(
-      (crew) => !exclude.includes(crew.channel),
+      (crew) => !excludedCrewChannels.includes(crew.channel),
     );
 
     const select = new StringSelectMenuBuilder()
@@ -276,21 +265,15 @@ export class TicketService {
   }
 
   async addTriageControlToThread(thread: ThreadChannel) {
-    const ticket = await this.ticketRepo.findOne({
+    const ticket = await this.ticketRepo.findOneOrFail({
       where: { thread: thread.id },
       withDeleted: true,
     });
-
-    if (!ticket) {
-      return { success: false, message: `${thread.name} is not a ticket` };
-    }
 
     const message = await thread.fetchStarterMessage();
     await message.edit({
       components: [this.createTriageControl(ticket)],
     });
-
-    return OperationStatus.SUCCESS;
   }
 
   createTriageControl(
@@ -320,111 +303,52 @@ export class TicketService {
     return new ActionRowBuilder<ButtonBuilder>().addComponents(decline, accept, close);
   }
 
-  async moveTicket(threadRef: Snowflake, channelRef: Snowflake, memberRef: Snowflake) {
-    const ticket = await this.ticketRepo.findOne({
-      where: { thread: threadRef },
+  async moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket) {
+    const ticket = await this.ticketRepo.findOneOrFail({
+      where: ticketRef,
       withDeleted: true,
     });
 
-    if (!ticket) {
-      return { success: false, message: `Thread ${threadRef} is not a ticket` };
-    }
-
-    const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
-
-    if (!this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.MEMBER)) {
-      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action');
-    }
-
-    const { name, content, createdBy } = ticket;
-
-    const createResult = await this.createTicket(channelRef, memberRef, {
-      name,
-      content,
-      createdBy,
+    const result = await this.createTicket(ticket.crew, {
+      ...ticketOverride,
+      createdBy: ticket.createdBy,
     });
 
-    if (!createResult.success) {
-      return createResult;
-    }
-
-    return this.updateTicket(ticket.thread, member, TicketTag.MOVED);
+    await this.updateTicket(ticketRef, TicketTag.MOVED);
   }
 
-  private async _deleteTicket(
-    ticket: Ticket,
-    guild: Guild,
-    guildMember: GuildMember,
-    options: Partial<DeleteOptions> = {},
-  ): Promise<OperationStatus> {
-    const crewMember = await this.memberRepo.findOne({
-      where: { channel: ticket.discussion, member: guildMember.id },
+  async deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake) {
+    const ticket = await this.ticketRepo.findOneOrFail({
+      where: ticketRef,
+      withDeleted: true,
     });
 
-    if (
-      !options.isAdmin &&
-      !options.skipAccessControl &&
-      (!crewMember || !crewMember.requireAccess(CrewMemberAccess.MEMBER, options))
-    ) {
-      return { success: false, message: 'Only crew members can perform this action' };
+    const discordGuild = await this.guildManager.fetch(ticket.guild);
+    const guildMember = await discordGuild.members.fetch(memberRef);
+    const forum = await discordGuild.channels.fetch(ticket.crew.team.forum);
+
+    if (!forum || !forum.isThreadOnly()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
     }
 
-    const thread = await this.resolveTicketThread(ticket);
-
-    const reason = `${guildMember} has triaged this ticket`;
+    const thread = await forum.threads.fetch(ticket.thread);
     const now = new Date();
 
-    try {
-      if (options.softDelete) {
-        const embed = new EmbedBuilder()
-          .setTitle('Ticket Closed')
-          .setColor('DarkRed')
-          .setDescription(`Your ticket was closed by ${guildMember}`)
-          .setThumbnail(guildMember.avatarURL() ?? guildMember.user.avatarURL());
+    const embed = new EmbedBuilder()
+      .setTitle('Ticket Closed')
+      .setColor('DarkRed')
+      .setDescription(`Your ticket was closed by ${guildMember}`)
+      .setThumbnail(guildMember.avatarURL() ?? guildMember.user.avatarURL());
 
-        await thread.send({ embeds: [embed] });
-        await thread.setLocked(true);
-        await thread.setArchived(true);
-      } else {
-        await thread.delete(reason);
-      }
-    } catch (err) {
-      this.logger.error(
-        `Failed to archive ticket ${ticket.name} in ${guild.name}: ${err.message}`,
-        err.stack,
-      );
-      return { success: false, message: 'Failed to archive ticket' };
-    }
+    await thread.send({ embeds: [embed] });
+    await thread.setLocked(true);
+    await thread.setArchived(true);
 
-    await this.ticketRepo.update(
-      { thread: ticket.thread },
-      {
-        deletedAt: now,
-        updatedBy: guildMember.id,
-        updatedAt: now,
-      },
-    );
-
-    return OperationStatus.SUCCESS;
-  }
-
-  async deleteTicket(
-    threadRef: Snowflake,
-    member: GuildMember,
-    options: Partial<DeleteOptions> = {},
-  ): Promise<OperationStatus> {
-    const ticket = await this.ticketRepo.findOne({
-      where: { thread: threadRef },
-      withDeleted: true,
+    return await this.ticketRepo.updateReturning(ticketRef, {
+      deletedAt: now,
+      updatedBy: guildMember.id,
+      updatedAt: now,
     });
-
-    if (!ticket) {
-      return { success: false, message: `Thread ${threadRef} is not a ticket` };
-    }
-
-    const guild = await this.resolveTicketGuild(ticket);
-
-    return this._deleteTicket(ticket, guild, member, { ...options });
   }
 
   getActiveTicketControls(
@@ -458,23 +382,25 @@ export class TicketService {
     return new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, repeatable, done, close);
   }
 
-  async updateTicket(
-    threadRef: Snowflake,
-    member: GuildMember,
-    tag: TicketTag,
-    reason?: string,
-  ): Promise<OperationStatus<string>> {
+  async updateTicket(data: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket> {
+    if (!data.updatedBy) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Ticket updates must provide updatedBy');
+    }
+
     const ticket = await this.ticketRepo.findOne({
-      where: { thread: threadRef },
+      where: { thread: data.thread },
       withDeleted: true,
     });
 
-    if (!ticket) {
-      return { success: false, message: `Thread ${threadRef} is not a ticket` };
+    const discordGuild = await this.guildManager.fetch(data.guild);
+    const member = await discordGuild.members.fetch(data.updatedBy);
+    const forum = await discordGuild.channels.fetch(ticket.crew.team.forum);
+
+    if (!forum || !forum.isThreadOnly()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
     }
 
-    const guild = await this.resolveTicketGuild(ticket);
-    const thread = await this.resolveTicketThread(ticket);
+    const thread = await forum.threads.fetch(ticket.thread);
 
     // let crewMember: CrewMember
     // try {
@@ -486,21 +412,21 @@ export class TicketService {
     // }
 
     // RBAC for ticket lifecycle changes
-    if (
-      !this.memberService.requireCrewAccess(
-        ticket.crew.channel,
-        member.id,
-        CrewMemberAccess.MEMBER,
-      ) &&
-      tag !== TicketTag.ABANDONED &&
-      ticket.createdBy !== member.id
-    ) {
-      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action');
-    }
+    // if (
+    //   !this.memberService.requireCrewAccess(
+    //     ticket.crew.channel,
+    //     member.id,
+    //     CrewMemberAccess.MEMBER,
+    //   ) &&
+    //   tag !== TicketTag.ABANDONED &&
+    //   ticket.createdBy !== member.id
+    // ) {
+    //   throw new AuthError('FORBIDDEN', 'Only crew members can perform this action');
+    // }
 
-    await this.ticketRepo.update(
-      { thread: ticket.thread },
-      { updatedAt: new Date(), updatedBy: member.id },
+    const result = await this.ticketRepo.updateReturning(
+      { thread: data.thread },
+      { ...data, updatedAt: new Date() },
     );
 
     const { title, color, action, tagsRemoved } = ticketProperties[tag];
@@ -571,7 +497,7 @@ export class TicketService {
       );
     } catch (err) {
       this.logger.error(
-        `Failed to apply tags to ${ticket.name} in ${guild.name}: ${err.message}`,
+        `Failed to apply tags to ${ticket.name} in ${discordGuild.name}: ${err.message}`,
         err.stack,
       );
     }
@@ -591,32 +517,33 @@ export class TicketService {
         });
       } catch (err) {
         this.logger.error(
-          `Failed to DM ticket creator for ${ticket.name} in ${guild.name}: ${err.message}`,
+          `Failed to DM ticket creator for ${ticket.name} in ${discordGuild.name}: ${err.message}`,
           err.stack,
         );
       }
     }
 
-    return OperationStatus.SUCCESS;
+    if (result?.affected) {
+      return (result?.raw as Ticket[]).pop();
+    }
   }
 
-  public async sendIndividualStatus(
-    channel: GuildTextBasedChannel,
-    member: GuildMember,
-    crew: Crew,
-  ): Promise<OperationStatus> {
-    const guild = member.guild;
+  public async sendIndividualStatus(crewRef: SelectCrew, targetChannelRef: Snowflake) {
+    const crew = await this.crewService.getCrew(crewRef);
+    const discordGuild = await this.guildManager.fetch(crew.guild);
+    const targetChannel = await discordGuild.channels.fetch(targetChannelRef);
 
-    if (!channel || !channel.isTextBased()) {
-      return { success: false, message: 'Invalid channel' };
+    if (!targetChannel || !targetChannel.isTextBased()) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid channel').asDisplayable();
     }
 
     const tickets = await crew.tickets;
-    const owner = await crew.getCrewOwner();
+    const members = await crew.members;
+    const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
     const embed = new EmbedBuilder()
       .setTitle(`Tickets: ${crew.name}`)
       .setColor('DarkGreen')
-      .setThumbnail(guild.iconURL())
+      .setThumbnail(discordGuild.iconURL())
       .setTimestamp()
       .setDescription(
         `${channelMention(crew.channel)} is led by ${owner ? userMention(owner.member) : 'nobody'}.`,
@@ -633,26 +560,30 @@ export class TicketService {
         },
       ]);
 
-    if (channel.id === crew.channel) {
-      await channel.send({ embeds: [embed], components: [this.crewService.createCrewActions()] });
+    if (targetChannel.id === crew.channel) {
+      await targetChannel.send({
+        embeds: [embed],
+        components: [this.crewService.createCrewActions()],
+      });
     } else {
-      await channel.send({ embeds: [embed] });
+      await targetChannel.send({ embeds: [embed] });
     }
-
-    return OperationStatus.SUCCESS;
   }
 
   public async sendAllStatus(
-    channel: GuildTextBasedChannel,
-    member: GuildMember,
-  ): Promise<OperationStatus> {
-    const guild = member.guild;
+    guildRef: SelectGuild,
+    targetChannelRef: Snowflake,
+    memberRef: Snowflake,
+  ) {
+    const discordGuild = await this.guildManager.fetch(guildRef.guild);
+    const member = await discordGuild.members.fetch(memberRef);
+    const targetChannel = await discordGuild.channels.fetch(targetChannelRef);
 
-    if (!channel || !channel.isTextBased()) {
-      return { success: false, message: 'Invalid channel' };
+    if (!targetChannel || !targetChannel.isTextBased()) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid channel').asDisplayable();
     }
 
-    const crews = await this.crewRepo.find({ where: { guild: channel.guildId } });
+    const crews = await this.crewRepo.find({ where: { guild: targetChannel.guildId } });
     const accessibleCrews = crews.filter((crew) => {
       try {
         return member.permissionsIn(crew.channel).has(PermissionsBitField.Flags.ViewChannel);
@@ -667,7 +598,7 @@ export class TicketService {
     const embed = new EmbedBuilder()
       .setTitle('Ticket Status')
       .setColor('DarkGreen')
-      .setThumbnail(guild.iconURL())
+      .setThumbnail(discordGuild.iconURL())
       .setTimestamp();
 
     const crewSummary: string[] = [];
@@ -675,7 +606,7 @@ export class TicketService {
     for (const crew of accessibleCrews) {
       const members = await crew.members;
       const tickets = await crew.tickets;
-      const owner = await crew.getCrewOwner();
+      const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
 
       crewSummary.push(
         `- ${channelMention(crew.channel)} (${members.length} members) led by ${owner ? userMention(owner.member) : 'nobody'}`,
@@ -695,9 +626,7 @@ export class TicketService {
 
     embed.addFields(...fields);
 
-    await channel.send({ embeds: [embed] });
-
-    return OperationStatus.SUCCESS;
+    await targetChannel.send({ embeds: [embed] });
   }
 
   createTicketButton(crewRef: Snowflake) {

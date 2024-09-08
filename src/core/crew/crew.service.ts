@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { DeepPartial } from 'typeorm';
+import { DeepPartial, UpdateResult } from 'typeorm';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -12,36 +12,61 @@ import {
   GuildMember,
   GuildTextBasedChannel,
   PermissionsBitField,
-  Role,
   Snowflake,
   channelMention,
-  inlineCode,
   messageLink,
-  roleMention,
   userMention,
 } from 'discord.js';
-import { ArchiveOptions, DeleteOptions } from 'src/types';
-import { OperationStatus, toSlug } from 'src/util';
-import { AuthError, DatabaseError, ExternalError, InternalError } from 'src/errors';
+import { toSlug } from 'src/util';
+import { DatabaseError, ExternalError, InternalError, ValidationError } from 'src/errors';
+import { DiscordService } from 'src/bot/discord.service';
 import { TeamService } from 'src/core/team/team.service';
 import { TeamRepository } from 'src/core/team/team.repository';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { TagTemplateRepository } from 'src/core/tag/tag-template.repository';
+import { Ticket } from 'src/core/ticket/ticket.entity';
 import { TicketService } from 'src/core/ticket/ticket.service';
 import { TicketRepository } from 'src/core/ticket/ticket.repository';
-import { Crew } from './crew.entity';
+import { ArchiveCrew, Crew, InsertCrew, SelectCrew } from './crew.entity';
 import { CrewRepository } from './crew.repository';
-import { CrewMember, CrewMemberAccess } from './member/crew-member.entity';
+import { CrewMemberAccess } from './member/crew-member.entity';
 import { CrewMemberRepository } from './member/crew-member.repository';
 import { CrewMemberService } from './member/crew-member.service';
 import { crewAuditPrompt, newCrewMessage } from './crew.messages';
 
+export abstract class CrewService {
+  abstract getCrew(crewRef: SelectCrew): Promise<Crew>;
+  abstract registerCrew(
+    categoryRef: Snowflake,
+    memberRef: Snowflake,
+    data: InsertCrew,
+  ): Promise<Crew>;
+  abstract deregisterCrew(
+    channelRef: Snowflake,
+    memberRef: Snowflake,
+    options?: ArchiveCrew,
+  ): Promise<Crew | undefined>;
+  abstract updateCrew(
+    channelRef: Snowflake,
+    update: DeepPartial<Pick<Crew, 'movePrompt' | 'permanent'>>,
+  ): Promise<UpdateResult>;
+  abstract sendIndividualStatus(
+    channel: GuildTextBasedChannel,
+    member: GuildMember,
+    crew: Crew,
+  ): Promise<void>;
+  abstract sendAllStatus(channel: GuildTextBasedChannel, member: GuildMember): Promise<void>;
+  abstract crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel): Promise<void>;
+  abstract createCrewActions(): ActionRowBuilder<ButtonBuilder>;
+}
+
 @Injectable()
-export class CrewService {
+export class CrewServiceImpl extends CrewService {
   private readonly logger = new Logger(CrewService.name);
 
   constructor(
     private readonly guildManager: GuildManager,
+    private readonly discordService: DiscordService,
     private readonly teamService: TeamService,
     private readonly teamRepo: TeamRepository,
     private readonly tagService: TagService,
@@ -50,79 +75,21 @@ export class CrewService {
     private readonly ticketRepo: TicketRepository,
     private readonly crewRepo: CrewRepository,
     private readonly memberService: CrewMemberService,
-    private readonly memberRepo: CrewMemberRepository,
-  ) {}
-
-  async resolveCrewGuild(crew: Crew) {
-    try {
-      return await this.guildManager.fetch(crew.parent.guild);
-    } catch (err) {
-      throw new ExternalError(
-        'DISCORD_API_ERROR',
-        `Failed to retrieve guild for ${crew.name}`,
-        err,
-      );
-    }
+  ) {
+    super();
   }
 
-  async resolveCrewTextChannel(crew: Crew) {
-    const guild = await this.resolveCrewGuild(crew);
-    let channel: GuildBasedChannel;
-
-    try {
-      channel = await guild.channels.fetch(crew.channel);
-    } catch (err) {
-      throw new ExternalError(
-        'DISCORD_API_ERROR',
-        `Failed to retrieve channel for ${crew.name}`,
-        err,
-      );
-    }
-
-    if (!channel || !channel.isTextBased()) {
-      throw new InternalError(
-        'INTERNAL_SERVER_ERROR',
-        `${crew.name} does not have a valid text channel`,
-      );
-    }
-
-    return channel;
+  async getCrew(crewRef: SelectCrew) {
+    return this.crewRepo.findOneOrFail({ where: crewRef });
   }
 
-  async resolveCrewRole(crew: Crew) {
-    const guild = await this.resolveCrewGuild(crew);
+  async registerCrew(categoryRef: Snowflake, memberRef: Snowflake, data: InsertCrew) {
+    const team = await this.teamRepo.findOneOrFail({ where: { category: categoryRef } });
+    const discordGuild = await this.guildManager.fetch(team.guild);
+    const category = await discordGuild.channels.fetch(team.category);
 
-    try {
-      return await guild.roles.fetch(crew.role);
-    } catch (err) {
-      throw new ExternalError('DISCORD_API_ERROR', `Failed to retrieve role for ${crew.name}`, err);
-    }
-  }
-
-  async registerCrew(
-    categoryRef: Snowflake,
-    memberRef: Snowflake,
-    data: DeepPartial<Pick<Crew, 'name' | 'shortName' | 'slug' | 'movePrompt' | 'permanent'>>,
-  ): Promise<OperationStatus> {
-    const team = await this.teamRepo.findOne({ where: { category: categoryRef } });
-
-    if (!team) {
-      return new OperationStatus({
-        success: false,
-        message: `${channelMention(categoryRef)} does not belong to a registered team`,
-      });
-    }
-
-    const { data: guild, ...guildResult } = await this.teamService.resolveTeamGuild(team);
-
-    if (!guildResult.success) {
-      return guildResult;
-    }
-
-    const { data: category, ...categoryResult } = await this.teamService.resolveTeamCategory(team);
-
-    if (!categoryResult.success) {
-      return categoryResult;
+    if (!category) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Failed to resolve team category channel');
     }
 
     data.name = data.name || category.name;
@@ -130,39 +97,39 @@ export class CrewService {
     data.slug = data.slug || toSlug(data.name);
 
     if (data.shortName.length > 20) {
-      return new OperationStatus({
-        success: false,
-        message:
-          'Your name is too long to create a tag. Please try again with a `short_name` in your command that is under 20 characters.',
-      });
-    }
-
-    const usedRoles = await guild.roles.fetch();
-    if (usedRoles.find((role) => role.name.toLowerCase() === data.name.toLowerCase())) {
-      return new OperationStatus({
-        success: false,
-        message: `A role with the name _${data.name}_ already exists. Please choose something else`,
-      });
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        'Your name is too long to create a tag. Please try again with a `short_name` in your command that is under 20 characters.',
+      ).asDisplayable();
     }
 
     const knownTags = Object.values(TicketTag).map((t) => t.toLowerCase());
     if (knownTags.includes(data.shortName.toLowerCase())) {
-      return new OperationStatus({
-        success: false,
-        message: `${data.shortName} is a reserved name. Please choose something else`,
-      });
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        `_${data.shortName}_ is a reserved name. Please choose something else.`,
+      ).asDisplayable();
     }
 
-    if (await this.templateRepo.exists({ where: { guild: guild.id, name: data.shortName } })) {
-      return new OperationStatus({
-        success: false,
-        message: `Tag named ${data.shortName} already exists for this guild. Please choose a different ${inlineCode('name')} or a unique ${inlineCode('short_name')}.`,
-      });
+    const usedRoles = await discordGuild.roles.fetch();
+    if (usedRoles.find((role) => role.name.toLowerCase() === data.shortName.toLowerCase())) {
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        `A role with the name _${data.shortName}_ already exists. Please choose something else.`,
+      ).asDisplayable();
     }
 
-    const role = await guild.roles.create({
-      name: data.name,
-      mentionable: true,
+    if (
+      await this.templateRepo.exists({ where: { guild: discordGuild.id, name: data.shortName } })
+    ) {
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        `A forum tag named _${data.shortName}_ already exists for this guild. Please choose something else.`,
+      ).asDisplayable();
+    }
+
+    const role = await this.discordService.ensureRole(team.guild, data.role, {
+      name: data.shortName,
     });
 
     const prefixes = {
@@ -178,14 +145,39 @@ export class CrewService {
       }
     }
 
-    const channel = await guild.channels.create({
+    const denyEveryone = {
+      id: discordGuild.roles.everyone.id,
+      deny: [PermissionsBitField.Flags.ViewChannel],
+    };
+    const permissionOverwrites = [];
+
+    if (team.parent?.config?.crewViewerRole) {
+      if (!permissionOverwrites.length) {
+        permissionOverwrites.push(denyEveryone);
+      }
+
+      permissionOverwrites.push({
+        id: team.parent.config.crewViewerRole,
+        allow: [PermissionsBitField.Flags.ViewChannel],
+      });
+    }
+
+    if (team.parent?.config?.crewCreatorRole) {
+      if (!permissionOverwrites.length) {
+        permissionOverwrites.push(denyEveryone);
+      }
+
+      permissionOverwrites.push({
+        id: team.parent.config.crewCreatorRole,
+        allow: [PermissionsBitField.Flags.ViewChannel],
+      });
+    }
+
+    const channel = await this.discordService.ensureChannel(team.guild, data.channel, {
       name: `${prefix}c-${data.slug}`,
       parent: team.category,
       type: ChannelType.GuildText,
-      permissionOverwrites: [
-        { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        { id: team.role, allow: [PermissionsBitField.Flags.ViewChannel] },
-      ],
+      permissionOverwrites,
     });
 
     if (!data.movePrompt && data.movePrompt !== false) {
@@ -195,7 +187,7 @@ export class CrewService {
     const crew = this.crewRepo.create(
       Object.assign(data, {
         channel: channel.id,
-        guild: guild.id,
+        guild: discordGuild.id,
         role: role.id,
         forum: team.forum,
         createdBy: memberRef,
@@ -209,28 +201,25 @@ export class CrewService {
       throw new DatabaseError('QUERY_FAILED', 'Failed to insert crew', err);
     }
 
-    const tagResult = await this.tagService.createTagForCrew(crew);
-
-    if (!tagResult.success) {
-      return tagResult;
-    }
+    await this.tagService.createTagForCrew(crew);
 
     try {
       await this.memberService.registerCrewMember(channel.id, memberRef, CrewMemberAccess.OWNER);
     } catch (err) {
-      throw new InternalError(
-        'INTERNAL_SERVER_ERROR',
+      this.logger.error(
         `Crew was created successfully but failed to register crew member: ${err.message}`,
-        err,
+        err.stack,
       );
     }
 
-    await this.crewJoinPrompt(crew, channel);
+    if (channel.isTextBased()) {
+      await this.crewJoinPrompt(crew, channel);
+    }
 
     // Create audit prompt
-    if (team.audit) {
+    if (team.parent?.config?.crewAuditChannel) {
       try {
-        const audit = await guild.channels.fetch(team.audit);
+        const audit = await discordGuild.channels.fetch(team.parent.config.crewAuditChannel);
 
         if (audit.isTextBased()) {
           const embed = new EmbedBuilder()
@@ -259,124 +248,160 @@ export class CrewService {
       }
     }
 
-    return OperationStatus.SUCCESS;
+    return crew;
   }
 
   public async deregisterCrew(
     channelRef: Snowflake,
     memberRef: Snowflake,
-    options: Partial<DeleteOptions & ArchiveOptions>,
-  ): Promise<OperationStatus> {
-    const crew = await this.crewRepo.findOne({ where: { channel: channelRef } });
+    options: ArchiveCrew = {},
+  ) {
+    const crew = await this.crewRepo.findOneOrFail({ where: { channel: channelRef } });
+    const discordGuild = await this.guildManager.fetch(crew.guild);
 
-    if (!crew) {
-      return new OperationStatus({ success: false, message: 'Invalid channel' });
-    }
-
-    const guild = await this.resolveCrewGuild(crew);
-
-    const crewMember = await this.memberRepo.findOne({
-      where: { channel: channelRef, member: memberRef },
-    });
-
-    let member;
-
-    if (crewMember) {
-      if (!crewMember.requireAccess(CrewMemberAccess.ADMIN, options)) {
-        return new OperationStatus({
-          success: false,
-          message: 'Only crew members can perform this action',
-        });
-      } else if (options.isAdmin || options.skipAccessControl) {
-        try {
-          member = await guild.members.fetch(memberRef);
-        } catch (e) {
-          this.logger.error(`Failed to retrieve member for bot: ${e.message}`, e.stack);
-          return new OperationStatus({
-            success: false,
-            message: 'Failed to deregister crew. Please report this issue',
-          });
-        }
-      } else {
-        member = await this.memberService.resolveGuildMember(crewMember);
-      }
-    }
+    // if (crewMember) {
+    //   if (!crewMember.requireAccess(CrewMemberAccess.ADMIN, options)) {
+    //     return new OperationStatus({
+    //       success: false,
+    //       message: 'Only crew members can perform this action',
+    //     });
+    //   } else if (options.isAdmin || options.skipAccessControl) {
+    //     try {
+    //       member = await guild.members.fetch(memberRef);
+    //     } catch (e) {
+    //       this.logger.error(`Failed to retrieve member for bot: ${e.message}`, e.stack);
+    //       return new OperationStatus({
+    //         success: false,
+    //         message: 'Failed to deregister crew. Please report this issue',
+    //       });
+    //     }
+    //   } else {
+    //     member = await this.memberService.resolveGuildMember(crewMember);
+    //   }
+    // }
 
     // Close all currently open tickets
-    const tickets = await this.ticketRepo.find({ where: { discussion: channelRef } });
-    const ticketResults = OperationStatus.collect(
-      await Promise.all(
-        tickets.map(async (ticket) => {
-          const thread = await this.ticketService.resolveTicketThread(ticket);
+    let tickets: Ticket[];
+    try {
+      tickets = await this.ticketRepo.find({ where: { discussion: channelRef } });
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to fetch crew tickets', err);
+    }
+
+    const errors: Error[] = [];
+    await Promise.all(
+      tickets.map(async (ticket) => {
+        try {
+          const thread = await discordGuild.channels.fetch(ticket.thread);
+
+          if (!thread || !thread.isThread()) {
+            throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid thread');
+          }
+
           const triageSnowflake = await crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE);
 
           if (thread.appliedTags.includes(triageSnowflake)) {
-            return this.ticketService.updateTicket(ticket.thread, member, TicketTag.ABANDONED);
+            return this.ticketService.updateTicket(
+              { thread: ticket.thread, updatedBy: memberRef },
+              TicketTag.ABANDONED,
+            );
           } else {
-            return this.ticketService.updateTicket(ticket.thread, member, TicketTag.DONE);
+            return this.ticketService.updateTicket(
+              { thread: ticket.thread, updatedBy: memberRef },
+              TicketTag.DONE,
+            );
           }
-        }),
-      ),
+        } catch (err) {
+          errors.push(err);
+        }
+      }),
     );
-
-    if (!ticketResults.success) {
-      return ticketResults;
-    }
 
     // TODO: finish refactor
     try {
-      const tagTemplate = await this.templateRepo.findOne({ where: { channel: crew.channel } });
-      const botMember = await guild.members.fetchMe();
+      const tagTemplate = await this.templateRepo.findOneOrFail({
+        where: { channel: crew.channel },
+      });
+      const botMember = await discordGuild.members.fetchMe();
       await this.tagService.deleteTags(botMember, [tagTemplate]);
       await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
     } catch (err) {
       this.logger.error(`Failed to update ticket tags: ${err.message}`, err.stack);
     }
 
-    const reason = `Team archived by ${userMention(memberRef)}`;
-    const discussion = await this.resolveCrewTextChannel(crew);
-    const role = await this.resolveCrewRole(crew);
+    const discussion = await discordGuild.channels.fetch(crew.channel);
 
-    if (options.archiveTargetRef) {
+    if (!discussion || !discussion.isTextBased()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
+    }
+
+    const role = await discordGuild.roles.fetch(crew.role);
+
+    if (!role) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid role');
+    }
+
+    if (options.archiveSf) {
       let archiveTargetCategory;
 
       try {
-        archiveTargetCategory = await guild.channels.fetch(options.archiveTargetRef);
+        archiveTargetCategory = await discordGuild.channels.fetch(options.archiveSf);
       } catch (err) {
-        this.logger.error(
-          `Failed to load archive category ${options.archiveTargetRef} for crew ${crew.name} in ${guild.name}: ${err.message}`,
-          err.stack,
+        throw new ExternalError(
+          'DISCORD_API_ERROR',
+          `Failed to load archive category ${options.archiveSf} for crew ${crew.name} in ${discordGuild.name}: ${err.message}`,
+          err,
         );
       }
 
       if (archiveTargetCategory) {
-        await Promise.all([
-          discussion.edit({
-            name: options.archiveTag
-              ? [discussion.name, options.archiveTag.toLowerCase()].join('-')
-              : discussion.name,
-            permissionOverwrites: [{ id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }],
-            parent: archiveTargetCategory as CategoryChannel,
-          }),
-          role.delete(reason),
-        ]);
+        try {
+          await Promise.all([
+            discussion.edit({
+              name: options.tag
+                ? [discussion.name, options.tag.toLowerCase()].join('-')
+                : discussion.name,
+              permissionOverwrites: [
+                { id: discordGuild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+              ],
+              parent: archiveTargetCategory as CategoryChannel,
+            }),
+            role.delete(),
+          ]);
+        } catch (err) {
+          throw new ExternalError('DISCORD_API_ERROR', 'Failed to archive channel', err);
+        }
       } else {
-        return new OperationStatus({
-          success: false,
-          message: 'Failed to archive channel. Please report this issue.',
-        });
+        throw new InternalError(
+          'INTERNAL_SERVER_ERROR',
+          `Archive category ${options.archiveSf} does not exist`,
+        );
       }
     } else {
-      await Promise.all([discussion.delete(reason), role.delete(reason)]);
+      try {
+        await Promise.all([discussion.delete(), role.delete()]);
+      } catch (err) {
+        throw new ExternalError('DISCORD_API_ERROR', '');
+      }
     }
 
-    await this.crewRepo.softDelete({ channel: channelRef });
+    let result: UpdateResult;
+    try {
+      result = await this.crewRepo.updateReturning(
+        { channel: channelRef },
+        { deletedAt: new Date() },
+      );
+    } catch (err) {
+      throw new DatabaseError('QUERY_FAILED', 'Failed to update (soft-delete) crew', err);
+    }
 
-    this.logger.log(
-      `${userMention(memberRef)} archived crew ${crew.name} (${crew.channel}) in ${guild.name} (${guild.id})`,
-    );
+    if (result?.affected) {
+      this.logger.log(
+        `${userMention(memberRef)} archived crew ${crew.name} (${crew.channel}) in ${discordGuild.name} (${discordGuild.id})`,
+      );
 
-    return new OperationStatus({ success: true, message: 'Done', data: crew.name });
+      return (result?.raw as Crew[]).pop();
+    }
   }
 
   public async updateCrew(
@@ -394,18 +419,18 @@ export class CrewService {
     channel: GuildTextBasedChannel,
     member: GuildMember,
     crew: Crew,
-  ): Promise<OperationStatus> {
+  ) {
     const guild = member.guild;
 
     if (!channel || !channel.isTextBased()) {
-      return new OperationStatus({ success: false, message: 'Invalid channel' });
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
     const fields: { name: string; value: string }[] = [];
     const members = await crew.members;
     const logs = await crew.logs;
 
-    const owner = await crew.getCrewOwner();
+    const owner = await members.find((member) => member.access === CrewMemberAccess.OWNER);
     const embed = new EmbedBuilder()
       .setTitle(`Crew: ${crew.name}`)
       .setColor('DarkGreen')
@@ -436,23 +461,22 @@ export class CrewService {
 
     embed.addFields(...fields);
 
-    if (channel.id === crew.channel) {
-      await channel.send({ embeds: [embed], components: [this.createCrewActions()] });
-    } else {
-      await channel.send({ embeds: [embed] });
+    try {
+      if (channel.id === crew.channel) {
+        await channel.send({ embeds: [embed], components: [this.createCrewActions()] });
+      } else {
+        await channel.send({ embeds: [embed] });
+      }
+    } catch (err) {
+      throw new ExternalError('DISCORD_API_ERROR', 'Failed to publish crew status', err);
     }
-
-    return OperationStatus.SUCCESS;
   }
 
-  public async sendAllStatus(
-    channel: GuildTextBasedChannel,
-    member: GuildMember,
-  ): Promise<OperationStatus> {
+  public async sendAllStatus(channel: GuildTextBasedChannel, member: GuildMember) {
     const guild = member.guild;
 
     if (!channel || !channel.isTextBased()) {
-      return new OperationStatus({ success: false, message: 'Invalid channel' });
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
     const fields: { name: string; value: string }[] = [];
@@ -473,7 +497,7 @@ export class CrewService {
       const members = await crew.members;
       const logs = await crew.logs;
 
-      const owner = await crew.getCrewOwner();
+      const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
       const description = `${channelMention(crew.channel)} is led by ${owner ? userMention(owner.member) : 'nobody'} and has ${members.length} ${members.length > 1 ? 'members' : 'member'}.`;
 
       if (logs.length) {
@@ -505,19 +529,32 @@ export class CrewService {
       embed.setDescription('No data');
     }
 
-    await channel.send({ embeds: [embed] });
-
-    return OperationStatus.SUCCESS;
+    try {
+      await channel.send({ embeds: [embed] });
+    } catch (err) {
+      throw new ExternalError('DISCORD_API_ERROR', 'Failed to publish crew status', err);
+    }
   }
 
-  async crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel): Promise<OperationStatus> {
+  async crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel) {
     if (!crew) {
-      return new OperationStatus({ success: false, message: 'Invalid channel' });
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid crew');
     }
 
-    channel = channel ?? (await this.resolveCrewTextChannel(crew));
+    const discordGuild = await this.guildManager.fetch(crew.guild);
 
-    const owner = await crew.getCrewOwner();
+    if (!channel) {
+      const c = await discordGuild.channels.fetch(crew.channel);
+
+      if (!c || !c.isTextBased()) {
+        throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
+      }
+
+      channel = c;
+    }
+
+    const members = await crew.members;
+    const owner = await members.find((member) => member.access === CrewMemberAccess.OWNER);
     const embed = new EmbedBuilder()
       .setTitle(`Join ${crew.name}`)
       // TODO: refactor to use crew repo
@@ -526,8 +563,6 @@ export class CrewService {
 
     const message = await channel.send({ embeds: [embed], components: [this.createCrewActions()] });
     await message.pin();
-
-    return OperationStatus.SUCCESS;
   }
 
   createCrewActions() {

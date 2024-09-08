@@ -10,26 +10,57 @@ import {
   JoinColumn,
   Unique,
   DeleteDateColumn,
+  DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
 import { Team } from 'src/core/team/team.entity';
-import { CrewMember, CrewMemberAccess } from './member/crew-member.entity';
+import { CrewMember } from './member/crew-member.entity';
 import { CrewLog } from './log/crew-log.entity';
 import { CrewShare } from './share/crew-share.entity';
 import { Guild } from '../guild/guild.entity';
 
+export type InsertCrew = DeepPartial<
+  Omit<
+    Crew,
+    | 'parent'
+    | 'team'
+    | 'members'
+    | 'tags'
+    | 'tickets'
+    | 'logs'
+    | 'shared'
+    | 'createdAt'
+    | 'deletedAt'
+  >
+>;
+export type SelectCrew = DeepPartial<Pick<Crew, 'channel'>>;
+export type DeleteCrew = SelectCrew & { deletedBySf?: Snowflake };
+export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
+
 @Entity({ name: 'crew' })
 @Unique('unique_crew_tag_name', ['guild', 'shortName', 'deletedAt'])
 export class Crew {
-  @PrimaryColumn({ type: 'bigint', name: 'crew_channel_sf' })
+  @PrimaryColumn({
+    type: 'bigint',
+    name: 'crew_channel_sf',
+    primaryKeyConstraintName: 'pk_crew_channel_sf',
+  })
   channel: Snowflake;
 
   @Column({ type: 'bigint', name: 'guild_sf' })
   @RelationId((crew: Crew) => crew.parent)
-  @Index()
+  @Index('guild_sf_idx_crew')
   guild: Snowflake;
+
+  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
+  @JoinColumn({
+    name: 'guild_sf',
+    referencedColumnName: 'guild',
+    foreignKeyConstraintName: 'fk_guild_sf_crew',
+  })
+  parent: Guild;
 
   @Column()
   name: string;
@@ -41,7 +72,7 @@ export class Crew {
   slug: string;
 
   @Column({ type: 'bigint', name: 'role_sf' })
-  @Index()
+  @Index('role_sf_idx_crew')
   role: Snowflake;
 
   @Column({ type: 'boolean', name: 'enable_move_prompt', default: false })
@@ -52,22 +83,16 @@ export class Crew {
 
   @Column({ type: 'bigint', name: 'forum_channel_sf' })
   @RelationId((crew: Crew) => crew.team)
-  @Index()
+  @Index('forum_channel_sf_idx_crew')
   forum: Snowflake;
 
   @ManyToOne(() => Team, (team) => team.crews, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'forum_channel_sf',
     referencedColumnName: 'forum',
+    foreignKeyConstraintName: 'fk_forum_channel_sf_crew',
   })
   team: Team;
-
-  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
-  @JoinColumn({
-    name: 'guild_sf',
-    referencedColumnName: 'guild',
-  })
-  parent: Guild;
 
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: Promise<CrewMember[]>;
@@ -92,18 +117,4 @@ export class Crew {
 
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
-
-  get isDeleted() {
-    return Boolean(this.deletedAt);
-  }
-
-  async getCrewTag() {
-    const tags = await this.team.tags;
-    return tags.find((tag) => tag.name === this.shortName);
-  }
-
-  async getCrewOwner() {
-    const members = await this.members;
-    return members.find((member) => member.access === CrewMemberAccess.OWNER);
-  }
 }

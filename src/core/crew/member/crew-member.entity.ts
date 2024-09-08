@@ -7,6 +7,7 @@ import {
   JoinColumn,
   RelationId,
   CreateDateColumn,
+  DeepPartial,
 } from 'typeorm';
 import { Crew } from 'src/core/crew/crew.entity';
 import { Snowflake } from 'discord.js';
@@ -19,14 +20,18 @@ export enum CrewMemberAccess {
   SUBSCRIBED = 100,
 }
 
+export type InsertCrewMember = DeepPartial<Omit<CrewMember, 'crew' | 'createdAt' | 'deletedAt'>>;
+export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'member' | 'channel'>>;
+export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'icon' | 'access'>>;
+
 @Entity({ name: 'crew_member' })
-@Index('crew_member_unique', ['member', 'channel'], { unique: true })
+// @Index('uk_crew_member', ['member', 'channel'], { unique: true })
 export class CrewMember {
-  @PrimaryColumn({ type: 'bigint', name: 'member_sf' })
+  @PrimaryColumn({ type: 'bigint', name: 'member_sf', primaryKeyConstraintName: 'pk_crew_member' })
   member: Snowflake;
 
   @Column({ type: 'bigint', name: 'guild_sf' })
-  @Index()
+  @Index('guild_sf_idx_crew_member')
   guild: Snowflake;
 
   @Column()
@@ -42,14 +47,20 @@ export class CrewMember {
   })
   access: CrewMemberAccess;
 
-  @PrimaryColumn({ type: 'bigint', name: 'crew_channel_sf' })
+  @PrimaryColumn({
+    type: 'bigint',
+    name: 'crew_channel_sf',
+    primaryKeyConstraintName: 'pk_crew_member',
+  })
   @RelationId((member: CrewMember) => member.crew)
+  @Index('crew_channel_sf_idx_crew_member')
   channel: Snowflake;
 
   @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'crew_channel_sf',
     referencedColumnName: 'channel',
+    foreignKeyConstraintName: 'fk_crew_channel_sf_crew_member',
   })
   crew: Crew;
 

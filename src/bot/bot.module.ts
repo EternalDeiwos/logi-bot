@@ -5,8 +5,8 @@ import { NecordModule } from 'necord';
 import { IntentsBitField } from 'discord.js';
 import { RMQModule } from 'src/rmq/rmq.module';
 import { DiscordExceptionFilter } from './bot-exception.filter';
-import { BotService } from './bot.service';
-import { DiscordService } from './discord.service';
+import { BotService, BotServiceImpl } from './bot.service';
+import { DiscordService, DiscordServiceImpl } from './discord.service';
 
 @Module({
   imports: [
@@ -32,7 +32,11 @@ import { DiscordService } from './discord.service';
       allowTraversal: true,
     }),
   ],
-  providers: [DiscordExceptionFilter, BotService, DiscordService],
+  providers: [
+    DiscordExceptionFilter,
+    { provide: BotService, useClass: BotServiceImpl },
+    { provide: DiscordService, useClass: DiscordServiceImpl },
+  ],
   exports: [DiscordExceptionFilter, BotService, DiscordService],
 })
 export class BotModule {}

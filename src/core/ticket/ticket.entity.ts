@@ -9,32 +9,38 @@ import {
   JoinColumn,
   PrimaryColumn,
   UpdateDateColumn,
+  DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Crew } from 'src/core/crew/crew.entity';
 
+export type InsertTicket = DeepPartial<
+  Omit<Ticket, 'crew' | 'updatedAt' | 'createdAt' | 'deletedAt'>
+>;
+export type SelectTicket = DeepPartial<Pick<Ticket, 'thread'>>;
+
 @Entity({ name: 'ticket' })
 export class Ticket {
-  @PrimaryColumn({ type: 'bigint', name: 'thread_sf' })
+  @PrimaryColumn({ type: 'bigint', name: 'thread_sf', primaryKeyConstraintName: 'pk_thread_sf' })
   thread: Snowflake;
 
   @Column({ type: 'bigint', name: 'guild_sf' })
-  @Index()
+  @Index('guild_sf_idx_ticket')
   guild: Snowflake;
 
   @Column({ type: 'bigint', name: 'crew_channel_sf' })
-  @Index()
+  @Index('crew_channel_sf_idx_ticket')
   @RelationId((ticket: Ticket) => ticket.crew)
   discussion: Snowflake;
 
   @Column({ name: 'content', type: 'text' })
-  @Index({ fulltext: true })
   content: string;
 
   @ManyToOne(() => Crew, (crew) => crew.tickets, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'crew_channel_sf',
     referencedColumnName: 'channel',
+    foreignKeyConstraintName: 'fk_ticket_crew',
   })
   crew: Crew;
 

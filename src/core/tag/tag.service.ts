@@ -1,12 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Guild, GuildMember, GuildForumTag } from 'discord.js';
-import { OperationStatus } from 'src/util';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { Guild, GuildMember, GuildForumTag, PermissionsBitField, GuildManager } from 'discord.js';
+import { In } from 'typeorm';
+import _ from 'lodash';
+import { InternalError, ValidationError } from 'src/errors';
 import { Crew } from 'src/core/crew/crew.entity';
-import { Team } from 'src/core/team/team.entity';
+import { SelectTeam } from 'src/core/team/team.entity';
+import { SelectGuild } from 'src/core/guild/guild.entity';
 import { ForumTagTemplate } from './tag-template.entity';
 import { TagTemplateRepository } from './tag-template.repository';
 import { TagRepository } from './tag.repository';
-import { In } from 'typeorm';
+import { TeamService } from '../team/team.service';
 
 export enum TicketTag {
   TRIAGE = 'Triage',
@@ -19,16 +22,38 @@ export enum TicketTag {
   ABANDONED = 'Abandoned',
 }
 
+export abstract class TagService {
+  abstract createTicketTags(
+    member: GuildMember,
+  ): Promise<{ success: boolean; message: string } | any[]>;
+  abstract createTagForCrew(crew: Crew): Promise<any>;
+  abstract createTag(name: string, member: GuildMember, moderated?: boolean): Promise<any>;
+  abstract addTags(
+    guildRef: SelectGuild,
+    teamRef: SelectTeam,
+    templates: ForumTagTemplate[],
+  ): Promise<void>;
+  abstract deleteTags(member: GuildMember, templates?: (ForumTagTemplate | string)[]): Promise<any>;
+  abstract deleteTagTemplates(
+    member: GuildMember,
+    templates?: (ForumTagTemplate | string)[],
+  ): Promise<any>;
+}
+
 @Injectable()
-export class TagService {
+export class TagServiceImpl extends TagService {
   private readonly logger = new Logger(TagService.name);
 
   constructor(
+    private readonly guildManager: GuildManager,
+    @Inject(forwardRef(() => TeamService)) private readonly teamService: TeamService,
     private readonly tagRepo: TagRepository,
     private readonly templateRepo: TagTemplateRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async createTicketTags(member: GuildMember): Promise<OperationStatus> {
+  async createTicketTags(member: GuildMember) {
     if (!member.permissions.has('Administrator')) {
       return { success: false, message: 'Only guild administrators can perform this action' };
     }
@@ -76,114 +101,86 @@ export class TagService {
     }));
     const tags = [triage, accepted, declined, moved].concat(unmoderated);
 
-    for (const tag of tags) {
-      try {
-        await this.templateRepo.insert(tag);
-      } catch {
-        this.logger.warn(`${tag.name} already exists`);
-      }
-    }
-
-    return OperationStatus.SUCCESS;
+    return _.compact(
+      await Promise.all(
+        tags.map(async (tag) => {
+          try {
+            return await this.templateRepo.insert(tag);
+          } catch {
+            this.logger.warn(`${tag.name} already exists`);
+          }
+        }),
+      ),
+    );
   }
 
-  async createTagForCrew(crew: Crew): Promise<OperationStatus> {
+  async createTagForCrew(crew: Crew) {
     if (!crew) {
-      return { success: false, message: `Invalid crew` };
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid crew');
     }
 
-    try {
-      await this.templateRepo.insert({
-        name: crew.shortName,
-        guild: crew.guild,
-        channel: crew.channel,
-        createdBy: crew.createdBy,
-        moderated: true,
-      });
-    } catch {
-      return { success: false, message: 'A tag with this name already exists' };
-    }
-
-    return OperationStatus.SUCCESS;
+    return await this.templateRepo.insert({
+      name: crew.shortName,
+      guild: crew.guild,
+      channel: crew.channel,
+      createdBy: crew.createdBy,
+      moderated: true,
+    });
   }
 
-  async createTag(name: string, member: GuildMember, moderated = false): Promise<OperationStatus> {
-    if (!member.permissions.has('Administrator')) {
-      return { success: false, message: 'Only guild administrators can perform this action' };
-    }
+  async createTag(name: string, member: GuildMember, moderated = false) {
     const guild = member.guild;
 
-    try {
-      await this.templateRepo.insert({
-        name: name,
-        guild: guild.id,
-        moderated,
-        createdBy: member.id,
-      });
-    } catch {
-      return { success: false, message: 'A tag with this name already exists' };
-    }
-
-    return OperationStatus.SUCCESS;
+    return await this.templateRepo.insert({
+      name: name,
+      guild: guild.id,
+      moderated,
+      createdBy: member.id,
+    });
   }
 
-  async addTags(guild: Guild, team: Team, templates: ForumTagTemplate[]): Promise<OperationStatus> {
-    if (!team) {
-      return { success: false, message: `Invalid team` };
-    }
-
+  async addTags(guildRef: SelectGuild, teamRef: SelectTeam, templates: ForumTagTemplate[]) {
+    const team = await this.teamService.getTeam(teamRef);
+    const guild = await this.guildManager.fetch(guildRef.guild);
     const forum = await guild.channels.fetch(team.forum);
 
-    if (!forum.isThreadOnly()) {
-      return { success: false, message: `${forum} is not a forum` };
+    if (!forum || !forum.isThreadOnly()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
     }
 
-    try {
-      const updatedForum = await forum.setAvailableTags([
-        ...forum.availableTags.concat(),
-        ...templates.map((template) => ({
-          name: template.name,
-          moderated: template.moderated,
-          default: template.default,
-        })),
-      ]);
+    const updatedForum = await forum.setAvailableTags([
+      ...forum.availableTags.concat(),
+      ...templates.map((template) => ({
+        name: template.name,
+        moderated: template.moderated,
+        default: template.default,
+      })),
+    ]);
 
-      const newTags = updatedForum.availableTags.reduce(
-        (accumulator, tag) => {
-          const template = templates.find((template) => tag.name === template.name);
-          if (template) {
-            accumulator.push([template, tag]);
-          }
-          return accumulator;
-        },
-        [] as [ForumTagTemplate, GuildForumTag][],
-      );
+    const newTags = updatedForum.availableTags.reduce(
+      (accumulator, tag) => {
+        const template = templates.find((template) => tag.name === template.name);
+        if (template) {
+          accumulator.push([template, tag]);
+        }
+        return accumulator;
+      },
+      [] as [ForumTagTemplate, GuildForumTag][],
+    );
 
-      await this.tagRepo.upsert(
-        newTags.map(([template, tag]) => ({
-          tag: tag.id,
-          name: tag.name,
-          guild: guild.id,
-          forum: forum.id,
-          templateId: template.id,
-        })),
-        { conflictPaths: { templateId: true, forum: true }, skipUpdateIfNoValuesChanged: true },
-      );
-    } catch (err) {
-      this.logger.error(`Failed to set tags for ${team.name}: ${err.message}`);
-      return {
-        success: false,
-        message: `Unable to set forum tags for ${forum}. Please remove existing tags and try again.`,
-      };
-    }
-
-    return OperationStatus.SUCCESS;
+    await this.tagRepo.upsert(
+      newTags.map(([template, tag]) => ({
+        tag: tag.id,
+        name: tag.name,
+        guild: guildRef.guild,
+        forum: forum.id,
+        templateId: template.id,
+      })),
+      { conflictPaths: { templateId: true, forum: true }, skipUpdateIfNoValuesChanged: true },
+    );
   }
 
-  async deleteTags(
-    member: GuildMember,
-    templates?: (ForumTagTemplate | string)[],
-  ): Promise<OperationStatus> {
+  async deleteTags(member: GuildMember, templates?: (ForumTagTemplate | string)[]) {
     if (!member.permissions.has('Administrator')) {
       return { success: false, message: 'Only guild administrators can perform this action' };
     }
@@ -215,41 +212,23 @@ export class TagService {
       result.map(async ({ forum: forumRef, tags }) => {
         const forum = await guild.channels.fetch(forumRef);
 
-        if (!forum.isThreadOnly()) {
-          return { success: false, message: `${forum} is not a forum` };
+        if (!forum || !forum.isThreadOnly()) {
+          throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
         }
 
-        try {
-          const remaining = forum.availableTags.filter((t) => !Object.values(tags).includes(t.id));
-          await forum.setAvailableTags(remaining);
+        const remaining = forum.availableTags.filter((t) => !Object.values(tags).includes(t.id));
+        await forum.setAvailableTags(remaining);
 
-          await this.tagRepo.delete({
-            templateId: In(
-              templates.map((template) => (typeof template === 'string' ? template : template?.id)),
-            ),
-          });
-        } catch (err) {
-          return {
-            success: false,
-            message: `Failed to remove forum ${forum} tags ${Object.keys(tags).join(', ')}`,
-          };
-        }
-
-        return OperationStatus.SUCCESS;
+        return await this.tagRepo.delete({
+          templateId: In(
+            templates.map((template) => (typeof template === 'string' ? template : template?.id)),
+          ),
+        });
       }),
     );
-
-    return OperationStatus.collect(results);
   }
 
-  async deleteTagTemplates(
-    member: GuildMember,
-    templates?: (ForumTagTemplate | string)[],
-  ): Promise<OperationStatus> {
-    if (!member.permissions.has('Administrator')) {
-      return { success: false, message: 'Only guild administrators can perform this action' };
-    }
-
+  async deleteTagTemplates(member: GuildMember, templates?: (ForumTagTemplate | string)[]) {
     const guild = member.guild;
 
     if (!templates || !Array.isArray(templates)) {
@@ -258,10 +237,8 @@ export class TagService {
       });
     }
 
-    await this.templateRepo.delete(
+    return await this.templateRepo.delete(
       templates.map((template) => (typeof template === 'string' ? template : template?.id)),
     );
-
-    return OperationStatus.SUCCESS;
   }
 }

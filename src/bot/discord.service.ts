@@ -5,22 +5,79 @@ import {
   Snowflake,
   PermissionsBitField,
   GuildForumTagData,
+  RoleCreateOptions,
+  Role,
+  GuildBasedChannel,
 } from 'discord.js';
 import _ from 'lodash';
 import { SelectTag } from 'src/core/tag/tag.entity';
-import { BaseError } from 'src/errors';
+import { ExternalError, InternalError } from 'src/errors';
+
+export abstract class DiscordService {
+  abstract hasRole(
+    guildSf: Snowflake,
+    memberSf: Snowflake,
+    roleSf: Snowflake,
+    checkAdmin?: boolean,
+  ): Promise<boolean>;
+
+  abstract ensureRole(
+    guildSf: Snowflake,
+    roleSf: Snowflake | undefined,
+    options: RoleCreateOptions,
+  ): Promise<Role>;
+
+  abstract ensureChannel(
+    guildSf: Snowflake,
+    channelSf: Snowflake | undefined,
+    options: GuildChannelCreateOptions,
+  ): Promise<GuildBasedChannel>;
+
+  abstract ensureForumTags(
+    guildSf: Snowflake,
+    forumSf: Snowflake,
+    tags: GuildForumTagData[],
+  ): Promise<GuildForumTagData[]>;
+
+  abstract deleteForumTags(
+    guildSf: Snowflake,
+    forumSf: Snowflake,
+    tags: SelectTag[],
+  ): Promise<GuildForumTagData[]>;
+}
 
 @Injectable()
-export class DiscordService {
+export class DiscordServiceImpl extends DiscordService {
   private readonly logger = new Logger(DiscordService.name);
 
-  constructor(private readonly guildManager: GuildManager) {}
+  constructor(private readonly guildManager: GuildManager) {
+    super();
+  }
 
-  public async ensureRole(guildSf: Snowflake, roleSf: Snowflake | undefined, name: string) {
+  public async hasRole(
+    guildSf: Snowflake,
+    memberSf: Snowflake,
+    roleSf: Snowflake,
+    checkAdmin = true,
+  ) {
+    const guild = await this.guildManager.fetch(guildSf);
+    const member = await guild.members.fetch(memberSf);
+
+    return (
+      member.roles.cache.has(roleSf) ||
+      (checkAdmin && member.permissions.has(PermissionsBitField.Flags.Administrator))
+    );
+  }
+
+  public async ensureRole(
+    guildSf: Snowflake,
+    roleSf: Snowflake | undefined,
+    options: RoleCreateOptions,
+  ) {
     const guild = await this.guildManager.fetch(guildSf);
 
     if (roleSf) {
-      const role = guild.roles.fetch(roleSf);
+      const role = await guild.roles.fetch(roleSf);
 
       if (role) {
         return role;
@@ -28,20 +85,23 @@ export class DiscordService {
     }
 
     const roles = await guild.roles.fetch();
-    const maybeRole = roles.find((role) => role.name.toLowerCase() === name.toLowerCase());
+    const maybeRole = roles.find((role) => role.name.toLowerCase() === options.name.toLowerCase());
 
-    const bot = await guild.members.fetchMe();
-    if (!bot.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
-      throw new BaseError('BOT_FORBIDDEN', 'LogiBot requires additional privileges: Manage Roles');
+    if (maybeRole) {
+      return maybeRole;
     }
 
-    return (
-      maybeRole ??
-      (await guild.roles.create({
-        name,
-        mentionable: true,
-      }))
-    );
+    const bot = await guild.members.fetchMe();
+
+    if (!bot.permissions.has(PermissionsBitField.Flags.ManageChannels, true)) {
+      throw new ExternalError(
+        'INSUFFICIENT_PRIVILEGES',
+        'Bot requires additional privileges',
+        new PermissionsBitField(PermissionsBitField.Flags.ManageChannels).toArray(),
+      );
+    }
+
+    return await guild.roles.create({ mentionable: true, ...options });
   }
 
   public async ensureChannel(
@@ -55,6 +115,7 @@ export class DiscordService {
       const channel = await guild.channels.fetch(channelSf);
 
       if (channel) {
+        // Note: do not overwrite permissions
         return channel;
       }
     }
@@ -66,15 +127,25 @@ export class DiscordService {
         channel.parentId === options.parent,
     );
 
+    if (maybeChannel) {
+      if (options.permissionOverwrites) {
+        await maybeChannel.permissionOverwrites.set(options.permissionOverwrites);
+      }
+
+      return maybeChannel;
+    }
+
     const bot = await guild.members.fetchMe();
+
     if (!bot.permissions.has(PermissionsBitField.Flags.ManageChannels, true)) {
-      throw new BaseError(
-        'BOT_FORBIDDEN',
-        'LogiBot requires additional privileges: Manage Channels',
+      throw new ExternalError(
+        'INSUFFICIENT_PRIVILEGES',
+        'Bot requires additional privileges',
+        new PermissionsBitField(PermissionsBitField.Flags.ManageChannels).toArray(),
       );
     }
 
-    return maybeChannel ?? (await guild.channels.create(options));
+    return await guild.channels.create(options);
   }
 
   public async ensureForumTags(guildSf: Snowflake, forumSf: Snowflake, tags: GuildForumTagData[]) {
@@ -82,14 +153,16 @@ export class DiscordService {
     const forum = await guild.channels.fetch(forumSf);
 
     if (!forum.isThreadOnly()) {
-      throw new BaseError('INTERNAL_SERVER_ERROR', `${forum} is not a forum`);
+      throw new InternalError('INTERNAL_SERVER_ERROR', `Forum ${forum} is not a forum`);
     }
 
     const bot = await guild.members.fetchMe();
+
     if (!bot.permissionsIn(forumSf).has(PermissionsBitField.Flags.ManageChannels, true)) {
-      throw new BaseError(
-        'BOT_FORBIDDEN',
-        'LogiBot requires additional privileges: Manage Channels',
+      throw new ExternalError(
+        'INSUFFICIENT_PRIVILEGES',
+        'Bot requires additional privileges',
+        new PermissionsBitField(PermissionsBitField.Flags.ManageChannels).toArray(),
       );
     }
 
@@ -110,14 +183,16 @@ export class DiscordService {
     const forum = await guild.channels.fetch(forumSf);
 
     if (!forum.isThreadOnly()) {
-      throw new BaseError('INTERNAL_SERVER_ERROR', `${forum} is not a forum`);
+      throw new InternalError('INTERNAL_SERVER_ERROR', `Forum ${forum} is not a forum`);
     }
 
     const bot = await guild.members.fetchMe();
+
     if (!bot.permissionsIn(forumSf).has(PermissionsBitField.Flags.ManageChannels, true)) {
-      throw new BaseError(
-        'BOT_FORBIDDEN',
-        'LogiBot requires additional privileges: Manage Channels',
+      throw new ExternalError(
+        'INSUFFICIENT_PRIVILEGES',
+        'Bot requires additional privileges',
+        new PermissionsBitField(PermissionsBitField.Flags.ManageChannels).toArray(),
       );
     }
 
@@ -133,6 +208,7 @@ export class DiscordService {
     }
 
     await forum.setAvailableTags(keep);
+
     return deleted;
   }
 }

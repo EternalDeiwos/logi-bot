@@ -21,6 +21,7 @@ import {
   EmbedBuilder,
   GuildChannel,
   GuildChannelResolvable,
+  GuildManager,
   GuildMember,
   ModalBuilder,
   PermissionsBitField,
@@ -29,9 +30,12 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import _ from 'lodash';
-import { AuthError, DatabaseError } from 'src/errors';
+import { AuthError, DatabaseError, ValidationError } from 'src/errors';
+import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
+import { BotService } from 'src/bot/bot.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
+import { GuildService } from '../guild/guild.service';
 import { TeamService } from 'src/core/team/team.service';
 import { TeamSelectAutocompleteInterceptor } from 'src/core/team/team-select.interceptor';
 import { CrewService } from './crew.service';
@@ -192,6 +196,9 @@ export class CrewCommand {
   private readonly logger = new Logger(CrewCommand.name);
 
   constructor(
+    private readonly botService: BotService,
+    private readonly guildManager: GuildManager,
+    private readonly guildService: GuildService,
     private readonly teamService: TeamService,
     private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
@@ -211,26 +218,29 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: CreateCrewCommandParams,
   ) {
-    try {
-      const crewResult = await this.crewService.registerCrew(data.team, interaction.user.id, {
-        name: data.name,
-        shortName: data.shortName,
-        movePrompt: data.movePrompt,
-      });
+    const discordGuild = await this.guildManager.fetch(interaction.guildId);
+    const member = await discordGuild.members.fetch(interaction);
+    const guild = await this.guildService.getGuild({ guild: interaction.guildId });
 
-      if (!crewResult.success) {
-        return interaction.reply({ content: crewResult.message, ephemeral: true });
-      }
-
-      const result = await this.teamService.reconcileGuildForumTags(interaction.guildId);
-      return interaction.reply({ content: result.message, ephemeral: true });
-    } catch (err) {
-      this.logger.error(`Failed to create crew: ${err.message}`, err.stack);
-      return interaction.reply({
-        content: `Failed to create crew. Please report this issue`,
-        ephemeral: true,
-      });
+    if (
+      guild.config?.crewCreatorRole &&
+      !interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator) &&
+      !member.roles.cache.has(guild.config.crewCreatorRole)
+    ) {
+      throw new AuthError('FORBIDDEN', 'Not allowed to create crews').asDisplayable();
     }
+
+    const crew = await this.crewService.registerCrew(data.team, interaction.user.id, {
+      name: data.name,
+      shortName: data.shortName,
+      movePrompt: data.movePrompt,
+    });
+
+    await this.teamService.reconcileGuildForumTags({ guild: interaction.guildId });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew registered')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -257,7 +267,9 @@ export class CrewCommand {
       movePrompt: data.value,
     });
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew updated')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -284,7 +296,9 @@ export class CrewCommand {
       permanent: data.value,
     });
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew updated')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -304,7 +318,9 @@ export class CrewCommand {
       CrewMemberAccess.MEMBER,
     );
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Joined crew')],
+    });
   }
 
   @Button('crew/join')
@@ -315,7 +331,9 @@ export class CrewCommand {
       CrewMemberAccess.MEMBER,
     );
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Joined crew')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -327,8 +345,11 @@ export class CrewCommand {
   })
   async onCrewJoinPrompt(@Context() [interaction]: SlashCommandContext) {
     const crew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
-    const { message: content } = await this.crewService.crewJoinPrompt(crew);
-    return interaction.reply({ content, ephemeral: true });
+    await this.crewService.crewJoinPrompt(crew);
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Done')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -348,7 +369,9 @@ export class CrewCommand {
       CrewMemberAccess.SUBSCRIBED,
     );
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Subscribed to crew')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -366,7 +389,13 @@ export class CrewCommand {
       interaction.member?.user?.id ?? interaction.user?.id,
     );
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [
+        new SuccessEmbed('SUCCESS_GENERIC')
+          .setTitle('Left crew')
+          .setDescription('You can join again any time.'),
+      ],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -379,39 +408,39 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    const currentMember = await this.memberRepo.findOne({
-      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
-    });
+    const channelRef = data.crew || interaction.channelId;
 
     const targetMember = await this.memberRepo.findOne({
-      where: { channel: data.crew || interaction.channelId, member: data.member.id },
+      where: { channel: channelRef, member: data.member.id },
     });
 
-    let result;
-    if (!currentMember) {
-      result = { success: false, message: 'You are not a member of this team' };
-    } else if (
-      !(currentMember.requireAccess(CrewMemberAccess.OWNER),
-      { isAdmin: interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator) })
+    if (
+      !this.memberService.requireCrewAccess(
+        channelRef,
+        interaction.member?.user?.id ?? interaction.user?.id,
+        CrewMemberAccess.OWNER,
+      )
     ) {
-      result = { success: false, message: 'Only the team owner can perform this action' };
-    } else if (!targetMember) {
-      result = { success: false, message: `${data.member} is not a member of this team` };
-    } else {
-      result = await this.memberService.updateCrewMember(targetMember, {
-        access: CrewMemberAccess.OWNER,
-      });
-
-      if (!result.success) {
-        return interaction.reply({ content: result.message, ephemeral: true });
-      }
-
-      result = await this.memberService.updateCrewMember(currentMember, {
-        access: CrewMemberAccess.ADMIN,
-      });
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only crew owner or guild admin may transfer ownership',
+      ).asDisplayable();
     }
 
-    return interaction.reply({ content: result.message, ephemeral: true });
+    if (!targetMember) {
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        `${data.member} is not a member of this team`,
+      ).asDisplayable();
+    }
+
+    await this.memberService.updateCrewMember(targetMember, {
+      access: CrewMemberAccess.OWNER,
+    });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew ownership transferred')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -425,6 +454,7 @@ export class CrewCommand {
     @Options() data: SelectCrewMemberCommandParams,
   ) {
     const channelRef = data.crew || interaction.channelId;
+
     if (
       !this.memberService.requireCrewAccess(
         channelRef,
@@ -436,14 +466,16 @@ export class CrewCommand {
     }
 
     const crewMember = await this.memberRepo.findOne({
-      where: { channel: data.crew || interaction.channelId, member: interaction.user.id },
+      where: { channel: channelRef, member: interaction.user.id },
     });
 
     await this.memberService.updateCrewMember(crewMember, {
       access: CrewMemberAccess.ADMIN,
     });
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Promoted to crew administrator')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -473,7 +505,9 @@ export class CrewCommand {
       CrewMemberAccess.MEMBER,
     );
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew member registered')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -499,7 +533,9 @@ export class CrewCommand {
 
     await this.memberService.removeCrewMember(channelRef, data.member.id);
 
-    return interaction.reply({ content: 'Done', ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew member removed')],
+    });
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -512,18 +548,20 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: ArchiveCrewCommandParams,
   ) {
-    const { message: content } = await this.crewService.deregisterCrew(
-      data.crew || interaction.channelId,
-      interaction.user.id,
-      {
-        isAdmin: interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator),
-        archiveTag: data.tag,
-        archiveTargetRef: data.archive?.id,
-        softDelete: true,
-      },
-    );
+    const channelRef = data.crew || interaction.channelId;
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    if (!this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.ADMIN)) {
+      throw new AuthError('FORBIDDEN', 'Only a crew administrator can perform this action');
+    }
 
-    return interaction.reply({ content, ephemeral: true });
+    await this.crewService.deregisterCrew(channelRef, memberRef, {
+      tag: data.tag,
+      archiveSf: data.archive?.id,
+    });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew archived')],
+    });
   }
 
   @Subcommand({
@@ -556,10 +594,8 @@ export class CrewCommand {
         crews.map(async (crew) => {
           try {
             return await this.crewService.deregisterCrew(crew.channel, interaction.user.id, {
-              isAdmin: interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator),
-              softDelete: true,
-              archiveTag: data.tag,
-              archiveTargetRef: data.archive?.id,
+              tag: data.tag,
+              archiveSf: data.archive?.id,
             });
           } catch (err) {
             errors.push(err);
@@ -568,11 +604,27 @@ export class CrewCommand {
       ),
     );
 
-    // if (!result.success) {
-    //   for (const message of result.data) {
-    //     this.logger.error(message);
-    //   }
-    // }
+    if (errors.length) {
+      await this.botService.replyOrFollowUp(interaction, {
+        embeds: [
+          new ErrorEmbed('ERROR_GENERIC').setTitle(
+            `Purged ${result.length} crews. Failed to purge ${errors.length} crews.`,
+          ),
+        ],
+      });
+
+      for (const r of result) {
+        this.logger.log(`Archived crew ${r.name} in ${r.parent.name}`);
+      }
+
+      for (const e of errors) {
+        this.logger.error(`Failed to purge crew`, e.stack);
+      }
+    } else {
+      await this.botService.replyOrFollowUp(interaction, {
+        embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crews purged')],
+      });
+    }
 
     return interaction.editReply({ content: 'Done' });
   }
@@ -601,18 +653,19 @@ export class CrewCommand {
   @Modal('crew/delete/:crew')
   async onCrewDelete(
     @Context() [interaction]: ModalContext,
-    @ModalParam('crew') crewRef: Snowflake,
+    @ModalParam('crew') channelRef: Snowflake,
   ) {
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const reason = interaction.fields.getTextInputValue('crew/delete/reason');
 
-    const member = await this.memberService.resolveGuildMember(interaction.user.id, crewRef);
+    const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
 
-    const result = await this.crewService.deregisterCrew(crewRef, interaction.user.id, {
-      skipAccessControl: true,
+    const result = await this.crewService.deregisterCrew(channelRef, memberRef);
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crews purged')],
     });
-    await interaction.reply({ content: result.message, ephemeral: true });
 
-    if (result.success) {
+    if (result) {
       const message = reason
         .split('\n')
         .map((r) => `> ${r}`)
@@ -622,7 +675,7 @@ export class CrewCommand {
         .setTitle('Crew Removed')
         .setColor('DarkRed')
         .setDescription(
-          `Crew **${result.data}** was removed by ${member} for the following reason:\n\n${message}`,
+          `Crew **${result.name}** was removed by ${member} for the following reason:\n\n${message}`,
         )
         .setThumbnail(member.avatarURL() ?? member.user.avatarURL());
 
@@ -707,7 +760,9 @@ export class CrewCommand {
   async onCrewLog(@Context() [interaction]: ModalContext, @ModalParam('crew') crewRef: Snowflake) {
     const content = interaction.fields.getTextInputValue('crew/log/content');
     const result = await this.logService.addCrewLog(crewRef, interaction.user.id, { content });
-    await interaction.reply({ content: result.message, ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Log added')],
+    });
   }
 
   @UseInterceptors(CrewShareAutocompleteInterceptor)
@@ -720,13 +775,21 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: ShareCrewCommandParams,
   ) {
-    const { message: content } = await this.shareService.shareCrew(
-      data.guild,
-      data.crew || interaction.channelId,
-      interaction.user.id,
-      { isAdmin: interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator) },
-    );
+    const channelRef = data.crew || interaction.channelId;
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
 
-    return interaction.reply({ content, ephemeral: true });
+    if (!this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.ADMIN)) {
+      throw new AuthError('FORBIDDEN', 'Only a crew administrator can perform this action');
+    }
+
+    const result = await this.shareService.shareCrew({
+      target: data.guild,
+      channel: channelRef,
+      createdBy: memberRef,
+    });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew shared')],
+    });
   }
 }

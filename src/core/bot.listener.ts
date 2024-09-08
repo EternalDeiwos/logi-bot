@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Context, ContextOf, On } from 'necord';
 import { ConfigKey } from 'src/app.config';
-import { OperationStatus } from 'src/util';
-import { MoveTicketBehaviour } from 'src/types';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { TicketService } from './ticket/ticket.service';
 import { TicketRepository } from './ticket/ticket.repository';
@@ -16,7 +14,6 @@ export class BotEventListener {
   private readonly logger = new Logger(BotEventListener.name);
 
   constructor(
-    private readonly configService: ConfigService<Record<ConfigKey, unknown>>,
     private readonly tagService: TagService,
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,
@@ -28,23 +25,17 @@ export class BotEventListener {
   @On('guildCreate')
   async onGuildCreate(@Context() [guild]: ContextOf<'guildCreate'>) {
     const member = await guild.members.fetchMe();
-    const result = OperationStatus.collect(
-      await Promise.all([
-        this.tagService.createTicketTags(member),
-        this.guildService.registerGuild({
-          guild: guild.id,
-          name: guild.name,
-          shortName: guild.nameAcronym,
-          icon: guild.iconURL({ extension: 'png', forceStatic: true }),
-        }),
-      ]),
-    );
+    const result = await Promise.all([
+      this.tagService.createTicketTags(member),
+      this.guildService.registerGuild({
+        guild: guild.id,
+        name: guild.name,
+        shortName: guild.nameAcronym,
+        icon: guild.iconURL({ extension: 'png', forceStatic: true }),
+      }),
+    ]);
 
-    if (result.success) {
-      this.logger.log('Registering guild');
-    } else {
-      this.logger.warn(`Failed to register guild: ${result.message}`);
-    }
+    this.logger.log('Registering guild');
   }
 
   @On('guildDelete')
@@ -52,8 +43,8 @@ export class BotEventListener {
     const member = await guild.members.fetchMe();
     const result = await this.tagService.deleteTagTemplates(member);
 
-    if (!result.success) {
-      return this.logger.warn(`Failed to delete guild tags: ${result.message}`);
+    if (!result.affected) {
+      return this.logger.warn(`Failed to delete guild tags`);
     }
   }
 
@@ -95,13 +86,7 @@ export class BotEventListener {
 
     if (toDeleteFlag && !deletedFlag) {
       this.logger.log(`Deleting ticket ${ticket.name}`);
-      const softDelete =
-        (await this.configService.get<string>('APP_TICKETS_MOVE_ACTION')) ===
-        MoveTicketBehaviour.ARCHIVE;
-      await this.ticketService.deleteTicket(newThread.id, member, {
-        softDelete,
-        skipAccessControl: true,
-      });
+      await this.ticketService.deleteTicket({ thread: newThread.id }, member.id);
     }
   }
 

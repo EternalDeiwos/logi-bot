@@ -12,26 +12,26 @@ import { CrewLog } from './crew/log/crew-log.entity';
 import { Guild } from './guild/guild.entity';
 import { CrewShare } from './crew/share/crew-share.entity';
 import { BotEventListener } from './bot.listener';
-import { TeamService } from './team/team.service';
+import { TeamService, TeamServiceImpl } from './team/team.service';
 import { TeamCommand } from './team/team.command';
 import { TeamRepository } from './team/team.repository';
-import { CrewService } from './crew/crew.service';
+import { CrewService, CrewServiceImpl } from './crew/crew.service';
 import { CrewCommand } from './crew/crew.command';
 import { CrewRepository } from './crew/crew.repository';
-import { CrewMemberService } from './crew/member/crew-member.service';
+import { CrewMemberService, CrewMemberServiceImpl } from './crew/member/crew-member.service';
 import { CrewMemberRepository } from './crew/member/crew-member.repository';
-import { CrewLogService } from './crew/log/crew-log.service';
+import { CrewLogService, CrewLogServiceImpl } from './crew/log/crew-log.service';
 import { CrewLogRepository } from './crew/log/crew-log.repository';
-import { CrewShareService } from './crew/share/crew-share.service';
+import { CrewShareService, CrewShareServiceImpl } from './crew/share/crew-share.service';
 import { CrewShareRepository } from './crew/share/crew-share.repository';
-import { TagService } from './tag/tag.service';
+import { TagService, TagServiceImpl } from './tag/tag.service';
 import { TagCommand } from './tag/tag.command';
 import { TagRepository } from './tag/tag.repository';
 import { TagTemplateRepository } from './tag/tag-template.repository';
-import { TicketService } from './ticket/ticket.service';
+import { TicketService, TicketServiceImpl } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
 import { TicketRepository } from './ticket/ticket.repository';
-import { GuildService } from './guild/guild.service';
+import { GuildService, GuildServiceImpl } from './guild/guild.service';
 import { GuildCommand } from './guild/guild.command';
 import { GuildRepository } from './guild/guild.repository';
 
@@ -53,29 +53,39 @@ import { GuildRepository } from './guild/guild.repository';
   ],
   providers: [
     BotEventListener,
-    TeamService,
+    GuildRepository,
+    GuildCommand,
     TeamCommand,
     TeamRepository,
     CrewRepository,
-    CrewService,
     CrewCommand,
     CrewMemberRepository,
-    CrewMemberService,
-    CrewLogService,
     CrewLogRepository,
-    CrewShareService,
     CrewShareRepository,
-    TagService,
     TagCommand,
     TagRepository,
     TagTemplateRepository,
-    TicketService,
     TicketCommand,
     TicketRepository,
-    GuildRepository,
-    GuildService,
-    GuildCommand,
+    { provide: GuildService, useClass: GuildServiceImpl },
+    { provide: TeamService, useClass: TeamServiceImpl },
+    { provide: CrewService, useClass: CrewServiceImpl },
+    { provide: CrewMemberService, useClass: CrewMemberServiceImpl },
+    { provide: CrewLogService, useClass: CrewLogServiceImpl },
+    { provide: CrewShareService, useClass: CrewShareServiceImpl },
+    { provide: TagService, useClass: TagServiceImpl },
+    { provide: TicketService, useClass: TicketServiceImpl },
   ],
-  exports: [TypeOrmModule],
+  exports: [
+    TypeOrmModule,
+    GuildService,
+    TeamService,
+    CrewService,
+    CrewMemberService,
+    CrewLogService,
+    CrewShareService,
+    TagService,
+    TicketService,
+  ],
 })
 export class CoreModule {}

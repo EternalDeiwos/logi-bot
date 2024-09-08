@@ -8,7 +8,7 @@ import {
   InteractionReplyOptions,
   ModalSubmitInteraction,
 } from 'discord.js';
-import { ConsumerResponsePayload, DiscordAPIInteraction } from 'src/types';
+import { ArrayOrElement, ConsumerResponsePayload, DiscordAPIInteraction } from 'src/types';
 import { ConsumerResponseError, BaseError } from 'src/errors';
 import { ErrorEmbed } from './embed';
 
@@ -18,19 +18,45 @@ export type CommandInteraction =
   | ModalSubmitInteraction
   | ButtonInteraction;
 
+export abstract class BotService {
+  abstract replyOrFollowUp(
+    interaction: ArrayOrElement<CommandInteraction>,
+    options: InteractionReplyOptions,
+  ): Promise<any>;
+
+  abstract reportCommandError(
+    interaction: ArrayOrElement<CommandInteraction>,
+    error: ConsumerResponseError,
+  ): Promise<void>;
+
+  abstract request<T = any, R = any>(
+    interaction: ArrayOrElement<CommandInteraction>,
+    exchange: string,
+    routingKey: string,
+    data?: T,
+  ): Promise<R>;
+
+  abstract publish<T = any>(
+    interaction: ArrayOrElement<CommandInteraction>,
+    exchange: string,
+    routingKey: string,
+    data?: T,
+  ): Promise<void>;
+}
+
 @Injectable()
-export class BotService {
+export class BotServiceImpl extends BotService {
   private readonly logger = new Logger(BotService.name);
 
   constructor(
     private readonly configService: ConfigService,
     private readonly rmq: AmqpConnection,
-  ) {}
+  ) {
+    super();
+  }
 
-  async replyOrFollowUp(interaction: [CommandInteraction], options: InteractionReplyOptions);
-  async replyOrFollowUp(interaction: CommandInteraction, options: InteractionReplyOptions);
   async replyOrFollowUp(
-    interaction: CommandInteraction | [CommandInteraction],
+    interaction: ArrayOrElement<CommandInteraction>,
     options: InteractionReplyOptions,
   ) {
     if (Array.isArray(interaction)) {
@@ -44,10 +70,8 @@ export class BotService {
     }
   }
 
-  async reportCommandError(interaction: [CommandInteraction], error: ConsumerResponseError);
-  async reportCommandError(interaction: CommandInteraction, error: ConsumerResponseError);
   async reportCommandError(
-    interaction: CommandInteraction | [CommandInteraction],
+    interaction: ArrayOrElement<CommandInteraction>,
     error: ConsumerResponseError,
   ): Promise<void> {
     this.logger.error(`${error.code}: ${error.message}`, error.cause);
@@ -75,19 +99,7 @@ export class BotService {
   }
 
   async request<T = any, R = any>(
-    interaction: [CommandInteraction],
-    exchange: string,
-    routingKey: string,
-    data?: T,
-  ): Promise<R>;
-  async request<T = any, R = any>(
-    interaction: CommandInteraction,
-    exchange: string,
-    routingKey: string,
-    data?: T,
-  ): Promise<R>;
-  async request<T = any, R = any>(
-    interaction: CommandInteraction | [CommandInteraction],
+    interaction: ArrayOrElement<CommandInteraction>,
     exchange: string,
     routingKey: string,
     data?: T,
@@ -123,19 +135,7 @@ export class BotService {
   }
 
   async publish<T = any>(
-    interaction: [CommandInteraction],
-    exchange: string,
-    routingKey: string,
-    data?: T,
-  ): Promise<void>;
-  async publish<T = any>(
-    interaction: CommandInteraction,
-    exchange: string,
-    routingKey: string,
-    data?: T,
-  ): Promise<void>;
-  async publish<T = any>(
-    interaction: CommandInteraction | [CommandInteraction],
+    interaction: ArrayOrElement<CommandInteraction>,
     exchange: string,
     routingKey: string,
     data?: T,

@@ -1,218 +1,87 @@
-import { Injectable, Logger } from '@nestjs/common';
-import {
-  CategoryChannel,
-  channelMention,
-  Guild,
-  GuildChannel,
-  GuildChannelResolvable,
-  GuildManager,
-  GuildMember,
-  Role,
-  Snowflake,
-  ThreadOnlyChannel,
-  User,
-} from 'discord.js';
-import { OperationStatus } from 'src/util';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { GuildManager } from 'discord.js';
+import { DeleteResult, InsertResult } from 'typeorm';
+import { InternalError } from 'src/errors';
+import { BotService } from 'src/bot/bot.service';
+import { DiscordService } from 'src/bot/discord.service';
 import { TagService } from 'src/core/tag/tag.service';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { TagTemplateRepository } from 'src/core/tag/tag-template.repository';
+import { SelectGuild } from 'src/core/guild/guild.entity';
 import { TeamRepository } from './team.repository';
-import { Team } from './team.entity';
+import { InsertTeam, SelectTeam, Team } from './team.entity';
+
+export abstract class TeamService {
+  abstract getTeam(team: SelectTeam): Promise<Team>;
+  abstract registerTeam(team: InsertTeam): Promise<InsertResult>;
+  abstract deleteTeam(team: SelectTeam): Promise<DeleteResult>;
+  abstract reconcileGuildForumTags(guild: SelectGuild): Promise<void>;
+  abstract reconcileTeamForumTags(
+    guildRef: SelectGuild,
+    teamRef: SelectTeam,
+    templates: ForumTagTemplate[],
+  ): Promise<void>;
+}
 
 @Injectable()
-export class TeamService {
+export class TeamServiceImpl extends TeamService {
   private readonly logger = new Logger(TeamService.name);
 
   constructor(
     private readonly guildManager: GuildManager,
-    private readonly tagService: TagService,
+    private readonly botService: BotService,
+    private readonly discordService: DiscordService,
+    @Inject(forwardRef(() => TagService)) private readonly tagService: TagService,
     private readonly templateRepo: TagTemplateRepository,
     private readonly teamRepo: TeamRepository,
-  ) {}
-
-  async resolveTeamGuild(team: Team): Promise<OperationStatus<Guild>> {
-    try {
-      const guild = await this.guildManager.fetch(team.guild);
-      return new OperationStatus({ success: true, message: 'Done', data: guild });
-    } catch (err) {
-      this.logger.error(`Failed to resolve guild: ${err.message}`, err.stack);
-      return {
-        success: false,
-        message: 'Guild is improperly registered. Please report this incident.',
-      };
-    }
+  ) {
+    super();
   }
 
-  async resolveTeamCategory(team: Team): Promise<OperationStatus<CategoryChannel>> {
-    const { data: guild, ...guildResult } = await this.resolveTeamGuild(team);
-
-    if (!guildResult.success) {
-      return guildResult;
-    }
-
-    try {
-      const category = await guild.channels.fetch(team.category);
-
-      if (!category) {
-        return {
-          success: false,
-          message: `${team.name} does not have a category. Please report this incident.`,
-        };
-      }
-
-      return new OperationStatus({
-        success: true,
-        message: 'Done',
-        data: category as CategoryChannel,
-      });
-    } catch (err) {
-      this.logger.error(
-        `Failed to fetch category ${team.category} for ${team.name} in ${guild.name}: ${err.message}`,
-        err.stack,
-      );
-      return {
-        success: false,
-        message: `${team.name} does not have a ticket category. Please report this incident.`,
-      };
-    }
+  async getTeam(team: SelectTeam) {
+    return this.teamRepo.findOneOrFail({ where: team });
   }
 
-  async resolveTeamForum(team: Team): Promise<OperationStatus<ThreadOnlyChannel>> {
-    const { data: guild, ...guildResult } = await this.resolveTeamGuild(team);
+  async registerTeam(team: InsertTeam) {
+    const discordGuild = await this.guildManager.fetch(team.guild);
+    const forum = await discordGuild.channels.fetch(team.forum);
 
-    if (!guildResult.success) {
-      return guildResult;
+    if (!forum || !forum.isThreadOnly()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
     }
 
-    try {
-      const forum = await guild.channels.fetch(team.forum);
+    const category = await forum.parent.fetch();
 
-      if (!forum || !forum.isThreadOnly()) {
-        return {
-          success: false,
-          message: `${team.name} does not have a ticket forum. Please report this incident.`,
-        };
-      }
-
-      return new OperationStatus({ success: true, message: 'Done', data: forum });
-    } catch (err) {
-      this.logger.error(
-        `Failed to fetch forum ${team.forum} for ${team.name} in ${guild.name}: ${err.message}`,
-        err.stack,
-      );
-      return {
-        success: false,
-        message: `${team.name} does not have a ticket forum. Please report this incident.`,
-      };
-    }
-  }
-
-  async registerTeam(
-    forum: GuildChannel,
-    role: GuildMember | Role | User,
-    member: GuildMember,
-    audit?: GuildChannel,
-  ): Promise<OperationStatus<string>> {
-    if (!member.permissions.has('Administrator')) {
-      return { success: false, message: 'Only guild administrators can perform this action' };
-    }
-
-    if (!forum.isThreadOnly()) {
-      return { success: false, message: `${forum} is not a valid forum` };
-    }
-
-    if ('roles' in role || 'username' in role) {
-      return { success: false, message: `${role} is not a valid role` };
-    }
-
-    let category;
-    try {
-      category = await forum.parent.fetch();
-    } catch (e) {
-      this.logger.error(`Cannot interact with forum ${forum.parentId}: ${e.message}`, e.stack);
-      return new OperationStatus({
-        success: false,
-        message: `Cannot interact with ${channelMention(forum.parentId)}`,
-      });
-    }
-
-    if (await this.teamRepo.exists({ where: { category: category.id } })) {
-      return { success: false, message: `${category.name} is already a registered team` };
-    }
-
-    const {
-      identifiers: [{ id: teamId }],
-    } = await this.teamRepo.insert({
-      name: category.name,
-      category: category.id,
-      guild: category.guildId,
-      forum: forum.id,
-      role: role.id,
-      audit: audit?.id,
-    });
-
-    return new OperationStatus({ success: true, message: 'Done', data: teamId });
-  }
-
-  async deleteTeam(category: GuildChannel, member: GuildMember): Promise<OperationStatus> {
-    if (!member.permissions.has('Administrator')) {
-      return { success: false, message: 'Only guild administrators can perform this action' };
-    }
-
-    await this.teamRepo.delete({
-      category: category.id,
-    });
-
-    return OperationStatus.SUCCESS;
-  }
-
-  async updateTeam(
-    categoryRef: GuildChannelResolvable,
-    member: GuildMember,
-    audit: GuildChannel,
-  ): Promise<OperationStatus> {
-    if (!member.permissions.has('Administrator')) {
-      return { success: false, message: 'Only guild administrators can perform this action' };
-    }
-
-    const guild = member.guild;
-    const category = await guild.channels.cache.get(
-      typeof categoryRef === 'string' ? categoryRef : categoryRef.id,
+    return this.teamRepo.upsert(
+      {
+        name: category.name,
+        category: category.id,
+        guild: category.guildId,
+        forum: forum.id,
+      },
+      ['name', 'guild', 'forum'],
     );
-
-    if (!category) {
-      return { success: false, message: 'Invalid channel' };
-    }
-
-    await this.teamRepo.update({ category: category.id }, { audit: audit.id });
-
-    return OperationStatus.SUCCESS;
   }
 
-  async reconcileGuildForumTags(guildId: Snowflake): Promise<OperationStatus> {
-    const guild = await this.guildManager.fetch(guildId);
-    const templates = await this.templateRepo.find({ where: { guild: guildId } });
-    const teams = await this.teamRepo.find({ where: { guild: guildId } });
+  async deleteTeam(team: SelectTeam) {
+    return await this.teamRepo.delete(team);
+  }
+
+  async reconcileGuildForumTags(guildRef: SelectGuild) {
+    const templates = await this.templateRepo.find({ where: guildRef });
+    const teams = await this.teamRepo.find({ where: guildRef });
 
     const result = await Promise.all(
-      teams.map((team) => this.reconcileTeamForumTags(guild, team, templates)),
+      teams.map((team) => this.reconcileTeamForumTags(guildRef, team, templates)),
     );
-
-    const failed = result.filter((r) => !r.success);
-
-    if (failed.length) {
-      const message = failed.map((r) => `- ${r.message}`).join('\n');
-      return { success: false, message };
-    }
-
-    return OperationStatus.SUCCESS;
   }
 
   async reconcileTeamForumTags(
-    guild: Guild,
-    team: Team,
+    guildRef: SelectGuild,
+    teamRef: SelectTeam,
     templates: ForumTagTemplate[],
-  ): Promise<OperationStatus> {
+  ) {
+    const team = await this.teamRepo.findOneOrFail({ where: teamRef });
     const tags = await team.tags;
     const filteredTemplates = templates.filter((template) => {
       return (
@@ -223,6 +92,6 @@ export class TeamService {
       );
     });
 
-    return this.tagService.addTags(guild, team, filteredTemplates);
+    return this.tagService.addTags(guildRef, teamRef, filteredTemplates);
   }
 }

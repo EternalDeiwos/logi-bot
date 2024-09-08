@@ -1,4 +1,4 @@
-import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
+import { Injectable, Logger, UseFilters } from '@nestjs/common';
 import {
   ChannelOption,
   Context,
@@ -6,16 +6,24 @@ import {
   Options,
   SlashCommandContext,
   SlashCommandMeta,
-  StringOption,
   Subcommand,
 } from 'necord';
-import { ChannelType, GuildChannel, GuildMember, Role, Snowflake, User } from 'discord.js';
+import { ChannelType, GuildChannel, GuildMember, Role, User } from 'discord.js';
 import { EchoCommand } from 'src/core/echo.command-group';
+import { SuccessEmbed } from 'src/bot/embed';
+import { BotService } from 'src/bot/bot.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
-import { TeamSelectAutocompleteInterceptor } from './team-select.interceptor';
 import { TeamService } from './team.service';
 
 export class CreateTeamCommandParams {
+  @ChannelOption({
+    name: 'category',
+    description: 'Select a category',
+    channel_types: [ChannelType.GuildCategory],
+    required: true,
+  })
+  category: GuildChannel;
+
   @ChannelOption({
     name: 'forum',
     description: 'Select a forum where tickets will be created.',
@@ -30,14 +38,6 @@ export class CreateTeamCommandParams {
     required: true,
   })
   role: GuildMember | Role | User;
-
-  @ChannelOption({
-    name: 'audit',
-    description: 'A channel where crew control messages will be displayed.',
-    channel_types: [ChannelType.GuildText],
-    required: false,
-  })
-  audit: GuildChannel;
 }
 
 export class SelectTeamCommandParams {
@@ -50,24 +50,6 @@ export class SelectTeamCommandParams {
   category: GuildChannel;
 }
 
-export class SetAuditTeamCommandParams {
-  @StringOption({
-    name: 'team',
-    description: 'Select a team',
-    autocomplete: true,
-    required: true,
-  })
-  team: Snowflake;
-
-  @ChannelOption({
-    name: 'audit',
-    description: 'A channel where crew control messages will be displayed.',
-    channel_types: [ChannelType.GuildText],
-    required: true,
-  })
-  audit: GuildChannel;
-}
-
 @Injectable()
 @EchoCommand({
   name: 'team',
@@ -77,7 +59,10 @@ export class SetAuditTeamCommandParams {
 export class TeamCommand {
   private readonly logger = new Logger(TeamCommand.name);
 
-  constructor(private readonly teamService: TeamService) {}
+  constructor(
+    private readonly botService: BotService,
+    private readonly teamService: TeamService,
+  ) {}
 
   @Subcommand({
     name: 'add',
@@ -89,9 +74,15 @@ export class TeamCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: CreateTeamCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.teamService.registerTeam(data.forum, data.role, member, data.audit);
-    return interaction.reply({ content: result.message, ephemeral: true });
+    const result = await this.teamService.registerTeam({
+      forum: data.forum.id,
+      guild: interaction.guildId,
+      category: data.category.id,
+    });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Team registered')],
+    });
   }
 
   @Subcommand({
@@ -103,23 +94,10 @@ export class TeamCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectTeamCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.teamService.deleteTeam(data.category, member);
-    return interaction.reply({ content: result.message, ephemeral: true });
-  }
+    const result = await this.teamService.deleteTeam({ category: data.category.id });
 
-  @UseInterceptors(TeamSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'set_audit',
-    description: 'Set the audit channel for this team',
-    dmPermission: false,
-  })
-  async onTeamSetAuditChannel(
-    @Context() [interaction]: SlashCommandContext,
-    @Options() data: SetAuditTeamCommandParams,
-  ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.teamService.updateTeam(data.team, member, data.audit);
-    return interaction.reply({ content: result.message, ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Team deregistered')],
+    });
   }
 }
