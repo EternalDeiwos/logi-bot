@@ -1,15 +1,16 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { Guild, GuildMember, GuildForumTag, PermissionsBitField, GuildManager } from 'discord.js';
-import { In } from 'typeorm';
-import _ from 'lodash';
+import { GuildMember, GuildForumTag, GuildManager, Snowflake } from 'discord.js';
+import { In, InsertResult } from 'typeorm';
+import { compact } from 'lodash';
 import { InternalError, ValidationError } from 'src/errors';
 import { Crew } from 'src/core/crew/crew.entity';
 import { SelectTeam } from 'src/core/team/team.entity';
+import { TeamService } from 'src/core/team/team.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
+import { GuildService } from 'src/core/guild/guild.service';
 import { ForumTagTemplate } from './tag-template.entity';
 import { TagTemplateRepository } from './tag-template.repository';
 import { TagRepository } from './tag.repository';
-import { TeamService } from '../team/team.service';
 
 export enum TicketTag {
   TRIAGE = 'Triage',
@@ -23,9 +24,7 @@ export enum TicketTag {
 }
 
 export abstract class TagService {
-  abstract createTicketTags(
-    member: GuildMember,
-  ): Promise<{ success: boolean; message: string } | any[]>;
+  abstract createTicketTags(guildRef: SelectGuild, memberRef: Snowflake): Promise<InsertResult[]>;
   abstract createTagForCrew(crew: Crew): Promise<any>;
   abstract createTag(name: string, member: GuildMember, moderated?: boolean): Promise<any>;
   abstract addTags(
@@ -46,6 +45,7 @@ export class TagServiceImpl extends TagService {
 
   constructor(
     private readonly guildManager: GuildManager,
+    private readonly guildService: GuildService,
     @Inject(forwardRef(() => TeamService)) private readonly teamService: TeamService,
     private readonly tagRepo: TagRepository,
     private readonly templateRepo: TagTemplateRepository,
@@ -53,39 +53,36 @@ export class TagServiceImpl extends TagService {
     super();
   }
 
-  async createTicketTags(member: GuildMember) {
-    if (!member.permissions.has('Administrator')) {
-      return { success: false, message: 'Only guild administrators can perform this action' };
-    }
-    const guild = member.guild;
+  async createTicketTags(guildRef: SelectGuild, memberRef: Snowflake) {
+    const guild = await this.guildService.getGuild(guildRef);
 
     const triage = {
       name: TicketTag.TRIAGE,
-      guild: guild.id,
+      guildId: guild.id,
       moderated: true,
       default: true,
-      createdBy: member.id,
+      createdBy: memberRef,
     };
 
     const accepted = {
       name: TicketTag.ACCEPTED,
-      guild: guild.id,
+      guildId: guild.id,
       moderated: true,
-      createdBy: member.id,
+      createdBy: memberRef,
     };
 
     const declined = {
       name: TicketTag.DECLINED,
-      guild: guild.id,
+      guildId: guild.id,
       moderated: true,
-      createdBy: member.id,
+      createdBy: memberRef,
     };
 
     const moved = {
       name: TicketTag.MOVED,
-      guild: guild.id,
+      guildId: guild.id,
       moderated: true,
-      createdBy: member.id,
+      createdBy: memberRef,
     };
 
     const unmoderated = [
@@ -95,13 +92,13 @@ export class TagServiceImpl extends TagService {
       TicketTag.REPEATABLE,
     ].map((name) => ({
       name,
-      guild: guild.id,
+      guildId: guild.id,
       moderated: false,
-      createdBy: member.id,
+      createdBy: memberRef,
     }));
     const tags = [triage, accepted, declined, moved].concat(unmoderated);
 
-    return _.compact(
+    return compact(
       await Promise.all(
         tags.map(async (tag) => {
           try {
@@ -121,8 +118,8 @@ export class TagServiceImpl extends TagService {
 
     return await this.templateRepo.insert({
       name: crew.shortName,
-      guild: crew.guild,
-      channel: crew.channel,
+      guildId: crew.guildId,
+      crewSf: crew.crewSf,
       createdBy: crew.createdBy,
       moderated: true,
     });
@@ -133,7 +130,7 @@ export class TagServiceImpl extends TagService {
 
     return await this.templateRepo.insert({
       name: name,
-      guild: guild.id,
+      guildId: guild.id,
       moderated,
       createdBy: member.id,
     });
@@ -141,8 +138,8 @@ export class TagServiceImpl extends TagService {
 
   async addTags(guildRef: SelectGuild, teamRef: SelectTeam, templates: ForumTagTemplate[]) {
     const team = await this.teamService.getTeam(teamRef);
-    const guild = await this.guildManager.fetch(guildRef.guild);
-    const forum = await guild.channels.fetch(team.forum);
+    const discordGuild = await this.guildManager.fetch(guildRef.guildSf);
+    const forum = await discordGuild.channels.fetch(team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
@@ -170,13 +167,13 @@ export class TagServiceImpl extends TagService {
 
     await this.tagRepo.upsert(
       newTags.map(([template, tag]) => ({
-        tag: tag.id,
+        tagSf: tag.id,
         name: tag.name,
-        guild: guildRef.guild,
-        forum: forum.id,
+        guildId: team.guildId,
+        forumSf: forum.id,
         templateId: template.id,
       })),
-      { conflictPaths: { templateId: true, forum: true }, skipUpdateIfNoValuesChanged: true },
+      { conflictPaths: ['templateId', 'forumSf'], skipUpdateIfNoValuesChanged: true },
     );
   }
 
@@ -189,7 +186,7 @@ export class TagServiceImpl extends TagService {
 
     if (!templates || !Array.isArray(templates)) {
       templates = await this.templateRepo.find({
-        where: { guild: guild.id },
+        where: { guildId: guild.id },
       });
     }
 
@@ -233,7 +230,7 @@ export class TagServiceImpl extends TagService {
 
     if (!templates || !Array.isArray(templates)) {
       templates = await this.templateRepo.find({
-        where: { guild: guild.id },
+        where: { guildId: guild.id },
       });
     }
 

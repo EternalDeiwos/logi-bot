@@ -1,10 +1,17 @@
-import { Entity, Column, CreateDateColumn, PrimaryColumn, DeepPartial, OneToMany } from 'typeorm';
-import { Snowflake } from 'discord.js';
+import {
+  Entity,
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Unique,
+  DeepPartial,
+  OneToMany,
+  PrimaryColumn,
+} from 'typeorm';
 import { CrewShare } from 'src/core/crew/share/crew-share.entity';
-import { Team } from 'src/core/team/team.entity';
 
-export type InsertGuild = DeepPartial<Omit<Guild, 'shared' | 'createdAt' | 'deletedAt'>>;
-export type SelectGuild = DeepPartial<Pick<Guild, 'guild'>>;
+export type InsertGuild = DeepPartial<Omit<Guild, 'createdAt' | 'deletedAt'>>;
+export type SelectGuild = DeepPartial<Pick<Guild, 'id' | 'guildSf'>>;
 export type GuildConfig = {
   crewAuditChannel?: string;
   globalLogChannel?: string;
@@ -13,19 +20,23 @@ export type GuildConfig = {
   crewViewerRole?: string;
 };
 
-@Entity({ name: 'guild' })
+@Entity()
+@Unique('uk_guild_sf_deleted_at', ['guildSf', 'deletedAt'])
 export class Guild {
-  @PrimaryColumn({ type: 'bigint', name: 'guild_sf', primaryKeyConstraintName: 'pk_guild_sf' })
-  guild: Snowflake;
+  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_guild_id' })
+  id: string;
 
-  @Column()
+  @Column({ name: 'guild_sf', type: 'int8' })
+  guildSf: string;
+
+  @Column({ name: 'name' })
   name: string;
 
-  @Column({ name: 'name_short' })
+  @Column({ name: 'short_name' })
   shortName: string;
 
-  @Column({ nullable: true })
-  icon: string;
+  @Column({ name: 'icon', nullable: true })
+  icon?: string;
 
   @Column({ type: 'jsonb', default: {} })
   config: GuildConfig;
@@ -33,9 +44,9 @@ export class Guild {
   @OneToMany(() => CrewShare, (share) => share.guild)
   shared: Promise<CrewShare[]>;
 
-  @OneToMany(() => Team, (team) => team.parent)
-  teams: Promise<Team[]>;
-
-  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
+  deletedAt: Date;
 }

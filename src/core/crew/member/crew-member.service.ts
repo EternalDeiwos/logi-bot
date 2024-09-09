@@ -2,16 +2,12 @@ import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { DeleteResult, Equal, InsertResult } from 'typeorm';
 import { GuildManager, GuildMember, PermissionsBitField, Snowflake } from 'discord.js';
 import { DatabaseError, ExternalError, InternalError } from 'src/errors';
+import { CrewMemberAccess } from 'src/types';
 import { Crew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewMemberRepository } from './crew-member.repository';
-import {
-  CrewMember,
-  CrewMemberAccess,
-  SelectCrewMember,
-  UpdateCrewMember,
-} from './crew-member.entity';
+import { CrewMember, SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
 
 export abstract class CrewMemberService {
   abstract resolveGuildMember(member: CrewMember): Promise<GuildMember>;
@@ -57,8 +53,8 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     channelRef?: Snowflake,
   ): Promise<GuildMember> {
     if (typeof memberRef !== 'string' && memberRef instanceof CrewMember) {
-      channelRef = memberRef.channel;
-      memberRef = memberRef.member;
+      channelRef = memberRef.crewSf;
+      memberRef = memberRef.memberSf;
     }
 
     if (!memberRef) {
@@ -68,14 +64,14 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     let crew: Crew;
     try {
       crew = await this.crewRepo.findOneOrFail({
-        where: { channel: channelRef },
+        where: { crewSf: channelRef },
         withDeleted: true,
       });
     } catch (err) {
       throw new DatabaseError('QUERY_FAILED', `Unable to find crew ${channelRef}`, err);
     }
 
-    const discordGuild = await this.guildManager.fetch(crew.guild);
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
 
     try {
       return await discordGuild.members.fetch(memberRef);
@@ -93,27 +89,24 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     memberRef: Snowflake,
     access: CrewMemberAccess = CrewMemberAccess.MEMBER,
   ): Promise<InsertResult> {
-    const crew = await this.crewRepo.findOneOrFail({ where: { channel: channelRef } });
-    const member = await this.resolveGuildMember(memberRef, crew.channel);
+    const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
+    const member = await this.resolveGuildMember(memberRef, crew.crewSf);
 
     try {
-      await member.roles.add(crew.role);
+      await member.roles.add(crew.roleSf);
     } catch (err) {
-      if (!member.roles.cache.has(crew.role)) {
+      if (!member.roles.cache.has(crew.roleSf)) {
         throw new ExternalError('DISCORD_API_ERROR', 'Failed to add member role', err);
       }
     }
 
     return await this.memberRepo.upsert(
       {
-        member: member.id,
-        guild: crew.guild,
+        memberSf: member.id,
+        guildId: crew.guildId,
         name: member.displayName,
-        icon:
-          member.avatarURL({ extension: 'png', forceStatic: true }) ??
-          member.user.avatarURL({ extension: 'png', forceStatic: true }),
         access,
-        channel: crew.channel,
+        crewSf: crew.crewSf,
       },
       ['guild', 'member'],
     );
@@ -121,7 +114,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
   async updateCrewMember(crewMember: SelectCrewMember, data: UpdateCrewMember) {
     const result = await this.memberRepo.updateReturning(
-      { channel: Equal(crewMember.channel), member: Equal(crewMember.member) },
+      { crewSf: Equal(crewMember.crewSf), memberSf: Equal(crewMember.memberSf) },
       data,
     );
 
@@ -133,7 +126,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   async removeCrewMember(channelRef: Snowflake, memberRef: Snowflake) {
     let crew: Crew;
     try {
-      crew = await this.crewRepo.findOneOrFail({ where: { channel: channelRef } });
+      crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
     } catch (err) {
       throw new DatabaseError('QUERY_FAILED', 'Failed to fetch crew', err);
     }
@@ -141,14 +134,14 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     const member = await this.resolveGuildMember(memberRef, channelRef);
 
     try {
-      await member.roles.remove(crew.role);
+      await member.roles.remove(crew.roleSf);
     } catch (err) {
-      if (member.roles.cache.has(crew.role)) {
+      if (member.roles.cache.has(crew.roleSf)) {
         throw new ExternalError('DISCORD_API_ERROR', 'Failed to remove member role', err);
       }
     }
 
-    return await this.memberRepo.delete({ member: memberRef, channel: channelRef });
+    return await this.memberRepo.delete({ memberSf: memberRef, crewSf: channelRef });
   }
 
   async requireCrewAccess(
@@ -161,7 +154,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     let crewMember: CrewMember;
     try {
       crewMember = await this.memberRepo.findOne({
-        where: { channel: channelRef, member: memberRef },
+        where: { crewSf: channelRef, memberSf: memberRef },
       });
     } catch (err) {
       throw new DatabaseError('QUERY_FAILED', `Failed to fetch crew member`, err);

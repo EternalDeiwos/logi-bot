@@ -1,13 +1,13 @@
 import {
   Entity,
   Column,
-  Index,
   PrimaryColumn,
   ManyToOne,
   JoinColumn,
   RelationId,
   CreateDateColumn,
   DeleteDateColumn,
+  Unique,
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
@@ -17,45 +17,48 @@ import { Crew } from 'src/core/crew/crew.entity';
 export type InsertCrewShare = DeepPartial<
   Omit<CrewShare, 'crew' | 'guild' | 'createdAt' | 'deletedAt'>
 >;
-export type SelectCrewShare = DeepPartial<Pick<CrewShare, 'target' | 'channel'>>;
+export type SelectCrewShare = DeepPartial<Pick<CrewShare, 'guildId' | 'crewSf'>>;
 
-@Entity({ name: 'crew_share' })
-@Index('crew_share_unique', ['target', 'channel'], { unique: true })
+@Entity('crew_share')
+@Unique('uk_guild_crew_deleted_at', ['guildId', 'crewSf', 'deletedAt'])
 export class CrewShare {
+  /**
+   * Snowflake for crew Discord channel
+   * @type Snowflake
+   */
   @PrimaryColumn({
-    type: 'bigint',
+    type: 'int8',
     name: 'crew_channel_sf',
-    primaryKeyConstraintName: 'pk_crew_target_guild',
+    primaryKeyConstraintName: 'pk_crew_share',
   })
   @RelationId((share: CrewShare) => share.crew)
-  channel: Snowflake;
+  crewSf: Snowflake;
 
   @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE' })
   @JoinColumn({
     name: 'crew_channel_sf',
-    referencedColumnName: 'channel',
-    foreignKeyConstraintName: 'fk_crew_channel_sf_crew_share',
+    referencedColumnName: 'crewSf',
+    foreignKeyConstraintName: 'fk_crew_share_crew_channel_sf',
   })
-  crew: Crew;
+  crew: Promise<Crew>;
 
   @PrimaryColumn({
-    type: 'bigint',
-    name: 'target_guild_sf',
-    primaryKeyConstraintName: 'pk_crew_target_guild',
+    type: 'int8',
+    name: 'target_guild_id',
+    primaryKeyConstraintName: 'pk_crew_share',
   })
   @RelationId((target: CrewShare) => target.guild)
-  @Index('target_guild_sf_idx_crew_share')
-  target: Snowflake;
+  guildId: string;
 
-  @ManyToOne(() => Guild)
+  @ManyToOne(() => Guild, (guild) => guild.shared, { onDelete: 'CASCADE' })
   @JoinColumn({
-    name: 'target_guild_sf',
-    referencedColumnName: 'guild',
-    foreignKeyConstraintName: 'fk_target_guild_sf_crew_share',
+    name: 'target_guild_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_crew_share_guild_id',
   })
-  guild: Guild;
+  guild: Promise<Guild>;
 
-  @Column({ type: 'bigint', name: 'created_by_sf' })
+  @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

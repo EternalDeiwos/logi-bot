@@ -18,7 +18,7 @@ export class TeamSelectAutocompleteInterceptor extends AutocompleteInterceptor {
         .search(interaction.guildId, focused.value.toString())
         .getMany();
       return interaction.respond(
-        results.map((result) => ({ name: result.name, value: result.category })),
+        results.map((result) => ({ name: result.name, value: result.id })),
       );
     }
   }

@@ -8,6 +8,7 @@ import { TagService } from 'src/core/tag/tag.service';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { TagTemplateRepository } from 'src/core/tag/tag-template.repository';
 import { SelectGuild } from 'src/core/guild/guild.entity';
+import { GuildService } from 'src/core/guild/guild.service';
 import { TeamRepository } from './team.repository';
 import { InsertTeam, SelectTeam, Team } from './team.entity';
 
@@ -31,6 +32,7 @@ export class TeamServiceImpl extends TeamService {
     private readonly guildManager: GuildManager,
     private readonly botService: BotService,
     private readonly discordService: DiscordService,
+    private readonly guildService: GuildService,
     @Inject(forwardRef(() => TagService)) private readonly tagService: TagService,
     private readonly templateRepo: TagTemplateRepository,
     private readonly teamRepo: TeamRepository,
@@ -43,8 +45,9 @@ export class TeamServiceImpl extends TeamService {
   }
 
   async registerTeam(team: InsertTeam) {
-    const discordGuild = await this.guildManager.fetch(team.guild);
-    const forum = await discordGuild.channels.fetch(team.forum);
+    const guild = await this.guildService.getGuild({ id: team.guildId });
+    const discordGuild = await this.guildManager.fetch(guild.guildSf);
+    const forum = await discordGuild.channels.fetch(team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
@@ -55,9 +58,9 @@ export class TeamServiceImpl extends TeamService {
     return this.teamRepo.upsert(
       {
         name: category.name,
-        category: category.id,
-        guild: category.guildId,
-        forum: forum.id,
+        categorySf: category.id,
+        guildId: category.guildId,
+        forumSf: forum.id,
       },
       ['name', 'guild', 'forum'],
     );
@@ -86,7 +89,7 @@ export class TeamServiceImpl extends TeamService {
     const filteredTemplates = templates.filter((template) => {
       return (
         // Crew tags only appear on their team's forum
-        (!template.channel || template.crew?.forum === team.forum) &&
+        (!template.crewSf || template.crew?.team?.id === team.id) &&
         // Don't create tags that already exist
         !tags.find((tag) => template.id === tag.templateId)
       );

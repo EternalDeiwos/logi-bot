@@ -29,8 +29,9 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
-import _ from 'lodash';
+import { compact } from 'lodash';
 import { AuthError, DatabaseError, ValidationError } from 'src/errors';
+import { CrewMemberAccess } from 'src/types';
 import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { BotService } from 'src/bot/bot.service';
@@ -42,7 +43,6 @@ import { CrewService } from './crew.service';
 import { CrewRepository } from './crew.repository';
 import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
 import { CrewShareAutocompleteInterceptor } from './share/crew-share.interceptor';
-import { CrewMemberAccess } from './member/crew-member.entity';
 import { CrewMemberService } from './member/crew-member.service';
 import { CrewMemberRepository } from './member/crew-member.repository';
 import { CrewShareService } from './share/crew-share.service';
@@ -220,7 +220,7 @@ export class CrewCommand {
   ) {
     const discordGuild = await this.guildManager.fetch(interaction.guildId);
     const member = await discordGuild.members.fetch(interaction);
-    const guild = await this.guildService.getGuild({ guild: interaction.guildId });
+    const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
 
     if (
       guild.config?.crewCreatorRole &&
@@ -233,10 +233,10 @@ export class CrewCommand {
     const crew = await this.crewService.registerCrew(data.team, interaction.user.id, {
       name: data.name,
       shortName: data.shortName,
-      movePrompt: data.movePrompt,
+      hasMovePrompt: data.movePrompt,
     });
 
-    await this.teamService.reconcileGuildForumTags({ guild: interaction.guildId });
+    await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew registered')],
@@ -264,7 +264,7 @@ export class CrewCommand {
     }
 
     await this.crewService.updateCrew(data.crew, {
-      movePrompt: data.value,
+      hasMovePrompt: data.value,
     });
 
     await this.botService.replyOrFollowUp(interaction, {
@@ -293,7 +293,7 @@ export class CrewCommand {
     }
 
     await this.crewService.updateCrew(data.crew, {
-      permanent: data.value,
+      isPermanent: data.value,
     });
 
     await this.botService.replyOrFollowUp(interaction, {
@@ -344,33 +344,11 @@ export class CrewCommand {
     dmPermission: false,
   })
   async onCrewJoinPrompt(@Context() [interaction]: SlashCommandContext) {
-    const crew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
+    const crew = await this.crewRepo.findOne({ where: { crewSf: interaction.channelId } });
     await this.crewService.crewJoinPrompt(crew);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Done')],
-    });
-  }
-
-  @UseInterceptors(CrewSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'subscribe',
-    description: 'Subscribe to team role without responsibility',
-    dmPermission: false,
-  })
-  async onSubscribeCrew(
-    @Context() [interaction]: SlashCommandContext,
-    @Options() data: SelectCrewCommandParams,
-  ) {
-    const channelRef = data.crew || interaction.channelId;
-    await this.memberService.registerCrewMember(
-      channelRef,
-      interaction.user.id,
-      CrewMemberAccess.SUBSCRIBED,
-    );
-
-    await this.botService.replyOrFollowUp(interaction, {
-      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Subscribed to crew')],
     });
   }
 
@@ -411,7 +389,7 @@ export class CrewCommand {
     const channelRef = data.crew || interaction.channelId;
 
     const targetMember = await this.memberRepo.findOne({
-      where: { channel: channelRef, member: data.member.id },
+      where: { crewSf: channelRef, memberSf: data.member.id },
     });
 
     if (
@@ -466,7 +444,7 @@ export class CrewCommand {
     }
 
     const crewMember = await this.memberRepo.findOne({
-      where: { channel: channelRef, member: interaction.user.id },
+      where: { crewSf: channelRef, memberSf: interaction.user.id },
     });
 
     await this.memberService.updateCrewMember(crewMember, {
@@ -582,18 +560,18 @@ export class CrewCommand {
     let crews: Crew[];
     try {
       crews = await this.crewRepo.find({
-        where: { guild: interaction.guildId, permanent: false },
+        where: { guild: { guildSf: interaction.guildId }, isPermanent: false },
       });
     } catch (err) {
       throw new DatabaseError('QUERY_FAILED', 'Failed to fetch crews', err);
     }
 
     const errors: Error[] = [];
-    const result = _.compact(
+    const result = compact(
       await Promise.all(
         crews.map(async (crew) => {
           try {
-            return await this.crewService.deregisterCrew(crew.channel, interaction.user.id, {
+            return await this.crewService.deregisterCrew(crew.crewSf, interaction.user.id, {
               tag: data.tag,
               archiveSf: data.archive?.id,
             });
@@ -614,7 +592,7 @@ export class CrewCommand {
       });
 
       for (const r of result) {
-        this.logger.log(`Archived crew ${r.name} in ${r.parent.name}`);
+        this.logger.log(`Archived crew ${r.name} in ${r.guild.name}`);
       }
 
       for (const e of errors) {
@@ -700,12 +678,14 @@ export class CrewCommand {
 
     // Use specified crew
     if (data.crew) {
-      const crew = await this.crewRepo.findOne({ where: { channel: data.crew } });
+      const crew = await this.crewRepo.findOne({ where: { crewSf: data.crew } });
       result = await this.crewService.sendIndividualStatus(interaction.channel, member, crew);
 
       // Try infer crew from current channel
     } else {
-      const maybeCrew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
+      const maybeCrew = await this.crewRepo.findOne({
+        where: { crewSf: interaction.channelId },
+      });
       if (maybeCrew) {
         result = await this.crewService.sendIndividualStatus(
           interaction.channel,
@@ -783,8 +763,8 @@ export class CrewCommand {
     }
 
     const result = await this.shareService.shareCrew({
-      target: data.guild,
-      channel: channelRef,
+      guildId: data.guild,
+      crewSf: channelRef,
       createdBy: memberRef,
     });
 

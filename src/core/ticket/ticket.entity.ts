@@ -12,48 +12,65 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
+import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
 export type InsertTicket = DeepPartial<
   Omit<Ticket, 'crew' | 'updatedAt' | 'createdAt' | 'deletedAt'>
 >;
-export type SelectTicket = DeepPartial<Pick<Ticket, 'thread'>>;
+export type SelectTicket = DeepPartial<Pick<Ticket, 'threadSf'>>;
 
-@Entity({ name: 'ticket' })
+@Entity()
 export class Ticket {
-  @PrimaryColumn({ type: 'bigint', name: 'thread_sf', primaryKeyConstraintName: 'pk_thread_sf' })
-  thread: Snowflake;
+  @PrimaryColumn({ type: 'int8', name: 'thread_sf', primaryKeyConstraintName: 'pk_thread_sf' })
+  threadSf: Snowflake;
 
-  @Column({ type: 'bigint', name: 'guild_sf' })
-  @Index('guild_sf_idx_ticket')
-  guild: Snowflake;
+  @Column({ type: 'int8', name: 'guild_id' })
+  @Index('guild_id_idx_ticket')
+  guildId: string;
 
-  @Column({ type: 'bigint', name: 'crew_channel_sf' })
-  @Index('crew_channel_sf_idx_ticket')
+  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
+  @JoinColumn({
+    name: 'guild_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_ticket_guild_id',
+  })
+  guild: Guild;
+
+  /**
+   * Snowflake for crew Discord channel
+   * @type Snowflake
+   */
+  @Column({ type: 'int8', name: 'crew_channel_sf', nullable: true })
   @RelationId((ticket: Ticket) => ticket.crew)
-  discussion: Snowflake;
+  @Index('crew_channel_sf_idx_ticket')
+  crewSf: Snowflake;
+
+  @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', nullable: true, eager: true })
+  @JoinColumn({
+    name: 'crew_channel_sf',
+    referencedColumnName: 'crewSf',
+    foreignKeyConstraintName: 'fk_ticket_crew_channel_sf',
+  })
+  crew: Crew;
 
   @Column({ name: 'content', type: 'text' })
   content: string;
 
-  @ManyToOne(() => Crew, (crew) => crew.tickets, { onDelete: 'CASCADE', eager: true })
-  @JoinColumn({
-    name: 'crew_channel_sf',
-    referencedColumnName: 'channel',
-    foreignKeyConstraintName: 'fk_ticket_crew',
-  })
-  crew: Crew;
-
   @Column()
   name: string;
+
+  @Column({ name: 'sort_order' })
+  @Index('sort_order_idx_ticket')
+  sortOrder: string;
 
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 
-  @Column({ type: 'bigint', name: 'updated_by_sf' })
+  @Column({ type: 'int8', name: 'updated_by_sf' })
   updatedBy: Snowflake;
 
-  @Column({ type: 'bigint', name: 'created_by_sf' })
+  @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

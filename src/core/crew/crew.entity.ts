@@ -13,18 +13,19 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
+import { CrewMemberAccess } from 'src/types';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
 import { Team } from 'src/core/team/team.entity';
+import { Guild } from 'src/core/guild/guild.entity';
 import { CrewMember } from './member/crew-member.entity';
 import { CrewLog } from './log/crew-log.entity';
 import { CrewShare } from './share/crew-share.entity';
-import { Guild } from '../guild/guild.entity';
 
 export type InsertCrew = DeepPartial<
   Omit<
     Crew,
-    | 'parent'
+    | 'guild'
     | 'team'
     | 'members'
     | 'tags'
@@ -33,34 +34,55 @@ export type InsertCrew = DeepPartial<
     | 'shared'
     | 'createdAt'
     | 'deletedAt'
+    | 'isDeleted'
+    | 'getCrewTag'
+    | 'getCrewOwner'
   >
 >;
-export type SelectCrew = DeepPartial<Pick<Crew, 'channel'>>;
+export type SelectCrew = DeepPartial<Pick<Crew, 'crewSf'>>;
+export type UpdateCrew = DeepPartial<Pick<Crew, 'hasMovePrompt' | 'isPermanent'>>;
 export type DeleteCrew = SelectCrew & { deletedBySf?: Snowflake };
 export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
 
-@Entity({ name: 'crew' })
-@Unique('unique_crew_tag_name', ['guild', 'shortName', 'deletedAt'])
+@Entity()
+@Unique('uk_guild_name_deleted_at', ['guild', 'shortName', 'deletedAt'])
 export class Crew {
+  /**
+   * Snowflake for crew Discord channel
+   * @type Snowflake
+   */
   @PrimaryColumn({
-    type: 'bigint',
+    type: 'int8',
     name: 'crew_channel_sf',
     primaryKeyConstraintName: 'pk_crew_channel_sf',
   })
-  channel: Snowflake;
+  crewSf: Snowflake;
 
-  @Column({ type: 'bigint', name: 'guild_sf' })
-  @RelationId((crew: Crew) => crew.parent)
-  @Index('guild_sf_idx_crew')
-  guild: Snowflake;
+  @Column({ type: 'int8', name: 'guild_id' })
+  @RelationId((crew: Crew) => crew.guild)
+  @Index('guild_id_idx_crew')
+  guildId: string;
 
   @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
-    name: 'guild_sf',
-    referencedColumnName: 'guild',
-    foreignKeyConstraintName: 'fk_guild_sf_crew',
+    name: 'guild_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_crew_guild_id',
   })
-  parent: Guild;
+  guild: Guild;
+
+  @Column({ type: 'int8', name: 'team_id' })
+  @RelationId((crew: Crew) => crew.team)
+  @Index('team_id_idx_crew')
+  teamId: string;
+
+  @ManyToOne(() => Team, (team) => team.crews, { onDelete: 'CASCADE', eager: true })
+  @JoinColumn({
+    name: 'team_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_crew_team_id',
+  })
+  team: Team;
 
   @Column()
   name: string;
@@ -71,28 +93,19 @@ export class Crew {
   @Column()
   slug: string;
 
-  @Column({ type: 'bigint', name: 'role_sf' })
+  @Column({ type: 'int8', name: 'role_sf' })
   @Index('role_sf_idx_crew')
-  role: Snowflake;
+  roleSf: Snowflake;
+
+  @Column({ type: 'int8', name: 'audit_message_sf', nullable: true })
+  @Index('audit_message_sf_idx_crew')
+  auditMessageSf: Snowflake;
 
   @Column({ type: 'boolean', name: 'enable_move_prompt', default: false })
-  movePrompt: boolean;
+  hasMovePrompt: boolean;
 
-  @Column({ type: 'boolean', name: 'permanent', default: false })
-  permanent: boolean;
-
-  @Column({ type: 'bigint', name: 'forum_channel_sf' })
-  @RelationId((crew: Crew) => crew.team)
-  @Index('forum_channel_sf_idx_crew')
-  forum: Snowflake;
-
-  @ManyToOne(() => Team, (team) => team.crews, { onDelete: 'CASCADE', eager: true })
-  @JoinColumn({
-    name: 'forum_channel_sf',
-    referencedColumnName: 'forum',
-    foreignKeyConstraintName: 'fk_forum_channel_sf_crew',
-  })
-  team: Team;
+  @Column({ type: 'boolean', name: 'is_permanent', default: false })
+  isPermanent: boolean;
 
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: Promise<CrewMember[]>;
@@ -109,12 +122,29 @@ export class Crew {
   @OneToMany(() => CrewShare, (share) => share.crew)
   shared: Promise<CrewShare[]>;
 
-  @Column({ type: 'bigint', name: 'created_by_sf' })
+  @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;
+
+  @Column({ type: 'int8', name: 'deleted_by_sf', nullable: true })
+  deletedBy: Snowflake;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
+
+  get isDeleted() {
+    return Boolean(this.deletedAt);
+  }
+
+  async getCrewTag() {
+    const tags = await this.team.tags;
+    return tags.find((tag) => tag.name === this.shortName);
+  }
+
+  async getCrewOwner() {
+    const members = await this.members;
+    return members.find((member) => member.access === CrewMemberAccess.OWNER);
+  }
 }

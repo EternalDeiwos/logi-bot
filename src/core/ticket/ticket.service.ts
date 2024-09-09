@@ -14,18 +14,18 @@ import {
   userMention,
 } from 'discord.js';
 import { InternalError, ValidationError } from 'src/errors';
+import { CrewMemberAccess } from 'src/types';
 import { TicketTag } from 'src/core/tag/tag.service';
+import { SelectGuild } from 'src/core/guild/guild.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
-import { CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
-import { CrewMemberRepository } from 'src/core/crew/member/crew-member.repository';
 import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
 import { TeamService } from 'src/core/team/team.service';
 import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
-import { SelectGuild } from '../guild/guild.entity';
+import { GuildService } from '../guild/guild.service';
 
 export const ticketProperties = {
   [TicketTag.ACCEPTED]: {
@@ -153,10 +153,10 @@ export class TicketServiceImpl extends TicketService {
 
   constructor(
     private readonly guildManager: GuildManager,
+    private readonly guildService: GuildService,
     private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
     private readonly memberService: CrewMemberService,
-    private readonly memberRepo: CrewMemberRepository,
     private readonly teamService: TeamService,
     private readonly ticketRepo: TicketRepository,
   ) {
@@ -165,8 +165,8 @@ export class TicketServiceImpl extends TicketService {
 
   async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
     const crew = await this.crewRepo.findOneOrFail({ where: crewRef, withDeleted: true });
-    const guild = await this.guildManager.fetch(crew.guild);
-    const forum = await guild.channels.fetch(crew.forum);
+    const guild = await this.guildManager.fetch(crew.guild.guildSf);
+    const forum = await guild.channels.fetch(crew.team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
@@ -186,7 +186,7 @@ export class TicketServiceImpl extends TicketService {
     }
 
     if (crewTag) {
-      appliedTags.push(crewTag.tag);
+      appliedTags.push(crewTag.tagSf);
     }
 
     const defaultTags = await crew.team.getDefaultTags();
@@ -195,24 +195,27 @@ export class TicketServiceImpl extends TicketService {
     const prompt = new EmbedBuilder()
       .setColor('DarkGold')
       .setTitle('New Ticket')
-      .setDescription(ticketTriageMessage(ticket.createdBy, crew.role));
+      .setDescription(ticketTriageMessage(ticket.createdBy, crew.roleSf));
 
     const thread = await forum.threads.create({
       name: ticket.name,
       message: {
-        content: newTicketMessage(ticket.content, ticket.createdBy, crew.role),
+        content: newTicketMessage(ticket.content, ticket.createdBy, crew.roleSf),
         embeds: [prompt],
-        allowedMentions: { users: [ticket.createdBy], roles: crew.movePrompt ? [] : [crew.role] },
+        allowedMentions: {
+          users: [ticket.createdBy],
+          roles: crew.hasMovePrompt ? [] : [crew.roleSf],
+        },
       },
       appliedTags,
     });
 
     const result = await this.ticketRepo.insert({
       ...ticket,
-      thread: thread.id,
+      threadSf: thread.id,
     });
 
-    if (crew.movePrompt) {
+    if (crew.hasMovePrompt) {
       await this.addMovePromptToTicket(thread);
     }
 
@@ -221,14 +224,14 @@ export class TicketServiceImpl extends TicketService {
 
   async addMovePromptToTicket(thread: ThreadChannel) {
     const ticket = await this.ticketRepo.findOneOrFail({
-      where: { thread: thread.id },
+      where: { threadSf: thread.id },
       withDeleted: true,
     });
 
     const message = await thread.fetchStarterMessage();
     await message.edit({
       components: [
-        await this.createMovePrompt(ticket, [{ channel: ticket.crew.channel }]),
+        await this.createMovePrompt(ticket, [{ crewSf: ticket.crew.crewSf }]),
         this.createTriageControl(ticket, { accept: true }),
       ],
     });
@@ -236,21 +239,21 @@ export class TicketServiceImpl extends TicketService {
 
   async createMovePrompt(ticketRef: SelectTicket, exclude: SelectCrew[] = []) {
     const ticket = await this.ticketRepo.findOneOrFail({ where: ticketRef, withDeleted: true });
-    const excludedCrewChannels = exclude.map((e) => e.channel);
-    const crews = (await this.crewRepo.getShared(ticket.guild, true).getMany()).filter(
-      (crew) => !excludedCrewChannels.includes(crew.channel),
+    const excludedCrewChannels = exclude.map((e) => e.crewSf);
+    const crews = (await this.crewRepo.getShared(ticket.guild.guildSf, true).getMany()).filter(
+      (crew) => !excludedCrewChannels.includes(crew.crewSf),
     );
 
     const select = new StringSelectMenuBuilder()
-      .setCustomId(`ticket/move/${ticket.thread}`)
+      .setCustomId(`ticket/move/${ticket.threadSf}`)
       .setPlaceholder('Select a crew')
       .setOptions(
         crews.map((crew) => {
           const teamName =
-            crew.parent.guild !== ticket.guild
-              ? `[${crew.parent.shortName}] ${crew.team.name}`
+            crew.guild.guildSf !== ticket.guild.guildSf
+              ? `[${crew.guild.shortName}] ${crew.team.name}`
               : crew.team.name;
-          return { label: `${teamName}: ${crew.name}`, value: crew.channel };
+          return { label: `${teamName}: ${crew.name}`, value: crew.crewSf };
         }),
       );
 
@@ -266,7 +269,7 @@ export class TicketServiceImpl extends TicketService {
 
   async addTriageControlToThread(thread: ThreadChannel) {
     const ticket = await this.ticketRepo.findOneOrFail({
-      where: { thread: thread.id },
+      where: { threadSf: thread.id },
       withDeleted: true,
     });
 
@@ -281,7 +284,7 @@ export class TicketServiceImpl extends TicketService {
     disabled: { [K in 'accept' | 'decline' | 'close']?: boolean } = {},
   ) {
     const accept = new ButtonBuilder()
-      .setCustomId(`ticket/action/accept/${ticket.thread}`)
+      .setCustomId(`ticket/action/accept/${ticket.threadSf}`)
       .setLabel('Accept')
       .setDisabled(Boolean(disabled.accept))
       .setStyle(ButtonStyle.Success);
@@ -289,13 +292,13 @@ export class TicketServiceImpl extends TicketService {
     const decline = new ButtonBuilder()
       // Decline is not an immediate action.
       // There is a form before the action is taken and is therefore handled differently
-      .setCustomId(`ticket/reqdecline/${ticket.thread}`)
+      .setCustomId(`ticket/reqdecline/${ticket.threadSf}`)
       .setLabel('Decline')
       .setDisabled(Boolean(disabled.decline))
       .setStyle(ButtonStyle.Danger);
 
     const close = new ButtonBuilder()
-      .setCustomId(`ticket/action/close/${ticket.thread}`)
+      .setCustomId(`ticket/action/close/${ticket.threadSf}`)
       .setLabel('Close')
       .setDisabled(Boolean(disabled.close))
       .setStyle(ButtonStyle.Secondary);
@@ -323,15 +326,15 @@ export class TicketServiceImpl extends TicketService {
       withDeleted: true,
     });
 
-    const discordGuild = await this.guildManager.fetch(ticket.guild);
+    const discordGuild = await this.guildManager.fetch(ticket.guild.guildSf);
     const guildMember = await discordGuild.members.fetch(memberRef);
-    const forum = await discordGuild.channels.fetch(ticket.crew.team.forum);
+    const forum = await discordGuild.channels.fetch(ticket.crew.team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
     }
 
-    const thread = await forum.threads.fetch(ticket.thread);
+    const thread = await forum.threads.fetch(ticket.threadSf);
     const now = new Date();
 
     const embed = new EmbedBuilder()
@@ -356,25 +359,25 @@ export class TicketServiceImpl extends TicketService {
     disabled: { [K in 'active' | 'repeat' | 'done' | 'close']?: boolean } = {},
   ) {
     const inProgress = new ButtonBuilder()
-      .setCustomId(`ticket/action/active/${ticket.thread}`)
+      .setCustomId(`ticket/action/active/${ticket.threadSf}`)
       .setLabel('In Progress')
       .setDisabled(Boolean(disabled.active))
       .setStyle(ButtonStyle.Primary);
 
     const repeatable = new ButtonBuilder()
-      .setCustomId(`ticket/action/repeat/${ticket.thread}`)
+      .setCustomId(`ticket/action/repeat/${ticket.threadSf}`)
       .setLabel('Repeatable')
       .setDisabled(Boolean(disabled.repeat))
       .setStyle(ButtonStyle.Secondary);
 
     const done = new ButtonBuilder()
-      .setCustomId(`ticket/action/done/${ticket.thread}`)
+      .setCustomId(`ticket/action/done/${ticket.threadSf}`)
       .setLabel('Done')
       .setDisabled(Boolean(disabled.done))
       .setStyle(ButtonStyle.Success);
 
     const close = new ButtonBuilder()
-      .setCustomId(`ticket/action/close/${ticket.thread}`)
+      .setCustomId(`ticket/action/close/${ticket.threadSf}`)
       .setLabel('Close')
       .setDisabled(Boolean(disabled.close))
       .setStyle(ButtonStyle.Danger);
@@ -388,19 +391,19 @@ export class TicketServiceImpl extends TicketService {
     }
 
     const ticket = await this.ticketRepo.findOne({
-      where: { thread: data.thread },
+      where: { threadSf: data.threadSf },
       withDeleted: true,
     });
 
-    const discordGuild = await this.guildManager.fetch(data.guild);
+    const discordGuild = await this.guildManager.fetch(ticket.guild.guildSf);
     const member = await discordGuild.members.fetch(data.updatedBy);
-    const forum = await discordGuild.channels.fetch(ticket.crew.team.forum);
+    const forum = await discordGuild.channels.fetch(ticket.crew.team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
     }
 
-    const thread = await forum.threads.fetch(ticket.thread);
+    const thread = await forum.threads.fetch(ticket.threadSf);
 
     // let crewMember: CrewMember
     // try {
@@ -425,7 +428,7 @@ export class TicketServiceImpl extends TicketService {
     // }
 
     const result = await this.ticketRepo.updateReturning(
-      { thread: data.thread },
+      { threadSf: data.threadSf },
       { ...data, updatedAt: new Date() },
     );
 
@@ -530,7 +533,7 @@ export class TicketServiceImpl extends TicketService {
 
   public async sendIndividualStatus(crewRef: SelectCrew, targetChannelRef: Snowflake) {
     const crew = await this.crewService.getCrew(crewRef);
-    const discordGuild = await this.guildManager.fetch(crew.guild);
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const targetChannel = await discordGuild.channels.fetch(targetChannelRef);
 
     if (!targetChannel || !targetChannel.isTextBased()) {
@@ -546,7 +549,7 @@ export class TicketServiceImpl extends TicketService {
       .setThumbnail(discordGuild.iconURL())
       .setTimestamp()
       .setDescription(
-        `${channelMention(crew.channel)} is led by ${owner ? userMention(owner.member) : 'nobody'}.`,
+        `${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'}.`,
       )
       .setFields([
         {
@@ -554,13 +557,13 @@ export class TicketServiceImpl extends TicketService {
           value: tickets
             .map(
               (ticket) =>
-                `- ${channelMention(ticket.thread)} from ${userMention(ticket.createdBy)}`,
+                `- ${channelMention(ticket.threadSf)} from ${userMention(ticket.createdBy)}`,
             )
             .join('\n'),
         },
       ]);
 
-    if (targetChannel.id === crew.channel) {
+    if (targetChannel.id === crew.crewSf) {
       await targetChannel.send({
         embeds: [embed],
         components: [this.crewService.createCrewActions()],
@@ -575,7 +578,8 @@ export class TicketServiceImpl extends TicketService {
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
-    const discordGuild = await this.guildManager.fetch(guildRef.guild);
+    const guild = await this.guildService.getGuild(guildRef);
+    const discordGuild = await this.guildManager.fetch(guild.guildSf);
     const member = await discordGuild.members.fetch(memberRef);
     const targetChannel = await discordGuild.channels.fetch(targetChannelRef);
 
@@ -583,10 +587,10 @@ export class TicketServiceImpl extends TicketService {
       throw new ValidationError('VALIDATION_FAILED', 'Invalid channel').asDisplayable();
     }
 
-    const crews = await this.crewRepo.find({ where: { guild: targetChannel.guildId } });
+    const crews = await this.crewRepo.find({ where: { guildId: guild.id } });
     const accessibleCrews = crews.filter((crew) => {
       try {
-        return member.permissionsIn(crew.channel).has(PermissionsBitField.Flags.ViewChannel);
+        return member.permissionsIn(crew.crewSf).has(PermissionsBitField.Flags.ViewChannel);
       } catch (err) {
         this.logger.warn(
           `Failed to test channel permissions for crew ${crew.name}: ${err.message}`,
@@ -609,11 +613,11 @@ export class TicketServiceImpl extends TicketService {
       const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
 
       crewSummary.push(
-        `- ${channelMention(crew.channel)} (${members.length} members) led by ${owner ? userMention(owner.member) : 'nobody'}`,
+        `- ${channelMention(crew.crewSf)} (${members.length} members) led by ${owner ? userMention(owner.memberSf) : 'nobody'}`,
       );
 
       for (const ticket of tickets) {
-        crewSummary.push(`  - ${channelMention(ticket.thread)}`);
+        crewSummary.push(`  - ${channelMention(ticket.threadSf)}`);
       }
     }
 
@@ -643,7 +647,10 @@ export class TicketServiceImpl extends TicketService {
       .setCustomId('ticket/start')
       .setPlaceholder('Select a crew')
       .setOptions(
-        crews.map((crew) => ({ label: `${crew.team.name}: ${crew.name}`, value: crew.channel })),
+        crews.map((crew) => ({
+          label: `${crew.team.name}: ${crew.name}`,
+          value: crew.crewSf,
+        })),
       );
 
     return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);

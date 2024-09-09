@@ -2,10 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EmbedBuilder, GuildManager, Snowflake, roleMention } from 'discord.js';
 import { InsertResult } from 'typeorm';
 import { AuthError, InternalError } from 'src/errors';
+import { CrewMemberAccess } from 'src/types';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
-import { CrewMemberAccess } from 'src/core/crew/member/crew-member.entity';
 import { CrewLogRepository } from './crew-log.repository';
 import { InsertCrewLog } from './crew-log.entity';
 
@@ -39,14 +39,14 @@ export class CrewLogServiceImpl extends CrewLogService {
   }
 
   async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLog) {
-    const crew = await this.crewRepo.findOneOrFail({ where: { channel: channelRef } });
+    const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
 
     if (!crew) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid crew');
     }
 
-    const discordGuild = await this.guildManager.fetch(crew.guild);
-    const channel = await discordGuild.channels.fetch(crew.channel);
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+    const channel = await discordGuild.channels.fetch(crew.crewSf);
 
     if (!channel || !channel.isTextBased()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
@@ -67,17 +67,17 @@ export class CrewLogServiceImpl extends CrewLogService {
       .setTimestamp(createdAt);
 
     const message = await channel.send({
-      content: roleMention(crew.role),
+      content: roleMention(crew.roleSf),
       embeds: [embed],
-      allowedMentions: { roles: [crew.role] },
+      allowedMentions: { roles: [crew.roleSf] },
     });
 
     await message.pin();
 
     return await this.logRepo.insert({
-      guild: crew.guild,
-      message: message.id,
-      discussion: crew.channel,
+      guildId: crew.guildId,
+      messageSf: message.id,
+      crewSf: crew.crewSf,
       content: data.content,
       createdAt,
       createdBy: memberRef,

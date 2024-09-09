@@ -1,3 +1,4 @@
+import { Snowflake } from 'discord.js';
 import {
   Entity,
   Column,
@@ -8,37 +9,61 @@ import {
   RelationId,
   CreateDateColumn,
   DeepPartial,
+  DeleteDateColumn,
+  Unique,
 } from 'typeorm';
+import { CrewMemberAccess, SkipAccessControlOptions } from 'src/types';
 import { Crew } from 'src/core/crew/crew.entity';
-import { Snowflake } from 'discord.js';
-import { AdminOverrideOptions, DeleteOptions, SkipAccessControlOptions } from 'src/types';
-
-export enum CrewMemberAccess {
-  OWNER = 0,
-  ADMIN = 1,
-  MEMBER = 10,
-  SUBSCRIBED = 100,
-}
+import { Guild } from 'src/core/guild/guild.entity';
 
 export type InsertCrewMember = DeepPartial<Omit<CrewMember, 'crew' | 'createdAt' | 'deletedAt'>>;
-export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'member' | 'channel'>>;
-export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'icon' | 'access'>>;
+export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'memberSf' | 'crewSf'>>;
+export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'access'>>;
 
-@Entity({ name: 'crew_member' })
-// @Index('uk_crew_member', ['member', 'channel'], { unique: true })
+@Entity('crew_member')
+@Unique('uk_crew_channel_member_deleted_at', ['crewSf', 'memberSf', 'deletedAt'])
 export class CrewMember {
-  @PrimaryColumn({ type: 'bigint', name: 'member_sf', primaryKeyConstraintName: 'pk_crew_member' })
-  member: Snowflake;
+  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_crew_member_id' })
+  id: string;
 
-  @Column({ type: 'bigint', name: 'guild_sf' })
-  @Index('guild_sf_idx_crew_member')
-  guild: Snowflake;
+  @Column({
+    type: 'int8',
+    name: 'crew_channel_sf',
+  })
+  @RelationId((member: CrewMember) => member.crew)
+  @Index('crew_channel_sf_idx_crew_member')
+  crewSf: Snowflake;
+
+  @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE', eager: true })
+  @JoinColumn({
+    name: 'crew_channel_sf',
+    referencedColumnName: 'crewSf',
+    foreignKeyConstraintName: 'fk_crew_member_crew_channel_sf',
+  })
+  crew: Crew;
+
+  @Column({
+    type: 'int8',
+    name: 'member_sf',
+  })
+  @Index('member_sf_idx_crew_member')
+  memberSf: string;
+
+  @Column({ type: 'int8', name: 'guild_id' })
+  @Index('guild_id_idx_crew_member')
+  @RelationId((member: CrewMember) => member.guild)
+  guildId: string;
+
+  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
+  @JoinColumn({
+    name: 'guild_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_crew_member_guild_id',
+  })
+  guild: Guild;
 
   @Column()
   name: string;
-
-  @Column({ nullable: true })
-  icon: string;
 
   @Column({
     type: 'enum',
@@ -47,30 +72,13 @@ export class CrewMember {
   })
   access: CrewMemberAccess;
 
-  @PrimaryColumn({
-    type: 'bigint',
-    name: 'crew_channel_sf',
-    primaryKeyConstraintName: 'pk_crew_member',
-  })
-  @RelationId((member: CrewMember) => member.crew)
-  @Index('crew_channel_sf_idx_crew_member')
-  channel: Snowflake;
-
-  @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE', eager: true })
-  @JoinColumn({
-    name: 'crew_channel_sf',
-    referencedColumnName: 'channel',
-    foreignKeyConstraintName: 'fk_crew_channel_sf_crew_member',
-  })
-  crew: Crew;
-
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  requireAccess(
-    access: CrewMemberAccess,
-    options: Partial<AdminOverrideOptions & SkipAccessControlOptions> = {},
-  ) {
-    return options.skipAccessControl || options.isAdmin || this.access <= access;
+  @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
+  deletedAt: Date;
+
+  requireAccess(access: CrewMemberAccess, options: Partial<SkipAccessControlOptions> = {}) {
+    return options.skipAccessControl || this.access <= access;
   }
 }

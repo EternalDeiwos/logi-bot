@@ -33,7 +33,7 @@ export class GuildServiceImpl extends GuildService {
   }
 
   async updateGuild(guildRef: Snowflake, guild: InsertGuild) {
-    const result = await this.guildRepo.updateReturning({ guild: guildRef }, guild);
+    const result = await this.guildRepo.updateReturning({ guildSf: guildRef }, guild);
     if (result?.affected) {
       const guild = (result?.raw as Guild[]).pop();
       this.logger.log(`Update guild config for ${guild.name}`);

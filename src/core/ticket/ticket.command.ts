@@ -30,8 +30,12 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
+import { InternalError } from 'src/errors';
+import { BotService } from 'src/bot/bot.service';
+import { PromptEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
+import { GuildService } from 'src/core/guild/guild.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
@@ -47,9 +51,6 @@ import {
   ticketPromptStatusInstructions,
   ticketPromptTriageHelp,
 } from './ticket.messages';
-import { InternalError } from 'src/errors';
-import { BotService } from 'src/bot/bot.service';
-import { PromptEmbed, SuccessEmbed } from 'src/bot/embed';
 
 export const TicketActionToTag: Record<string, TicketTag> = {
   accept: TicketTag.ACCEPTED,
@@ -80,6 +81,7 @@ export class TicketCommand {
 
   constructor(
     private readonly botService: BotService,
+    private readonly guildService: GuildService,
     private readonly crewRepo: CrewRepository,
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,
@@ -133,11 +135,11 @@ export class TicketCommand {
         },
       );
 
-    const maybeCrew = await this.crewRepo.findOne({ where: { channel: data.crew } });
+    const maybeCrew = await this.crewRepo.findOne({ where: { crewSf: data.crew } });
 
     // Use selected crew
     if (data.crew) {
-      const crew = await this.crewRepo.findOne({ where: { channel: data.crew } });
+      const crew = await this.crewRepo.findOne({ where: { crewSf: data.crew } });
 
       if (!crew) {
         return interaction.reply({ content: 'Invalid crew', ephemeral: true });
@@ -157,14 +159,16 @@ export class TicketCommand {
       // Try infer crew from interaction channel
     } else if (maybeCrew) {
       await interaction.channel.send({
-        components: [this.ticketService.createTicketButton(maybeCrew.channel)],
+        components: [this.ticketService.createTicketButton(maybeCrew.crewSf)],
         embeds: [prompt],
       });
 
       // Show global ticket status
     } else {
       prompt.setDescription(ticketPromptDescription(true));
-      const crews = await this.crewRepo.find({ where: { guild: interaction.guildId } });
+      const crews = await this.crewRepo.find({
+        where: { guild: { guildSf: interaction.guildId } },
+      });
 
       await interaction.channel.send({
         components: [this.ticketService.createCrewMenu(crews)],
@@ -291,9 +295,10 @@ export class TicketCommand {
     @SelectedStrings() [selected]: string[],
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
+    const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
     const result = await this.ticketService.moveTicket(
-      { thread: threadRef },
-      { guild: interaction.guildId, discussion: selected, updatedBy: member.id },
+      { threadSf: threadRef },
+      { guildId: guild.id, crewSf: selected, updatedBy: member.id },
     );
     return interaction.reply({ content: result.message, ephemeral: true });
   }
@@ -321,7 +326,7 @@ export class TicketCommand {
     ].join('\n');
 
     const result = await this.ticketService.createTicket(
-      { channel: crewRef },
+      { crewSf: crewRef },
       {
         name: title,
         content,
@@ -369,7 +374,7 @@ export class TicketCommand {
     }
 
     const result = await this.ticketService.updateTicket(
-      { thread: thread.id, updatedBy: member.id },
+      { threadSf: thread.id, updatedBy: member.id },
       TicketTag.DECLINED,
       reason,
     );
@@ -386,7 +391,7 @@ export class TicketCommand {
   })
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
     const ticket = await this.ticketRepo.findOne({
-      where: { thread: interaction.channelId },
+      where: { threadSf: interaction.channelId },
       withDeleted: true,
     });
     if (!ticket) {
@@ -396,9 +401,7 @@ export class TicketCommand {
       });
     }
 
-    const row = await this.ticketService.createMovePrompt(ticket, [
-      { channel: ticket.crew.channel },
-    ]);
+    const row = await this.ticketService.createMovePrompt(ticket, [{ crewSf: ticket.crew.crewSf }]);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new PromptEmbed('PROMPT_GENERIC').setTitle('Select destination')],
@@ -415,7 +418,7 @@ export class TicketCommand {
     const { channel } = interaction;
 
     const ticket = await this.ticketRepo.findOneOrFail({
-      where: { thread: channel.id },
+      where: { threadSf: channel.id },
       withDeleted: true,
     });
 
@@ -447,7 +450,7 @@ export class TicketCommand {
     }
 
     const result = await this.ticketService.updateTicket(
-      { thread: thread.id, updatedBy: member.id },
+      { threadSf: thread.id, updatedBy: member.id },
       tag,
     );
 
@@ -465,7 +468,7 @@ export class TicketCommand {
     }
 
     const result = await this.ticketService.updateTicket(
-      { thread: thread.id, updatedBy: member.id },
+      { threadSf: thread.id, updatedBy: member.id },
       tag,
       reason,
     );
@@ -546,22 +549,21 @@ export class TicketCommand {
 
     // Use specified crew
     if (data.crew) {
-      const crew = await this.crewRepo.findOneOrFail({ where: { channel: data.crew } });
-      await this.ticketService.sendIndividualStatus(
-        { channel: crew.channel },
-        interaction.channelId,
-      );
+      const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: data.crew } });
+      await this.ticketService.sendIndividualStatus({ crewSf: crew.crewSf }, interaction.channelId);
 
       // Try infer crew from current channel
     } else {
-      const maybeCrew = await this.crewRepo.findOne({ where: { channel: interaction.channelId } });
+      const maybeCrew = await this.crewRepo.findOne({
+        where: { crewSf: interaction.channelId },
+      });
       if (maybeCrew) {
         await this.ticketService.sendIndividualStatus(maybeCrew, interaction.channelId);
 
         // Send status for all crews
       } else {
         await this.ticketService.sendAllStatus(
-          { guild: interaction.guildId },
+          { guildSf: interaction.guildId },
           interaction.channelId,
           member.id,
         );

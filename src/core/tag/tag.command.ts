@@ -62,7 +62,7 @@ export class TagCommand {
   ) {
     const member = await interaction.guild.members.fetch(interaction.user);
     const result = await this.tagService.createTag(data.name, member);
-    await this.teamService.reconcileGuildForumTags({ guild: interaction.guildId });
+    await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Tag registered')],
     });
@@ -74,9 +74,12 @@ export class TagCommand {
     dmPermission: false,
   })
   async onSetupTags(@Context() [interaction]: SlashCommandContext) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.tagService.createTicketTags(member);
-    await this.teamService.reconcileGuildForumTags({ guild: interaction.guildId });
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const result = await this.tagService.createTicketTags(
+      { guildSf: interaction.guildId },
+      memberRef,
+    );
+    await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Lifecycle tags registered')],
     });
@@ -88,7 +91,7 @@ export class TagCommand {
     dmPermission: false,
   })
   async onRefreshTags(@Context() [interaction]: SlashCommandContext) {
-    const result = await this.teamService.reconcileGuildForumTags({ guild: interaction.guildId });
+    const result = await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Refresh scheduled')],
     });

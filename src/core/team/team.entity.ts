@@ -4,25 +4,27 @@ import {
   Index,
   OneToMany,
   CreateDateColumn,
-  PrimaryColumn,
+  DeleteDateColumn,
   ManyToOne,
   JoinColumn,
-  Unique,
   DeepPartial,
+  Unique,
+  PrimaryColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Guild } from 'src/core/guild/guild.entity';
+import { TicketTag } from 'src/types';
 import { ForumTag } from 'src/core/tag/tag.entity';
-import { TicketTag } from 'src/core/tag/tag.service';
+import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
 export type InsertTeam = DeepPartial<
   Omit<
     Team,
-    | 'parent'
+    | 'createdAt'
+    | 'deletedAt'
+    | 'guild'
     | 'tags'
     | 'crews'
-    | 'createdAt'
     | 'resolveSnowflakeFromTag'
     | 'resolveNameFromSnowflake'
     | 'getTagMap'
@@ -30,38 +32,45 @@ export type InsertTeam = DeepPartial<
     | 'getDefaultTags'
   >
 >;
-export type SelectTeam = DeepPartial<Pick<Team, 'category'>>;
+export type SelectTeam = DeepPartial<Pick<Team, 'id'>>;
 
-@Entity({ name: 'team' })
-@Unique('uk_name_guild_sf_team', ['name', 'guild'])
+@Entity()
+@Unique('uk_name_guild_id_team', ['name', 'guildId'])
 export class Team {
-  @PrimaryColumn({
-    type: 'bigint',
-    name: 'category_channel_sf',
-    primaryKeyConstraintName: 'pk_team_category_channel_sf',
-  })
-  @Index('category_channel_sf_idx_team')
-  category: Snowflake;
+  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_team_id' })
+  id: string;
 
   @Column()
   @Index('name_idx_team')
   name: string;
 
-  @Column({ type: 'bigint', name: 'guild_sf' })
-  @Index('guild_sf_idx_team')
-  guild: Snowflake;
+  @Column({ type: 'int8', name: 'guild_id' })
+  @Index('guild_id_idx_team')
+  guildId: string;
 
-  @Column({ type: 'bigint', name: 'forum_channel_sf' })
-  @Index('forum_channel_sf_idx_team', { unique: true })
-  forum: Snowflake;
-
-  @ManyToOne(() => Guild, (guild) => guild.teams, { onDelete: 'CASCADE', eager: true })
+  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
-    name: 'guild',
-    referencedColumnName: 'guild',
-    foreignKeyConstraintName: 'fk_team_guild_sf',
+    name: 'guild_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_team_guild_id',
   })
-  parent: Guild;
+  guild: Guild;
+
+  @Column({
+    type: 'int8',
+    name: 'forum_channel_sf',
+    comment: 'Forum where crew tickets will be sent',
+  })
+  @Index('forum_channel_sf_idx_team')
+  forumSf: Snowflake;
+
+  @Column({
+    type: 'int8',
+    name: 'category_channel_sf',
+    comment: 'Category where crew channels will be created',
+  })
+  @Index('category_channel_sf_idx_team')
+  categorySf: Snowflake;
 
   @OneToMany(() => ForumTag, (tag) => tag.team, { eager: true })
   tags: Promise<ForumTag[]>;
@@ -72,21 +81,24 @@ export class Team {
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
+  @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
+  deletedAt: Date;
+
   async resolveSnowflakeFromTag(tag: TicketTag): Promise<Snowflake> {
     const tags = await this.tags;
-    return tags.find((t) => t.name === tag)?.tag;
+    return tags.find((t) => t.name === tag)?.tagSf;
   }
 
   async resolveNameFromSnowflake(snowflake: Snowflake): Promise<string> {
     const tags = await this.tags;
-    return tags.find((t) => t.tag === snowflake)?.name;
+    return tags.find((t) => t.tagSf === snowflake)?.name;
   }
 
   async getTagMap() {
     const tags = await this.tags;
     return tags.reduce(
       (accumulator, tag) => {
-        accumulator[tag.tag] = tag.name;
+        accumulator[tag.tagSf] = tag.name;
         return accumulator;
       },
       {} as Record<Snowflake, string>,
@@ -97,7 +109,7 @@ export class Team {
     const tags = await this.tags;
     return tags.reduce(
       (accumulator, tag) => {
-        accumulator[tag.name] = tag.tag;
+        accumulator[tag.name] = tag.tagSf;
         return accumulator;
       },
       {} as Record<string, Snowflake>,
@@ -108,7 +120,7 @@ export class Team {
     const tags = await this.tags;
     return (
       await Promise.all(
-        tags.map(async (tag) => [tag.tag, (await tag.template).default] as [string, boolean]),
+        tags.map(async (tag) => [tag.tagSf, (await tag.template).default] as [string, boolean]),
       )
     ).reduce((acc, [tag_sf, isDefault]) => {
       if (isDefault) {

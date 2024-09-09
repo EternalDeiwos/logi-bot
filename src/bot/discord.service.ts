@@ -200,7 +200,7 @@ export class DiscordServiceImpl extends DiscordService {
     const keep: GuildForumTagData[] = [];
 
     for (const tag of forum.availableTags) {
-      if (tags.findIndex((t) => t.tag === tag.id) > -1) {
+      if (tags.findIndex((t) => t.tagSf === tag.id) > -1) {
         deleted.push(tag);
       } else {
         keep.push(tag);

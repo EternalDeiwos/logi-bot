@@ -14,24 +14,24 @@ export class BotEventListener {
   private readonly logger = new Logger(BotEventListener.name);
 
   constructor(
+    private readonly guildService: GuildService,
     private readonly tagService: TagService,
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,
     private readonly crewRepo: CrewRepository,
-    private readonly guildService: GuildService,
     private readonly memberRepo: CrewMemberRepository,
   ) {}
 
   @On('guildCreate')
-  async onGuildCreate(@Context() [guild]: ContextOf<'guildCreate'>) {
-    const member = await guild.members.fetchMe();
+  async onGuildCreate(@Context() [discordGuild]: ContextOf<'guildCreate'>) {
+    const member = await discordGuild.members.fetchMe();
     const result = await Promise.all([
-      this.tagService.createTicketTags(member),
+      this.tagService.createTicketTags({ guildSf: discordGuild.id }, member.id),
       this.guildService.registerGuild({
-        guild: guild.id,
-        name: guild.name,
-        shortName: guild.nameAcronym,
-        icon: guild.iconURL({ extension: 'png', forceStatic: true }),
+        guildSf: discordGuild.id,
+        name: discordGuild.name,
+        shortName: discordGuild.nameAcronym,
+        icon: discordGuild.iconURL({ extension: 'png', forceStatic: true }),
       }),
     ]);
 
@@ -52,7 +52,7 @@ export class BotEventListener {
   async onThreadUpdate(@Context() [oldThread, newThread]: ContextOf<'threadUpdate'>) {
     const guild = newThread.guild;
     const member = await guild.members.fetchMe();
-    const ticket = await this.ticketRepo.findOne({ where: { thread: oldThread.id } });
+    const ticket = await this.ticketRepo.findOne({ where: { threadSf: oldThread.id } });
 
     if (!ticket) {
       this.logger.debug(`No ticket for thread update on ${oldThread.name} (${oldThread.id})`);
@@ -60,7 +60,7 @@ export class BotEventListener {
     }
 
     const crew = await this.crewRepo.findOne({
-      where: { channel: ticket.discussion },
+      where: { crewSf: ticket.crewSf },
       withDeleted: true,
     });
 
@@ -86,7 +86,7 @@ export class BotEventListener {
 
     if (toDeleteFlag && !deletedFlag) {
       this.logger.log(`Deleting ticket ${ticket.name}`);
-      await this.ticketService.deleteTicket({ thread: newThread.id }, member.id);
+      await this.ticketService.deleteTicket({ threadSf: newThread.id }, member.id);
     }
   }
 
@@ -94,7 +94,7 @@ export class BotEventListener {
   async onThreadCreate(@Context() [thread]: ContextOf<'threadCreate'>) {
     // This is a hack to delay the event to ensure the Ticket record is written to the database before proceeding.
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    const ticket = await this.ticketRepo.findOne({ where: { thread: thread.id } });
+    const ticket = await this.ticketRepo.findOne({ where: { threadSf: thread.id } });
 
     if (!ticket?.crew) {
       return;
@@ -106,13 +106,13 @@ export class BotEventListener {
       await this.ticketService.addTriageControlToThread(thread);
     }
 
-    if (ticket.crew.movePrompt) {
+    if (ticket.crew.hasMovePrompt) {
       await this.ticketService.addMovePromptToTicket(thread);
     }
   }
 
   @On('guildMemberRemove')
   async onMemberLeave(@Context() [member]: ContextOf<'guildMemberRemove'>) {
-    await this.memberRepo.delete({ guild: member.guild.id, member: member.id });
+    await this.memberRepo.delete({ guild: { guildSf: member.guild.id }, memberSf: member.id });
   }
 }

@@ -12,47 +12,56 @@ import {
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Team } from 'src/core/team/team.entity';
+import { Guild } from 'src/core/guild/guild.entity';
 import { ForumTagTemplate } from './tag-template.entity';
 
 export type InsertTag = DeepPartial<Omit<ForumTag, 'guild' | 'team' | 'template' | 'createdAt'>>;
-export type SelectTag = DeepPartial<Pick<ForumTag, 'tag'>>;
+export type SelectTag = DeepPartial<Pick<ForumTag, 'tagSf'>>;
 
-@Entity({ name: 'tag' })
-@Unique('unique_forum_tag_template', ['templateId', 'forum'])
+@Entity('tag')
+@Unique('uk_template_id_team_id', ['templateId', 'teamId'])
 export class ForumTag {
-  @PrimaryColumn({ type: 'bigint', name: 'tag_sf', primaryKeyConstraintName: 'pk_tag_sf' })
-  tag: Snowflake;
+  @PrimaryColumn({ type: 'int8', name: 'tag_sf', primaryKeyConstraintName: 'pk_tag_sf' })
+  tagSf: Snowflake;
 
   @Column()
   name: string;
 
-  @Column({ type: 'bigint', name: 'guild_sf' })
-  @Index('guild_sf_idx_tag')
-  guild: Snowflake;
+  @Column({ type: 'int8', name: 'guild_id' })
+  @Index('guild_id_idx_tag')
+  guildId: string;
 
-  @Column({ type: 'bigint', name: 'forum_channel_sf' })
+  @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
+  @JoinColumn({
+    name: 'guild_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_tag_guild_id',
+  })
+  guild: Guild;
+
+  @Column({ type: 'int8', name: 'team_id' })
   @RelationId((tag: ForumTag) => tag.team)
-  @Index('forum_channel_idx_tag')
-  forum: Snowflake;
+  @Index('team_id_idx_tag')
+  teamId: Snowflake;
 
   @ManyToOne(() => Team, (team) => team.tags, { onDelete: 'CASCADE' })
   @JoinColumn({
-    name: 'forum_channel_sf',
-    referencedColumnName: 'forum',
-    foreignKeyConstraintName: 'fk_tag_team',
+    name: 'team_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_tag_team_id',
   })
   team: Promise<Team>;
 
-  @Column({ type: 'uuid', name: 'template_id' })
+  @Column({ type: 'int8', name: 'tag_template_id' })
   @RelationId((tag: ForumTag) => tag.template)
-  @Index('template_id_idx_tag')
+  @Index('tag_template_id_idx_tag')
   templateId: string;
 
   @ManyToOne(() => ForumTagTemplate, (template) => template.tags, { onDelete: 'CASCADE' })
   @JoinColumn({
-    name: 'template_id',
+    name: 'tag_template_id',
     referencedColumnName: 'id',
-    foreignKeyConstraintName: 'fk_tag_template',
+    foreignKeyConstraintName: 'fk_tag_tag_template_id',
   })
   template: Promise<ForumTagTemplate>;
 

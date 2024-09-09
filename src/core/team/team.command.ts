@@ -6,6 +6,7 @@ import {
   Options,
   SlashCommandContext,
   SlashCommandMeta,
+  StringOption,
   Subcommand,
 } from 'necord';
 import { ChannelType, GuildChannel, GuildMember, Role, User } from 'discord.js';
@@ -13,6 +14,7 @@ import { EchoCommand } from 'src/core/echo.command-group';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
+import { GuildService } from 'src/core/guild/guild.service';
 import { TeamService } from './team.service';
 
 export class CreateTeamCommandParams {
@@ -41,13 +43,13 @@ export class CreateTeamCommandParams {
 }
 
 export class SelectTeamCommandParams {
-  @ChannelOption({
+  @StringOption({
     name: 'team',
     description: 'Select a team',
-    channel_types: [ChannelType.GuildCategory],
+    autocomplete: true,
     required: true,
   })
-  category: GuildChannel;
+  teamId: string;
 }
 
 @Injectable()
@@ -61,6 +63,7 @@ export class TeamCommand {
 
   constructor(
     private readonly botService: BotService,
+    private readonly guildService: GuildService,
     private readonly teamService: TeamService,
   ) {}
 
@@ -74,10 +77,11 @@ export class TeamCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: CreateTeamCommandParams,
   ) {
+    const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
     const result = await this.teamService.registerTeam({
-      forum: data.forum.id,
-      guild: interaction.guildId,
-      category: data.category.id,
+      forumSf: data.forum.id,
+      guildId: guild.id,
+      categorySf: data.category.id,
     });
 
     await this.botService.replyOrFollowUp(interaction, {
@@ -94,7 +98,7 @@ export class TeamCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectTeamCommandParams,
   ) {
-    const result = await this.teamService.deleteTeam({ category: data.category.id });
+    const result = await this.teamService.deleteTeam({ id: data.teamId });
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Team deregistered')],

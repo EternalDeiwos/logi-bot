@@ -77,7 +77,7 @@ export class GuildCommand {
     const name = data.name ?? interaction.guild.name;
     const shortName = data.shortName ?? interaction.guild.nameAcronym;
     await this.guildService.registerGuild({
-      guild: interaction.guild.id,
+      guildSf: interaction.guild.id,
       name,
       shortName,
       icon: interaction.guild.iconURL({ extension: 'png', forceStatic: true }),
@@ -105,7 +105,11 @@ export class GuildCommand {
       throw new ValidationError('VALIDATION_FAILED', 'Audit channel not provided');
     }
 
-    await this.guildService.setConfig({ guild: interaction.guildId }, 'crewAuditChannel', audit.id);
+    await this.guildService.setConfig(
+      { guildSf: interaction.guildId },
+      'crewAuditChannel',
+      audit.id,
+    );
 
     await interaction.reply({
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Configuration updated')],

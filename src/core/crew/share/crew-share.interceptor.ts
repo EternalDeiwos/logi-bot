@@ -24,7 +24,7 @@ export class CrewShareAutocompleteInterceptor extends AutocompleteInterceptor {
       return interaction.respond(
         results.map((result) => ({
           name: `${result.team.name}: ${result.name}`,
-          value: result.channel,
+          value: result.crewSf,
         })),
       );
     }
@@ -37,7 +37,7 @@ export class CrewShareAutocompleteInterceptor extends AutocompleteInterceptor {
       return interaction.respond(
         results.map((result) => ({
           name: result.name,
-          value: result.guild,
+          value: result.id,
         })),
       );
     }

@@ -20,12 +20,12 @@ export class CrewSelectAutocompleteInterceptor extends AutocompleteInterceptor {
       return interaction.respond(
         results.map((result) => {
           const teamName =
-            result.parent.guild !== interaction.guildId
-              ? `[${result.parent.shortName}] ${result.team.name}`
+            result.guild.guildSf !== interaction.guildId
+              ? `[${result.guild.shortName}] ${result.team.name}`
               : result.team.name;
           return {
             name: `${teamName}: ${result.name}`,
-            value: result.channel,
+            value: result.crewSf,
           };
         }),
       );
