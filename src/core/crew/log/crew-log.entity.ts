@@ -18,7 +18,11 @@ export type SelectCrewLog = DeepPartial<Pick<CrewLog, 'message'>>;
 
 @Entity({ name: 'crew_log' })
 export class CrewLog {
-  @PrimaryColumn({ type: 'bigint', name: 'thread_sf', primaryKeyConstraintName: 'pk_thread_sf' })
+  @PrimaryColumn({
+    type: 'bigint',
+    name: 'log_message_sf',
+    primaryKeyConstraintName: 'pk_log_message_sf',
+  })
   message: Snowflake;
 
   @Column({ type: 'bigint', name: 'guild_sf' })

@@ -6,9 +6,9 @@ import {
   ManyToOne,
   JoinColumn,
   RelationId,
-  PrimaryGeneratedColumn,
   OneToMany,
   Unique,
+  PrimaryColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Crew } from 'src/core/crew/crew.entity';
@@ -17,7 +17,7 @@ import { ForumTag } from './tag.entity';
 @Entity({ name: 'tag_template' })
 @Unique('unique_tag_name', ['guild', 'name'])
 export class ForumTagTemplate {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_tag_template_id' })
   id: string;
 
   @Column()

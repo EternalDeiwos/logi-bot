@@ -10,15 +10,18 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?required}
 
   postgres:
-    image: postgres:16
+    image: ghcr.io/eternaldeiwos/postgresql:16
     restart: unless-stopped
     ports:
       - 127.0.0.1:5432:5432
     volumes:
-      - ./.postgres:/var/lib/postgresql/data
+      - bot-db-data:/var/lib/postgresql/data
       - ./hack/initdb.sh:/docker-entrypoint-initdb.d/initdb.sh
     environment:
       POSTGRES_USER: '${POSTGRES_USER:?required}'
       POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:?required}'
       POSTGRES_DB: '${POSTGRES_DB:?required}'
       POSTGRES_SCHEMA: '${POSTGRES_SCHEMA:?required}'
+
+volumes:
+  bot-db-data: {}
