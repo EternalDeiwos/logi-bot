@@ -1,6 +1,5 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   Index,
   RelationId,
@@ -8,6 +7,7 @@ import {
   JoinColumn,
   ViewEntity,
   ViewColumn,
+  PrimaryColumn,
 } from 'typeorm';
 import { War, WarFaction } from 'src/game/war/war.entity';
 
@@ -22,7 +22,7 @@ export type DynamicMapData = {
 
 @Entity()
 export class RegionLog {
-  @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_region_log_id' })
+  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_region_log_id' })
   id: string;
 
   @Column({ name: 'hex_id', type: 'int8' })
