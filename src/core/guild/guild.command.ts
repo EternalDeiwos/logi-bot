@@ -1,19 +1,23 @@
-import { Injectable, Logger, UseFilters } from '@nestjs/common';
+import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
 import {
   ChannelOption,
   Context,
   Options,
+  RoleOption,
   SlashCommandContext,
   StringOption,
   Subcommand,
 } from 'necord';
-import { ChannelType, GuildChannel, PermissionsBitField } from 'discord.js';
+import { ChannelType, GuildChannel, PermissionsBitField, Role } from 'discord.js';
 import { AuthError, ValidationError } from 'src/errors';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
+import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
+import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { GuildService } from './guild.service';
+import { GuildConfig } from './guild.entity';
 
 export class EditGuildCommandParams {
   @StringOption({
@@ -39,6 +43,25 @@ export class SelectGuildCommandParams {
     required: true,
   })
   guild: string;
+}
+
+export class SetRoleCommandParams {
+  @RoleOption({
+    name: 'role',
+    description: 'A role to be granted access',
+    required: true,
+  })
+  role: Role;
+}
+
+export class SetLogChannelCommandParams {
+  @ChannelOption({
+    name: 'log',
+    description: 'A channel where all log messages will be displayed.',
+    channel_types: [ChannelType.GuildText],
+    required: true,
+  })
+  log: GuildChannel;
 }
 
 export class SetAuditChannelCommandParams {
@@ -70,10 +93,17 @@ export class GuildCommand {
     description: 'Register this guild',
     dmPermission: false,
   })
-  async onCreateCrew(
+  async onGuildRegister(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: EditGuildCommandParams,
   ) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a guild administrator can perform this action',
+      ).asDisplayable();
+    }
+
     const name = data.name ?? interaction.guild.name;
     const shortName = data.shortName ?? interaction.guild.nameAcronym;
     await this.guildService.registerGuild({
@@ -88,32 +118,104 @@ export class GuildCommand {
     });
   }
 
+  async setConfig<K extends keyof GuildConfig>(
+    key: K,
+    [interaction]: SlashCommandContext,
+    value: GuildConfig[K],
+  ) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a guild administrator can perform this action',
+      ).asDisplayable();
+    }
+
+    await this.guildService.setConfig({ guildSf: interaction.guildId }, key, value);
+
+    await interaction.reply({
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Configuration updated')],
+      ephemeral: true,
+    });
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'set_triage',
+    description: 'Set the crew that will receive tickets by default. Guild Admin only',
+    dmPermission: false,
+  })
+  async onGuildSetTriageCrew(
+    @Context() context: SlashCommandContext,
+    @Options() { crew }: SelectCrewCommandParams,
+  ) {
+    if (!crew) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
+    }
+
+    return this.setConfig('ticketTriageCrew', context, crew);
+  }
+
+  @Subcommand({
+    name: 'set_crew_creator',
+    description: 'Set the role who can create crews. Guild Admin only',
+    dmPermission: false,
+  })
+  async onGuildSetCrewCreatorRole(
+    @Context() context: SlashCommandContext,
+    @Options() { role }: SetRoleCommandParams,
+  ) {
+    if (!role) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
+    }
+
+    return this.setConfig('crewCreatorRole', context, role.id);
+  }
+
+  @Subcommand({
+    name: 'set_crew_viewer',
+    description: 'Set the role to be given access to new crews. Guild Admin only',
+    dmPermission: false,
+  })
+  async onGuildSetCrewViewerRole(
+    @Context() context: SlashCommandContext,
+    @Options() { role }: SetRoleCommandParams,
+  ) {
+    if (!role) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
+    }
+
+    return this.setConfig('crewViewerRole', context, role.id);
+  }
+
+  @Subcommand({
+    name: 'set_log',
+    description: 'Set the global log channel for this guild. Guild Admin only',
+    dmPermission: false,
+  })
+  async onGuildSetLogChannel(
+    @Context() context: SlashCommandContext,
+    @Options() { log }: SetLogChannelCommandParams,
+  ) {
+    if (!log) {
+      throw new ValidationError('VALIDATION_FAILED', 'Log channel not provided');
+    }
+
+    return this.setConfig('globalLogChannel', context, log.id);
+  }
+
   @Subcommand({
     name: 'set_audit',
     description: 'Set the audit channel for this guild. Guild Admin only',
     dmPermission: false,
   })
   async onGuildSetAuditChannel(
-    @Context() [interaction]: SlashCommandContext,
+    @Context() context: SlashCommandContext,
     @Options() { audit }: SetAuditChannelCommandParams,
   ) {
-    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
-      throw new AuthError('FORBIDDEN', 'Only guild admins may register the guild');
-    }
-
     if (!audit) {
       throw new ValidationError('VALIDATION_FAILED', 'Audit channel not provided');
     }
 
-    await this.guildService.setConfig(
-      { guildSf: interaction.guildId },
-      'crewAuditChannel',
-      audit.id,
-    );
-
-    await interaction.reply({
-      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Configuration updated')],
-      ephemeral: true,
-    });
+    return this.setConfig('globalLogChannel', context, audit.id);
   }
 }

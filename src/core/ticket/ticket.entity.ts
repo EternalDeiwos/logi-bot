@@ -16,7 +16,7 @@ import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
 export type InsertTicket = DeepPartial<
-  Omit<Ticket, 'crew' | 'updatedAt' | 'createdAt' | 'deletedAt'>
+  Omit<Ticket, 'crew' | 'previous' | 'guild' | 'updatedAt' | 'createdAt' | 'deletedAt'>
 >;
 export type SelectTicket = DeepPartial<Pick<Ticket, 'threadSf'>>;
 
@@ -37,16 +37,29 @@ export class Ticket {
   })
   guild: Guild;
 
+  @Column({ type: 'int8', name: 'previous_thread_sf', nullable: true })
+  @RelationId((ticket: Ticket) => ticket.previous)
+  @Index('previous_thread_sf_idx_ticket')
+  previousThreadSf: Snowflake;
+
+  @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({
+    name: 'previous_thread_sf',
+    referencedColumnName: 'threadSf',
+    foreignKeyConstraintName: 'fk_ticket_previous_thread_sf',
+  })
+  previous: Promise<Ticket>;
+
   /**
    * Snowflake for crew Discord channel
    * @type Snowflake
    */
-  @Column({ type: 'int8', name: 'crew_channel_sf', nullable: true })
+  @Column({ type: 'int8', name: 'crew_channel_sf' })
   @RelationId((ticket: Ticket) => ticket.crew)
   @Index('crew_channel_sf_idx_ticket')
   crewSf: Snowflake;
 
-  @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', nullable: true, eager: true })
+  @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'crew_channel_sf',
     referencedColumnName: 'crewSf',
@@ -60,7 +73,7 @@ export class Ticket {
   @Column()
   name: string;
 
-  @Column({ name: 'sort_order' })
+  @Column({ name: 'sort_order', default: '' })
   @Index('sort_order_idx_ticket')
   sortOrder: string;
 

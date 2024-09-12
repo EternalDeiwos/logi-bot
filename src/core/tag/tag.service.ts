@@ -4,13 +4,14 @@ import { In, InsertResult } from 'typeorm';
 import { compact } from 'lodash';
 import { InternalError, ValidationError } from 'src/errors';
 import { Crew } from 'src/core/crew/crew.entity';
-import { SelectTeam } from 'src/core/team/team.entity';
+import { SelectTeam, Team } from 'src/core/team/team.entity';
 import { TeamService } from 'src/core/team/team.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { ForumTagTemplate } from './tag-template.entity';
 import { TagTemplateRepository } from './tag-template.repository';
 import { TagRepository } from './tag.repository';
+import { ForumTag } from './tag.entity';
 
 export enum TicketTag {
   TRIAGE = 'Triage',
@@ -24,14 +25,17 @@ export enum TicketTag {
 }
 
 export abstract class TagService {
+  abstract getTagByGuild(guildRef: SelectGuild): Promise<ForumTag[]>;
+  abstract getTemplateByGuild(guildRef: SelectGuild): Promise<ForumTagTemplate[]>;
   abstract createTicketTags(guildRef: SelectGuild, memberRef: Snowflake): Promise<InsertResult[]>;
   abstract createTagForCrew(crew: Crew): Promise<any>;
-  abstract createTag(name: string, member: GuildMember, moderated?: boolean): Promise<any>;
-  abstract addTags(
+  abstract createTag(
     guildRef: SelectGuild,
-    teamRef: SelectTeam,
-    templates: ForumTagTemplate[],
-  ): Promise<void>;
+    memberRef: Snowflake,
+    name: string,
+    moderated?: boolean,
+  ): Promise<any>;
+  abstract addTags(teamRef: SelectTeam, templates: ForumTagTemplate[]): Promise<void>;
   abstract deleteTags(member: GuildMember, templates?: (ForumTagTemplate | string)[]): Promise<any>;
   abstract deleteTagTemplates(
     member: GuildMember,
@@ -51,6 +55,14 @@ export class TagServiceImpl extends TagService {
     private readonly templateRepo: TagTemplateRepository,
   ) {
     super();
+  }
+
+  async getTagByGuild(guildRef: SelectGuild): Promise<ForumTag[]> {
+    return this.tagRepo.find({ where: { guild: guildRef } });
+  }
+
+  async getTemplateByGuild(guildRef: SelectGuild): Promise<ForumTagTemplate[]> {
+    return this.templateRepo.find({ where: { guild: guildRef } });
   }
 
   async createTicketTags(guildRef: SelectGuild, memberRef: Snowflake) {
@@ -104,7 +116,7 @@ export class TagServiceImpl extends TagService {
           try {
             return await this.templateRepo.insert(tag);
           } catch {
-            this.logger.warn(`${tag.name} already exists`);
+            this.logger.warn(`${tag.name} tag already exists`);
           }
         }),
       ),
@@ -125,36 +137,52 @@ export class TagServiceImpl extends TagService {
     });
   }
 
-  async createTag(name: string, member: GuildMember, moderated = false) {
-    const guild = member.guild;
+  async createTag(guildRef: SelectGuild, memberRef: Snowflake, name: string, moderated = false) {
+    const guild = await this.guildService.getGuild(guildRef);
 
-    return await this.templateRepo.insert({
-      name: name,
-      guildId: guild.id,
-      moderated,
-      createdBy: member.id,
-    });
+    return await this.templateRepo.upsert(
+      {
+        name: name,
+        guildId: guild.id,
+        moderated,
+        createdBy: memberRef,
+      },
+      ['name', 'guildId'],
+    );
   }
 
-  async addTags(guildRef: SelectGuild, teamRef: SelectTeam, templates: ForumTagTemplate[]) {
-    const team = await this.teamService.getTeam(teamRef);
-    const discordGuild = await this.guildManager.fetch(guildRef.guildSf);
+  async addTags(teamRef: SelectTeam, templates: ForumTagTemplate[]) {
+    const team: Team = teamRef instanceof Team ? teamRef : await this.teamService.getTeam(teamRef);
+    const discordGuild = await this.guildManager.fetch(team.guild.guildSf);
     const forum = await discordGuild.channels.fetch(team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
     }
 
-    const updatedForum = await forum.setAvailableTags([
-      ...forum.availableTags.concat(),
-      ...templates.map((template) => ({
+    const oldTags = forum.availableTags.concat();
+    const tagsToCreate = templates.filter(
+      (template) => oldTags.findIndex((old) => template.name === old.name) === -1,
+    );
+    const payload = [
+      ...oldTags,
+      ...tagsToCreate.map((template) => ({
         name: template.name,
         moderated: template.moderated,
         default: template.default,
       })),
-    ]);
+    ];
 
-    const newTags = updatedForum.availableTags.reduce(
+    if (payload.length > 20) {
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        'Too many forum tags. Must be 20 or fewer.',
+      ).asDisplayable();
+    }
+
+    const updatedForum = await forum.setAvailableTags(payload);
+
+    const tagsToRegister = updatedForum.availableTags.reduce(
       (accumulator, tag) => {
         const template = templates.find((template) => tag.name === template.name);
         if (template) {
@@ -166,14 +194,14 @@ export class TagServiceImpl extends TagService {
     );
 
     await this.tagRepo.upsert(
-      newTags.map(([template, tag]) => ({
+      tagsToRegister.map(([template, tag]) => ({
         tagSf: tag.id,
         name: tag.name,
         guildId: team.guildId,
-        forumSf: forum.id,
+        teamId: team.id,
         templateId: template.id,
       })),
-      { conflictPaths: ['templateId', 'forumSf'], skipUpdateIfNoValuesChanged: true },
+      { conflictPaths: ['templateId', 'teamId'], skipUpdateIfNoValuesChanged: true },
     );
   }
 
@@ -190,24 +218,12 @@ export class TagServiceImpl extends TagService {
       });
     }
 
-    const result = await this.templateRepo
-      .createQueryBuilder('template')
-      .distinctOn(['tag.forum'])
-      .select('tag.forum', 'forum')
-      .addSelect('jsonb_object_agg(tag.name, tag.tag_sf::varchar)', 'tags')
-      .leftJoin('template.tags', 'tag')
-      .where('tag.template IN (:...ids)', {
-        ids: templates.map((template) => (typeof template === 'string' ? template : template?.id)),
-      })
-      .groupBy('tag.forum')
-      .getRawMany<{
-        forum: string;
-        tags: Record<string, string>;
-      }>();
+    const result = await this.templateRepo.getTemplateTagForumMap(templates);
 
     const results = await Promise.all(
-      result.map(async ({ forum: forumRef, tags }) => {
-        const forum = await guild.channels.fetch(forumRef);
+      result.map(async ({ teamId, tags }) => {
+        const team = await this.teamService.getTeam({ id: teamId });
+        const forum = await guild.channels.fetch(team.forumSf);
 
         if (!forum || !forum.isThreadOnly()) {
           throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');

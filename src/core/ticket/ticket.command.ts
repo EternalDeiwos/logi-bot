@@ -30,12 +30,15 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
-import { InternalError } from 'src/errors';
+import { AuthError, InternalError } from 'src/errors';
+import { CrewMemberAccess } from 'src/types';
 import { BotService } from 'src/bot/bot.service';
-import { PromptEmbed, SuccessEmbed } from 'src/bot/embed';
+import { ErrorEmbed, PromptEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
+import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
+import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
@@ -51,6 +54,7 @@ import {
   ticketPromptStatusInstructions,
   ticketPromptTriageHelp,
 } from './ticket.messages';
+import { SelectTicket } from './ticket.entity';
 
 export const TicketActionToTag: Record<string, TicketTag> = {
   accept: TicketTag.ACCEPTED,
@@ -82,7 +86,9 @@ export class TicketCommand {
   constructor(
     private readonly botService: BotService,
     private readonly guildService: GuildService,
+    private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
+    private readonly memberService: CrewMemberService,
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,
   ) {}
@@ -220,17 +226,19 @@ export class TicketCommand {
     @Context() [interaction]: MessageCommandContext,
     @TargetMessage() message: Message,
   ) {
-    const guild = message.guild;
-    const submitter = await guild.members.fetch(interaction.user);
-    const author = await guild.members.fetch(message.author);
-    const modal = this.buildTicketModal(message.channel.id, {
-      what: proxyTicketMessage(
-        message.content,
-        submitter.id,
-        author.id,
-        message.channelId,
-        message.id,
-      ),
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const authorRef = message.author?.id;
+    let channelRef = message.channelId;
+
+    try {
+      const crew = await this.crewService.getCrew({ crewSf: channelRef });
+    } catch {
+      const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
+      channelRef = guild.config.ticketTriageCrew;
+    }
+
+    const modal = this.buildTicketModal(channelRef, {
+      what: proxyTicketMessage(message.content, memberRef, authorRef, channelRef, message.id),
     });
     interaction.showModal(modal);
   }
@@ -294,13 +302,24 @@ export class TicketCommand {
     @ComponentParam('thread') threadRef: Snowflake,
     @SelectedStrings() [selected]: string[],
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const ticket = await this.ticketService.getTicket({ threadSf: threadRef });
+
+    if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew members can perform this action',
+      ).asDisplayable();
+    }
+
+    const crew = await this.crewService.getCrew({ crewSf: selected });
     const result = await this.ticketService.moveTicket(
       { threadSf: threadRef },
-      { guildId: guild.id, crewSf: selected, updatedBy: member.id },
+      { guildId: crew.guildId, crewSf: selected, updatedBy: memberRef },
     );
-    return interaction.reply({ content: result.message, ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket moved')],
+    });
   }
 
   @Modal('ticket/create/:crew')
@@ -308,8 +327,7 @@ export class TicketCommand {
     @Context() [interaction]: ModalContext,
     @ModalParam('crew') crewRef: Snowflake,
   ) {
-    const guild = interaction.guild;
-    const member = await guild.members.fetch(interaction.user);
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
 
     const title = interaction.fields.getTextInputValue('ticket/form/title');
     const content = [
@@ -330,11 +348,15 @@ export class TicketCommand {
       {
         name: title,
         content,
-        createdBy: member.id,
+        crewSf: crewRef,
+        createdBy: memberRef,
+        updatedBy: memberRef,
       },
     );
 
-    return interaction.reply({ content: result.message, ephemeral: true });
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket created')],
+    });
   }
 
   buildDeclineModal(threadRef: GuildChannelResolvable) {
@@ -363,18 +385,20 @@ export class TicketCommand {
     @Context() [interaction]: ModalContext,
     @ModalParam('thread') threadRef: Snowflake,
   ) {
-    const guild = interaction.guild;
-    const member = await guild.members.fetch(interaction.user);
-    const reason = interaction.fields.getTextInputValue('ticket/decline/reason');
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const ticket = await this.ticketService.getTicket({ threadSf: threadRef });
 
-    const thread = await guild.channels.fetch(threadRef);
-
-    if (!thread.isThread()) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid thread');
+    if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew members can perform this action',
+      ).asDisplayable();
     }
 
+    const reason = interaction.fields.getTextInputValue('ticket/decline/reason');
+
     const result = await this.ticketService.updateTicket(
-      { threadSf: thread.id, updatedBy: member.id },
+      { threadSf: threadRef, updatedBy: memberRef },
       TicketTag.DECLINED,
       reason,
     );
@@ -390,18 +414,18 @@ export class TicketCommand {
     dmPermission: false,
   })
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
-    const ticket = await this.ticketRepo.findOne({
-      where: { threadSf: interaction.channelId },
-      withDeleted: true,
-    });
-    if (!ticket) {
-      return interaction.reply({
-        content: 'This command can only be used in a ticket',
-        ephemeral: true,
-      });
+    const ticketRef: SelectTicket = { threadSf: interaction.channelId };
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const ticket = await this.ticketService.getTicket(ticketRef);
+
+    if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew members can perform this action',
+      ).asDisplayable();
     }
 
-    const row = await this.ticketService.createMovePrompt(ticket, [{ crewSf: ticket.crew.crewSf }]);
+    const row = await this.ticketService.createMovePrompt(ticketRef, [{ crewSf: ticket.crewSf }]);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new PromptEmbed('PROMPT_GENERIC').setTitle('Select destination')],
@@ -415,12 +439,15 @@ export class TicketCommand {
     dmPermission: false,
   })
   async onTicketTriagePrompt(@Context() [interaction]: SlashCommandContext) {
-    const { channel } = interaction;
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const ticket = await this.ticketService.getTicket({ threadSf: interaction.channelId });
 
-    const ticket = await this.ticketRepo.findOneOrFail({
-      where: { threadSf: channel.id },
-      withDeleted: true,
-    });
+    if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew members can perform this action',
+      ).asDisplayable();
+    }
 
     const row = await this.ticketService.createTriageControl(ticket);
 
@@ -434,23 +461,29 @@ export class TicketCommand {
   async onTicketAction(
     @Context() [interaction]: ButtonContext,
     @ComponentParam('action') action: string,
-    @ComponentParam('thread') threadId: Snowflake,
+    @ComponentParam('thread') threadRef: Snowflake,
   ) {
-    const { guild } = interaction;
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const ticket = await this.ticketService.getTicket({ threadSf: threadRef });
     const tag = TicketActionToTag[action];
-    const member = await guild.members.fetch(interaction.user.id);
-    const thread = await guild.channels.fetch(threadId);
-
-    if (!thread.isThread()) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid ticket');
-    }
 
     if (!tag) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid ticket tag');
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid action').asDisplayable();
+    }
+
+    if (
+      // Ticket owner can close their own tickets
+      (tag === TicketTag.ABANDONED && ticket.createdBy !== memberRef) ||
+      !(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))
+    ) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew members can perform this action',
+      ).asDisplayable();
     }
 
     const result = await this.ticketService.updateTicket(
-      { threadSf: thread.id, updatedBy: member.id },
+      { threadSf: threadRef, updatedBy: memberRef },
       tag,
     );
 
@@ -460,15 +493,22 @@ export class TicketCommand {
   }
 
   async lifecycleCommand([interaction]: SlashCommandContext, tag: TicketTag, reason?: string) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    const thread = interaction.channel;
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const ticket = await this.ticketService.getTicket({ threadSf: interaction.channelId });
 
-    if (!thread.isThread()) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid thread');
+    if (
+      // Ticket owner can close their own tickets
+      (tag === TicketTag.ABANDONED && ticket.createdBy !== memberRef) ||
+      !(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))
+    ) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew members can perform this action',
+      ).asDisplayable();
     }
 
     const result = await this.ticketService.updateTicket(
-      { threadSf: thread.id, updatedBy: member.id },
+      { threadSf: ticket.threadSf, updatedBy: memberRef },
       tag,
       reason,
     );
@@ -497,6 +537,15 @@ export class TicketCommand {
     @Options() data: TicketDeclineReasonCommandParams,
   ) {
     return this.lifecycleCommand(context, TicketTag.DECLINED, data.reason);
+  }
+
+  @Subcommand({
+    name: 'close',
+    description: 'Mark a ticket as abandoned. Team members only',
+    dmPermission: false,
+  })
+  async onTicketCloseCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.ABANDONED);
   }
 
   @Subcommand({
@@ -545,29 +594,22 @@ export class TicketCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const crewRef = data.crew || interaction.channelId;
 
-    // Use specified crew
-    if (data.crew) {
-      const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: data.crew } });
-      await this.ticketService.sendIndividualStatus({ crewSf: crew.crewSf }, interaction.channelId);
-
-      // Try infer crew from current channel
-    } else {
-      const maybeCrew = await this.crewRepo.findOne({
-        where: { crewSf: interaction.channelId },
-      });
-      if (maybeCrew) {
-        await this.ticketService.sendIndividualStatus(maybeCrew, interaction.channelId);
-
-        // Send status for all crews
-      } else {
-        await this.ticketService.sendAllStatus(
-          { guildSf: interaction.guildId },
-          interaction.channelId,
-          member.id,
-        );
-      }
+    try {
+      await this.ticketService.sendIndividualStatus(
+        { crewSf: crewRef },
+        interaction.channelId,
+        memberRef,
+      );
+    } catch (err) {
+      this.logger.error(err, err.stack);
+      await this.ticketService.sendAllStatus(
+        { guildSf: interaction.guildId },
+        interaction.channelId,
+        memberRef,
+      );
     }
 
     await this.botService.replyOrFollowUp(interaction, {

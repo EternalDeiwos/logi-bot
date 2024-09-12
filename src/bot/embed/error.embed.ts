@@ -60,7 +60,7 @@ export const ErrorEmbed = BaseEmbed.factory({
       HowReportBugField,
     ],
   },
-  VALIDATION_ERROR: {
+  VALIDATION_FAILED: {
     title: '📝 User Input Error',
     description: 'One or more required fields are missing.',
     color: Colors.DarkRed,

@@ -18,7 +18,6 @@ export abstract class TeamService {
   abstract deleteTeam(team: SelectTeam): Promise<DeleteResult>;
   abstract reconcileGuildForumTags(guild: SelectGuild): Promise<void>;
   abstract reconcileTeamForumTags(
-    guildRef: SelectGuild,
     teamRef: SelectTeam,
     templates: ForumTagTemplate[],
   ): Promise<void>;
@@ -32,7 +31,6 @@ export class TeamServiceImpl extends TeamService {
     private readonly guildManager: GuildManager,
     private readonly botService: BotService,
     private readonly discordService: DiscordService,
-    private readonly guildService: GuildService,
     @Inject(forwardRef(() => TagService)) private readonly tagService: TagService,
     private readonly templateRepo: TagTemplateRepository,
     private readonly teamRepo: TeamRepository,
@@ -44,47 +42,29 @@ export class TeamServiceImpl extends TeamService {
     return this.teamRepo.findOneOrFail({ where: team });
   }
 
+  async getTeamByGuild(guildRef: SelectGuild) {
+    return this.teamRepo.find({ where: { guild: guildRef } });
+  }
+
   async registerTeam(team: InsertTeam) {
-    const guild = await this.guildService.getGuild({ id: team.guildId });
-    const discordGuild = await this.guildManager.fetch(guild.guildSf);
-    const forum = await discordGuild.channels.fetch(team.forumSf);
-
-    if (!forum || !forum.isThreadOnly()) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
-    }
-
-    const category = await forum.parent.fetch();
-
-    return this.teamRepo.upsert(
-      {
-        name: category.name,
-        categorySf: category.id,
-        guildId: category.guildId,
-        forumSf: forum.id,
-      },
-      ['name', 'guild', 'forum'],
-    );
+    return this.teamRepo.upsert(team, ['name', 'guildId', 'deletedAt']);
   }
 
   async deleteTeam(team: SelectTeam) {
-    return await this.teamRepo.delete(team);
+    return await this.teamRepo.updateReturning(team, { deletedAt: new Date() });
   }
 
   async reconcileGuildForumTags(guildRef: SelectGuild) {
-    const templates = await this.templateRepo.find({ where: guildRef });
-    const teams = await this.teamRepo.find({ where: guildRef });
+    const templates = await this.tagService.getTemplateByGuild(guildRef);
+    const teams = await this.teamRepo.find({ where: { guild: guildRef } });
 
     const result = await Promise.all(
-      teams.map((team) => this.reconcileTeamForumTags(guildRef, team, templates)),
+      teams.map((team) => this.reconcileTeamForumTags(team, templates)),
     );
   }
 
-  async reconcileTeamForumTags(
-    guildRef: SelectGuild,
-    teamRef: SelectTeam,
-    templates: ForumTagTemplate[],
-  ) {
-    const team = await this.teamRepo.findOneOrFail({ where: teamRef });
+  async reconcileTeamForumTags(teamRef: SelectTeam, templates: ForumTagTemplate[]) {
+    const team: Team = teamRef instanceof Team ? teamRef : await this.getTeam(teamRef);
     const tags = await team.tags;
     const filteredTemplates = templates.filter((template) => {
       return (
@@ -95,6 +75,6 @@ export class TeamServiceImpl extends TeamService {
       );
     });
 
-    return this.tagService.addTags(guildRef, teamRef, filteredTemplates);
+    return this.tagService.addTags(teamRef, filteredTemplates);
   }
 }

@@ -16,6 +16,6 @@ export class CrewShareServiceImpl extends CrewShareService {
   }
 
   async shareCrew(share: InsertCrewShare) {
-    return await this.shareRepo.upsert(share, ['target', 'channel']);
+    return await this.shareRepo.upsert(share, ['guildId', 'crewSf']);
   }
 }

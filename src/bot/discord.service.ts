@@ -120,20 +120,20 @@ export class DiscordServiceImpl extends DiscordService {
       }
     }
 
-    const channels = await guild.channels.fetch();
-    const maybeChannel = channels.find(
-      (channel) =>
-        channel.name.toLowerCase() === options.name.toLowerCase() &&
-        channel.parentId === options.parent,
-    );
+    // const channels = await guild.channels.fetch();
+    // const maybeChannel = channels.find(
+    //   (channel) =>
+    //     channel.name.toLowerCase() === options.name.toLowerCase() &&
+    //     channel.parentId === options.parent,
+    // );
 
-    if (maybeChannel) {
-      if (options.permissionOverwrites) {
-        await maybeChannel.permissionOverwrites.set(options.permissionOverwrites);
-      }
+    // if (maybeChannel) {
+    //   if (options.permissionOverwrites) {
+    //     await maybeChannel.permissionOverwrites.set(options.permissionOverwrites);
+    //   }
 
-      return maybeChannel;
-    }
+    //   return maybeChannel;
+    // }
 
     const bot = await guild.members.fetchMe();
 

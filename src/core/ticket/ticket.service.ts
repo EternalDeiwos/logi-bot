@@ -13,7 +13,7 @@ import {
   channelMention,
   userMention,
 } from 'discord.js';
-import { InternalError, ValidationError } from 'src/errors';
+import { AuthError, InternalError, ValidationError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
@@ -26,6 +26,7 @@ import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
 import { GuildService } from '../guild/guild.service';
+import { EntityNotFoundError, InsertResult } from 'typeorm';
 
 export const ticketProperties = {
   [TicketTag.ACCEPTED]: {
@@ -99,7 +100,8 @@ export const ticketProperties = {
 };
 
 export abstract class TicketService {
-  abstract createTicket(crewRef: SelectCrew, ticket?: InsertTicket);
+  abstract getTicket(ticket: SelectTicket): Promise<Ticket>;
+  abstract createTicket(crewRef: SelectCrew, ticket?: InsertTicket): Promise<InsertResult>;
 
   // Move to Ticket Control
   abstract addMovePromptToTicket(thread: ThreadChannel): Promise<void>;
@@ -131,7 +133,11 @@ export abstract class TicketService {
   abstract updateTicket(ticket: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket>;
 
   // Move to Ticket Control
-  abstract sendIndividualStatus(crewRef: SelectCrew, targetChannelRef: Snowflake): Promise<void>;
+  abstract sendIndividualStatus(
+    crewRef: SelectCrew,
+    targetChannelRef: Snowflake,
+    memberRef: Snowflake,
+  ): Promise<void>;
 
   // Move to Ticket Control
   abstract sendAllStatus(
@@ -163,6 +169,19 @@ export class TicketServiceImpl extends TicketService {
     super();
   }
 
+  async getTicket(ticketRef: SelectTicket) {
+    try {
+      return await this.ticketRepo.findOneOrFail({ where: ticketRef, withDeleted: true });
+    } catch (err) {
+      if (err instanceof EntityNotFoundError) {
+        throw new ValidationError(
+          'VALIDATION_FAILED',
+          'This action can only be performed inside a ticket thread.',
+        ).asDisplayable();
+      }
+    }
+  }
+
   async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
     const crew = await this.crewRepo.findOneOrFail({ where: crewRef, withDeleted: true });
     const guild = await this.guildManager.fetch(crew.guild.guildSf);
@@ -173,7 +192,11 @@ export class TicketServiceImpl extends TicketService {
     }
 
     if (!ticket?.name || !ticket.content || !ticket.createdBy) {
-      throw new ValidationError('VALIDATION_FAILED', 'Invalid ticket').asDisplayable();
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid ticket');
+    }
+
+    if (!ticket.updatedBy) {
+      ticket.updatedBy = ticket.createdBy;
     }
 
     const triageTag = await crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE);
@@ -213,6 +236,7 @@ export class TicketServiceImpl extends TicketService {
     const result = await this.ticketRepo.insert({
       ...ticket,
       threadSf: thread.id,
+      guildId: crew.guildId,
     });
 
     if (crew.hasMovePrompt) {
@@ -231,7 +255,7 @@ export class TicketServiceImpl extends TicketService {
     const message = await thread.fetchStarterMessage();
     await message.edit({
       components: [
-        await this.createMovePrompt(ticket, [{ crewSf: ticket.crew.crewSf }]),
+        await this.createMovePrompt({ threadSf: thread.id }, [{ crewSf: ticket.crewSf }]),
         this.createTriageControl(ticket, { accept: true }),
       ],
     });
@@ -312,12 +336,18 @@ export class TicketServiceImpl extends TicketService {
       withDeleted: true,
     });
 
-    const result = await this.createTicket(ticket.crew, {
-      ...ticketOverride,
-      createdBy: ticket.createdBy,
-    });
+    const result = await this.createTicket(
+      { crewSf: ticketOverride.crewSf },
+      {
+        name: ticket.name,
+        content: ticket.content,
+        ...ticketOverride,
+        createdBy: ticket.createdBy,
+        previousThreadSf: ticket.threadSf,
+      },
+    );
 
-    await this.updateTicket(ticketRef, TicketTag.MOVED);
+    await this.updateTicket({ ...ticketRef, updatedBy: ticketOverride.updatedBy }, TicketTag.MOVED);
   }
 
   async deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake) {
@@ -404,28 +434,6 @@ export class TicketServiceImpl extends TicketService {
     }
 
     const thread = await forum.threads.fetch(ticket.threadSf);
-
-    // let crewMember: CrewMember
-    // try {
-    //   crewMember = await this.memberRepo.findOneOrFail({
-    //     where: { channel: ticket.crew.channel, member: member.id },
-    //   });
-    // } catch (err) {
-    //   throw new DatabaseError('QUERY_FAILED', `Failed to fetch crew member`, err)
-    // }
-
-    // RBAC for ticket lifecycle changes
-    // if (
-    //   !this.memberService.requireCrewAccess(
-    //     ticket.crew.channel,
-    //     member.id,
-    //     CrewMemberAccess.MEMBER,
-    //   ) &&
-    //   tag !== TicketTag.ABANDONED &&
-    //   ticket.createdBy !== member.id
-    // ) {
-    //   throw new AuthError('FORBIDDEN', 'Only crew members can perform this action');
-    // }
 
     const result = await this.ticketRepo.updateReturning(
       { threadSf: data.threadSf },
@@ -531,9 +539,19 @@ export class TicketServiceImpl extends TicketService {
     }
   }
 
-  public async sendIndividualStatus(crewRef: SelectCrew, targetChannelRef: Snowflake) {
+  public async sendIndividualStatus(
+    crewRef: SelectCrew,
+    targetChannelRef: Snowflake,
+    memberRef: Snowflake,
+  ) {
     const crew = await this.crewService.getCrew(crewRef);
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+    const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+
+    if (!crewChannel.permissionsFor(memberRef).has(PermissionsBitField.Flags.ViewChannel, true)) {
+      throw new AuthError('FORBIDDEN', 'You do not have access to that crew').asDisplayable();
+    }
+
     const targetChannel = await discordGuild.channels.fetch(targetChannelRef);
 
     if (!targetChannel || !targetChannel.isTextBased()) {
@@ -550,8 +568,10 @@ export class TicketServiceImpl extends TicketService {
       .setTimestamp()
       .setDescription(
         `${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'}.`,
-      )
-      .setFields([
+      );
+
+    if (tickets.length) {
+      embed.setFields([
         {
           name: 'Active Tickets',
           value: tickets
@@ -562,6 +582,14 @@ export class TicketServiceImpl extends TicketService {
             .join('\n'),
         },
       ]);
+    } else {
+      embed.setFields([
+        {
+          name: 'Active Tickets',
+          value: 'None',
+        },
+      ]);
+    }
 
     if (targetChannel.id === crew.crewSf) {
       await targetChannel.send({

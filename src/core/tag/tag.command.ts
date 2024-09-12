@@ -8,11 +8,14 @@ import {
   StringOption,
   Subcommand,
 } from 'necord';
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } from 'discord.js';
+import { AuthError } from 'src/errors';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
+import { SelectGuild } from 'src/core/guild/guild.entity';
+import { GuildService } from 'src/core/guild/guild.service';
 import { TeamService } from 'src/core/team/team.service';
 import { TagService } from './tag.service';
 import { TagSelectAutocompleteInterceptor } from './tag-select.interceptor';
@@ -47,6 +50,7 @@ export class TagCommand {
 
   constructor(
     private readonly botService: BotService,
+    private readonly guildService: GuildService,
     private readonly teamService: TeamService,
     private readonly tagService: TagService,
   ) {}
@@ -60,9 +64,17 @@ export class TagCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: CreateTagCommandParams,
   ) {
-    const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.tagService.createTag(data.name, member);
-    await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a guild administrator can perform this action',
+      ).asDisplayable();
+    }
+
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const guildRef = { guildSf: interaction.guildId };
+    const result = await this.tagService.createTag(guildRef, memberRef, data.name);
+    await this.teamService.reconcileGuildForumTags(guildRef);
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Tag registered')],
     });
@@ -74,12 +86,17 @@ export class TagCommand {
     dmPermission: false,
   })
   async onSetupTags(@Context() [interaction]: SlashCommandContext) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a guild administrator can perform this action',
+      ).asDisplayable();
+    }
+
+    const guildRef: SelectGuild = { guildSf: interaction.guildId };
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const result = await this.tagService.createTicketTags(
-      { guildSf: interaction.guildId },
-      memberRef,
-    );
-    await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
+    const result = await this.tagService.createTicketTags(guildRef, memberRef);
+    await this.teamService.reconcileGuildForumTags(guildRef);
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Lifecycle tags registered')],
     });
@@ -91,6 +108,13 @@ export class TagCommand {
     dmPermission: false,
   })
   async onRefreshTags(@Context() [interaction]: SlashCommandContext) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a guild administrator can perform this action',
+      ).asDisplayable();
+    }
+
     const result = await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Refresh scheduled')],
@@ -107,6 +131,13 @@ export class TagCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectTagCommandParams,
   ) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a guild administrator can perform this action',
+      ).asDisplayable();
+    }
+
     if (!data.tag) {
       const confirm = new ButtonBuilder()
         .setCustomId('tags/destroy/all')
@@ -134,6 +165,13 @@ export class TagCommand {
 
   @Button('tags/destroy/all')
   async onTagsDeleteConfirm(@Context() [interaction]: ButtonContext) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a guild administrator can perform this action',
+      ).asDisplayable();
+    }
+
     const member = await interaction.guild.members.fetch(interaction.user);
     const result = await this.tagService.deleteTags(member);
 

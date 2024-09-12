@@ -13,9 +13,9 @@ export class CrewRepository extends CommonRepository<Crew> {
   search(guildRef: Snowflake, query: string, includeShared = false) {
     const qb = this.createQueryBuilder('crew')
       .leftJoinAndSelect('crew.team', 'team')
-      .leftJoinAndSelect('crew.parent', 'guild')
+      .leftJoinAndSelect('crew.guild', 'guild')
       .where(
-        'crew.guild_sf = :guild AND (crew.name ILIKE :query OR crew.name_short ILIKE :query)',
+        'guild.guild_sf = :guild AND (crew.name ILIKE :query OR crew.name_short ILIKE :query) AND crew.deleted_at IS NULL',
         {
           guild: guildRef,
           query: `%${query}%`,
@@ -23,9 +23,11 @@ export class CrewRepository extends CommonRepository<Crew> {
       );
 
     if (includeShared) {
-      qb.leftJoin('crew.shared', 'shared').orWhere(
-        'shared.target = :guild AND (crew.name ILIKE :query OR crew.name_short ILIKE :query)',
-      );
+      qb.leftJoin('crew.shared', 'shared')
+        .leftJoin('shared.guild', 'target_guild')
+        .orWhere(
+          'target_guild.guild_sf = :guild AND (crew.name ILIKE :query OR crew.name_short ILIKE :query)',
+        );
     }
 
     return qb;
@@ -34,14 +36,16 @@ export class CrewRepository extends CommonRepository<Crew> {
   getShared(guildRef: Snowflake, includeShared = false) {
     const qb = this.createQueryBuilder('crew')
       .leftJoinAndSelect('crew.team', 'team')
-      .where('crew.guild_sf = :guild', {
+      .leftJoinAndSelect('crew.guild', 'guild')
+      .where('guild.guild_sf = :guild', {
         guild: guildRef,
       });
 
     if (includeShared) {
       qb.leftJoin('crew.shared', 'shared')
-        .leftJoinAndSelect('crew.parent', 'guild')
-        .orWhere('shared.target = :guild');
+        .leftJoin('shared.guild', 'target_guild')
+        .leftJoinAndSelect('shared.crew', 'shared_crew')
+        .orWhere('target_guild.guild_sf = :guild');
     }
 
     return qb;

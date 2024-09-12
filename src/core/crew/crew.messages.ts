@@ -1,4 +1,5 @@
 import { userMention } from 'discord.js';
+import { Team } from 'src/core/team/team.entity';
 import { Crew } from './crew.entity';
 
 export const newCrewMessage = (member: string) =>
@@ -10,5 +11,5 @@ To run a successful crew you should do the following:
 - Advertise your crew elsewhere in the Discord so others can know to join you.
 - Continue to provide updates (or logs) as goals are complete or new goals are created.`;
 
-export const crewAuditPrompt = (crew: Crew) =>
-  `A new crew called **${crew.name}** was created under ${crew.team.name} by ${userMention(crew.createdBy)}. This prompt can be used to remove the team if there is something wrong.`;
+export const crewAuditPrompt = (crew: Crew, team: Team) =>
+  `A new crew called **${crew.name}** was created under ${team.name} by ${userMention(crew.createdBy)}. This prompt can be used to remove the team if there is something wrong.`;

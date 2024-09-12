@@ -1,22 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import {
-  ButtonInteraction,
-  ChatInputCommandInteraction,
-  ContextMenuCommandInteraction,
-  InteractionReplyOptions,
-  ModalSubmitInteraction,
-} from 'discord.js';
+import { AutocompleteInteraction, Interaction, InteractionReplyOptions } from 'discord.js';
 import { ArrayOrElement, ConsumerResponsePayload, DiscordAPIInteraction } from 'src/types';
 import { ConsumerResponseError, BaseError } from 'src/errors';
 import { ErrorEmbed } from './embed';
 
-export type CommandInteraction =
-  | ChatInputCommandInteraction
-  | ContextMenuCommandInteraction
-  | ModalSubmitInteraction
-  | ButtonInteraction;
+export type CommandInteraction = Exclude<Interaction, AutocompleteInteraction>;
 
 export abstract class BotService {
   abstract replyOrFollowUp(
@@ -25,19 +15,19 @@ export abstract class BotService {
   ): Promise<any>;
 
   abstract reportCommandError(
-    interaction: ArrayOrElement<CommandInteraction>,
+    interaction: ArrayOrElement<Interaction>,
     error: ConsumerResponseError,
   ): Promise<void>;
 
   abstract request<T = any, R = any>(
-    interaction: ArrayOrElement<CommandInteraction>,
+    interaction: ArrayOrElement<Interaction>,
     exchange: string,
     routingKey: string,
     data?: T,
   ): Promise<R>;
 
   abstract publish<T = any>(
-    interaction: ArrayOrElement<CommandInteraction>,
+    interaction: ArrayOrElement<Interaction>,
     exchange: string,
     routingKey: string,
     data?: T,
@@ -71,14 +61,16 @@ export class BotServiceImpl extends BotService {
   }
 
   async reportCommandError(
-    interaction: ArrayOrElement<CommandInteraction>,
+    interaction: ArrayOrElement<Interaction>,
     error: ConsumerResponseError,
   ): Promise<void> {
-    this.logger.error(`${error.code}: ${error.message}`, error.cause);
-
     try {
       if (Array.isArray(interaction)) {
         interaction = interaction.pop();
+      }
+
+      if (interaction instanceof AutocompleteInteraction) {
+        return;
       }
 
       const embed = ErrorEmbed.codes.includes(error.code)
@@ -91,6 +83,10 @@ export class BotServiceImpl extends BotService {
           : embed.setDescription(error.message);
       }
 
+      if (error.cause?.code) {
+        embed.setFooter({ text: `CODE: ${(error.cause as any).code}` });
+      }
+
       await this.replyOrFollowUp(interaction, { embeds: [embed] });
     } catch (err) {
       this.logger.error(err, err.stack);
@@ -99,7 +95,7 @@ export class BotServiceImpl extends BotService {
   }
 
   async request<T = any, R = any>(
-    interaction: ArrayOrElement<CommandInteraction>,
+    interaction: ArrayOrElement<Interaction>,
     exchange: string,
     routingKey: string,
     data?: T,
@@ -108,7 +104,11 @@ export class BotServiceImpl extends BotService {
       interaction = interaction.pop();
     }
 
-    if (!interaction.deferred && !interaction.replied) {
+    if (
+      !(interaction instanceof AutocompleteInteraction) &&
+      !interaction.deferred &&
+      !interaction.replied
+    ) {
       await interaction.deferReply({ ephemeral: true });
     }
 
@@ -135,7 +135,7 @@ export class BotServiceImpl extends BotService {
   }
 
   async publish<T = any>(
-    interaction: ArrayOrElement<CommandInteraction>,
+    interaction: ArrayOrElement<Interaction>,
     exchange: string,
     routingKey: string,
     data?: T,
@@ -144,7 +144,11 @@ export class BotServiceImpl extends BotService {
       interaction = interaction.pop();
     }
 
-    if (!interaction.deferred && !interaction.replied) {
+    if (
+      !(interaction instanceof AutocompleteInteraction) &&
+      !interaction.deferred &&
+      !interaction.replied
+    ) {
       await interaction.deferReply({ ephemeral: true });
     }
 

@@ -20,7 +20,7 @@ export type InsertCrewShare = DeepPartial<
 export type SelectCrewShare = DeepPartial<Pick<CrewShare, 'guildId' | 'crewSf'>>;
 
 @Entity('crew_share')
-@Unique('uk_guild_crew_deleted_at', ['guildId', 'crewSf', 'deletedAt'])
+@Unique('uk_share_target_guild_crew_deleted_at', ['guildId', 'crewSf', 'deletedAt'])
 export class CrewShare {
   /**
    * Snowflake for crew Discord channel
@@ -43,7 +43,7 @@ export class CrewShare {
   crew: Promise<Crew>;
 
   @PrimaryColumn({
-    type: 'int8',
+    type: 'uuid',
     name: 'target_guild_id',
     primaryKeyConstraintName: 'pk_crew_share',
   })

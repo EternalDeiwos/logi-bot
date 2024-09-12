@@ -10,6 +10,7 @@ import {
   DeepPartial,
   Unique,
   PrimaryColumn,
+  RelationId,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { TicketTag } from 'src/types';
@@ -35,7 +36,7 @@ export type InsertTeam = DeepPartial<
 export type SelectTeam = DeepPartial<Pick<Team, 'id'>>;
 
 @Entity()
-@Unique('uk_name_guild_id_team', ['name', 'guildId'])
+@Unique('uk_name_guild_id_team', ['name', 'guildId', 'deletedAt'])
 export class Team {
   @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_team_id' })
   id: string;
@@ -45,6 +46,7 @@ export class Team {
   name: string;
 
   @Column({ type: 'int8', name: 'guild_id' })
+  @RelationId((team: Team) => team.guild)
   @Index('guild_id_idx_team')
   guildId: string;
 
@@ -72,7 +74,7 @@ export class Team {
   @Index('category_channel_sf_idx_team')
   categorySf: Snowflake;
 
-  @OneToMany(() => ForumTag, (tag) => tag.team, { eager: true })
+  @OneToMany(() => ForumTag, (tag) => tag.team)
   tags: Promise<ForumTag[]>;
 
   @OneToMany(() => Crew, (crew) => crew.team)

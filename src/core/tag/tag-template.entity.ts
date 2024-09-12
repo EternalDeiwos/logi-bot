@@ -36,6 +36,9 @@ export class ForumTagTemplate {
   @Column({ default: false, comment: 'Is the tag applied automatically?' })
   default: boolean;
 
+  @Column({ nullable: true })
+  emoji: string;
+
   @Column({ type: 'int8', name: 'guild_id' })
   @Index('guild_id_idx_tag_template')
   guildId: string;

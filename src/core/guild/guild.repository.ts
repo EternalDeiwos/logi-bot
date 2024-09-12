@@ -15,7 +15,7 @@ export class GuildRepository extends CommonRepository<Guild> {
     });
 
     if (exclude) {
-      qb.andWhere('guild.guild != :exclude', { exclude });
+      qb.andWhere('guild.guild_sf != :exclude', { exclude });
     }
 
     return qb.getMany();

@@ -45,7 +45,8 @@ export type DeleteCrew = SelectCrew & { deletedBySf?: Snowflake };
 export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
 
 @Entity()
-@Unique('uk_guild_name_deleted_at', ['guild', 'shortName', 'deletedAt'])
+@Unique('uk_guild_name_deleted_at', ['guildId', 'shortName', 'deletedAt'])
+@Unique('uk_guild_crew_deleted_at', ['guildId', 'crewSf', 'deletedAt'])
 export class Crew {
   /**
    * Snowflake for crew Discord channel
@@ -133,10 +134,6 @@ export class Crew {
 
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
-
-  get isDeleted() {
-    return Boolean(this.deletedAt);
-  }
 
   async getCrewTag() {
     const tags = await this.team.tags;

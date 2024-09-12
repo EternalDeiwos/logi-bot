@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { DeleteResult, Equal, InsertResult } from 'typeorm';
+import { DeleteResult, Equal, InsertResult, IsNull } from 'typeorm';
 import { GuildManager, GuildMember, PermissionsBitField, Snowflake } from 'discord.js';
 import { DatabaseError, ExternalError, InternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
@@ -29,7 +29,18 @@ export abstract class CrewMemberService {
   abstract requireCrewAccess(
     channelRef: Snowflake,
     memberRef: Snowflake,
+    checkAdmin?: boolean,
+  ): Promise<boolean>;
+  abstract requireCrewAccess(
+    channelRef: Snowflake,
+    memberRef: Snowflake,
     access?: CrewMemberAccess,
+  ): Promise<boolean>;
+  abstract requireCrewAccess(
+    channelRef: Snowflake,
+    memberRef: Snowflake,
+    access?: CrewMemberAccess,
+    checkAdmin?: boolean,
   ): Promise<boolean>;
 }
 
@@ -61,27 +72,13 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid member reference');
     }
 
-    let crew: Crew;
-    try {
-      crew = await this.crewRepo.findOneOrFail({
-        where: { crewSf: channelRef },
-        withDeleted: true,
-      });
-    } catch (err) {
-      throw new DatabaseError('QUERY_FAILED', `Unable to find crew ${channelRef}`, err);
-    }
+    const crew = await this.crewRepo.findOneOrFail({
+      where: { crewSf: channelRef },
+      withDeleted: true,
+    });
 
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
-
-    try {
-      return await discordGuild.members.fetch(memberRef);
-    } catch (err) {
-      throw new ExternalError(
-        'DISCORD_API_ERROR',
-        `Failed to resolve member ${memberRef} in ${discordGuild.name}`,
-        err,
-      );
-    }
+    return await discordGuild.members.fetch(memberRef);
   }
 
   async registerCrewMember(
@@ -102,19 +99,23 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
     return await this.memberRepo.upsert(
       {
-        memberSf: member.id,
+        memberSf: memberRef,
         guildId: crew.guildId,
         name: member.displayName,
         access,
         crewSf: crew.crewSf,
       },
-      ['guild', 'member'],
+      ['crewSf', 'memberSf', 'deletedAt'],
     );
   }
 
   async updateCrewMember(crewMember: SelectCrewMember, data: UpdateCrewMember) {
     const result = await this.memberRepo.updateReturning(
-      { crewSf: Equal(crewMember.crewSf), memberSf: Equal(crewMember.memberSf) },
+      {
+        crewSf: Equal(crewMember.crewSf),
+        memberSf: Equal(crewMember.memberSf),
+        deletedAt: IsNull(),
+      },
       data,
     );
 
@@ -141,28 +142,38 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       }
     }
 
-    return await this.memberRepo.delete({ memberSf: memberRef, crewSf: channelRef });
+    return await this.memberRepo.updateReturning(
+      { memberSf: Equal(memberRef), crewSf: Equal(channelRef), deletedAt: IsNull() },
+      { deletedAt: new Date() },
+    );
   }
 
   async requireCrewAccess(
     channelRef: Snowflake,
     memberRef: Snowflake,
-    access: CrewMemberAccess = CrewMemberAccess.MEMBER,
+    access?: CrewMemberAccess | boolean,
+    checkAdmin = true,
   ): Promise<boolean> {
-    const member = await this.resolveGuildMember(memberRef, channelRef);
-
-    let crewMember: CrewMember;
-    try {
-      crewMember = await this.memberRepo.findOne({
-        where: { crewSf: channelRef, memberSf: memberRef },
-      });
-    } catch (err) {
-      throw new DatabaseError('QUERY_FAILED', `Failed to fetch crew member`, err);
+    // Resolve multiple signatures
+    if (typeof access === 'boolean') {
+      checkAdmin = access;
+      access = CrewMemberAccess.MEMBER;
     }
 
+    const crew = await this.crewService.getCrew({ crewSf: channelRef });
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+    const member = await discordGuild.members.fetch(memberRef);
+
+    const crewMember = await this.memberRepo.findOneBy({
+      crewSf: Equal(channelRef),
+      memberSf: Equal(memberRef),
+      deletedAt: IsNull(),
+    });
+
     return (
-      member.permissions.has(PermissionsBitField.Flags.Administrator) ||
-      member.roles.highest.permissions.has(PermissionsBitField.Flags.Administrator) ||
+      (checkAdmin &&
+        (member.permissions.has(PermissionsBitField.Flags.Administrator) ||
+          member.roles.highest.permissions.has(PermissionsBitField.Flags.Administrator))) ||
       (crewMember && crewMember.access <= access)
     );
   }

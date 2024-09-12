@@ -7,7 +7,7 @@ import { Guild, InsertGuild, SelectGuild } from './guild.entity';
 export abstract class GuildService {
   abstract getGuild(guild: SelectGuild): Promise<Guild>;
   abstract registerGuild(guild: InsertGuild): Promise<InsertResult>;
-  abstract searchGuild(query: string, exclude?: string): Promise<Guild[]>;
+  abstract search(query: string, exclude?: string): Promise<Guild[]>;
   abstract updateGuild(guildRef: Snowflake, guild: InsertGuild): Promise<Guild>;
   abstract setConfig(...args: Parameters<GuildRepository['setConfig']>): Promise<Guild>;
 }
@@ -20,15 +20,15 @@ export class GuildServiceImpl extends GuildService {
     super();
   }
 
-  async getGuild(guild: SelectGuild) {
-    return this.guildRepo.findOneByOrFail(guild);
+  async getGuild(guildRef: SelectGuild) {
+    return this.guildRepo.findOneOrFail({ where: guildRef, withDeleted: false });
   }
 
   async registerGuild(guild: InsertGuild) {
-    return this.guildRepo.upsert(guild, ['guild']);
+    return this.guildRepo.upsert(guild, ['guildSf', 'deletedAt']);
   }
 
-  async searchGuild(query: string, exclude?: string) {
+  async search(query: string, exclude?: string) {
     return this.guildRepo.searchByName(query, exclude);
   }
 

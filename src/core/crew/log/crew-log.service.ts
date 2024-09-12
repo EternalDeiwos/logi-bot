@@ -40,11 +40,6 @@ export class CrewLogServiceImpl extends CrewLogService {
 
   async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLog) {
     const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
-
-    if (!crew) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid crew');
-    }
-
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
 
@@ -52,11 +47,7 @@ export class CrewLogServiceImpl extends CrewLogService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
-    const member = await this.memberService.resolveGuildMember(channelRef, memberRef);
-
-    if (!this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.MEMBER)) {
-      throw new AuthError('FORBIDDEN', 'Not a member of this crew');
-    }
+    const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
 
     const createdAt = new Date();
     const embed = new EmbedBuilder()
@@ -71,6 +62,18 @@ export class CrewLogServiceImpl extends CrewLogService {
       embeds: [embed],
       allowedMentions: { roles: [crew.roleSf] },
     });
+
+    if (crew.guild?.config?.globalLogChannel) {
+      const logChannel = await discordGuild.channels.fetch(crew.guild.config.globalLogChannel);
+
+      if (!logChannel || !logChannel.isTextBased()) {
+        throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
+      }
+
+      await logChannel.send({
+        embeds: [embed.setTitle(crew.name)],
+      });
+    }
 
     await message.pin();
 
