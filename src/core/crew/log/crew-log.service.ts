@@ -53,8 +53,12 @@ export class CrewLogServiceImpl extends CrewLogService {
     const embed = new EmbedBuilder()
       .setTitle('Crew Update')
       .setColor('DarkGreen')
-      .setThumbnail(member.avatarURL() ?? member.user.avatarURL())
+      .setThumbnail(discordGuild.iconURL())
       .setDescription(data.content)
+      .setFooter({
+        iconURL: member.avatarURL() ?? member.user.avatarURL(),
+        text: `Submitted by ${member.displayName}`,
+      })
       .setTimestamp(createdAt);
 
     const message = await channel.send({
