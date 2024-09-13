@@ -44,7 +44,6 @@ import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
-import { TicketRepository } from './ticket.repository';
 import {
   crewPromptStatusInstructions,
   proxyTicketMessage,
@@ -90,7 +89,6 @@ export class TicketCommand {
     private readonly crewRepo: CrewRepository,
     private readonly memberService: CrewMemberService,
     private readonly ticketService: TicketService,
-    private readonly ticketRepo: TicketRepository,
   ) {}
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -313,13 +311,15 @@ export class TicketCommand {
     }
 
     const crew = await this.crewService.getCrew({ crewSf: selected });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Moving ticket')],
+    });
+
     const result = await this.ticketService.moveTicket(
       { threadSf: threadRef },
       { guildId: crew.guildId, crewSf: selected, updatedBy: memberRef },
     );
-    await this.botService.replyOrFollowUp(interaction, {
-      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket moved')],
-    });
   }
 
   @Modal('ticket/create/:crew')

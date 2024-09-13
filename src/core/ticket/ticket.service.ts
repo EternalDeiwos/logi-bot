@@ -164,8 +164,6 @@ export class TicketServiceImpl extends TicketService {
     private readonly guildService: GuildService,
     private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
-    private readonly memberService: CrewMemberService,
-    private readonly teamService: TeamService,
     private readonly ticketRepo: TicketRepository,
   ) {
     super();
@@ -186,8 +184,8 @@ export class TicketServiceImpl extends TicketService {
 
   async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
     const crew = await this.crewRepo.findOneOrFail({ where: crewRef, withDeleted: true });
-    const guild = await this.guildManager.fetch(crew.guild.guildSf);
-    const forum = await guild.channels.fetch(crew.team.forumSf);
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+    const forum = await discordGuild.channels.fetch(crew.team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
@@ -222,11 +220,35 @@ export class TicketServiceImpl extends TicketService {
       .setTitle('New Ticket')
       .setDescription(ticketTriageMessage(ticket.createdBy, crew.roleSf));
 
+    const embeds = [prompt];
+
+    if (ticket.previousThreadSf) {
+      const originalGuildRef = await this.ticketRepo.getOriginalGuild({
+        threadSf: ticket.previousThreadSf,
+      });
+
+      if (originalGuildRef.id !== crew.guildId) {
+        const originalGuild = await this.guildService.getGuild(originalGuildRef);
+        const embed = new EmbedBuilder()
+          .setColor('DarkGreen')
+          .setTitle(`Incoming Request from ${originalGuild.name}`)
+          .setDescription(
+            `This ticket was moved from ${originalGuild.name}. The ticket author might not have joined the server yet so please be patient.`,
+          );
+
+        if (originalGuild.icon) {
+          embed.setThumbnail(originalGuild.icon);
+        }
+
+        embeds.push(embed);
+      }
+    }
+
     const thread = await forum.threads.create({
       name: ticket.name,
       message: {
         content: newTicketMessage(ticket.content, ticket.createdBy, crew.roleSf),
-        embeds: [prompt],
+        embeds,
         allowedMentions: {
           users: [ticket.createdBy],
           roles: crew.hasMovePrompt ? [] : [crew.roleSf],
