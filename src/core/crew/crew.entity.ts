@@ -59,6 +59,9 @@ export class Crew {
   })
   crewSf: Snowflake;
 
+  @Column({ type: 'int8', name: 'voice_channel_sf', nullable: true })
+  voiceSf?: Snowflake;
+
   @Column({ type: 'int8', name: 'guild_id' })
   @RelationId((crew: Crew) => crew.guild)
   @Index('guild_id_idx_crew')

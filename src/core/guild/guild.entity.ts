@@ -15,6 +15,7 @@ export type SelectGuild = DeepPartial<Pick<Guild, 'id' | 'guildSf'>>;
 export type GuildConfig = {
   crewAuditChannel?: string;
   globalLogChannel?: string;
+  globalVoiceCategory?: string;
   ticketTriageCrew?: string;
   crewCreatorRole?: string;
   crewViewerRole?: string;

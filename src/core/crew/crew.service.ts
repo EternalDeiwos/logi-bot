@@ -10,6 +10,7 @@ import {
   EmbedBuilder,
   GuildManager,
   GuildTextBasedChannel,
+  OverwriteResolvable,
   PermissionsBitField,
   Snowflake,
   channelMention,
@@ -39,11 +40,15 @@ import { CrewRepository } from './crew.repository';
 import { CrewMemberService } from './member/crew-member.service';
 import { crewAuditPrompt, newCrewMessage } from './crew.messages';
 
+type RegisterCrewOptions = Partial<{
+  createVoice: boolean;
+}>;
+
 export abstract class CrewService {
   abstract getCrew(crewRef: SelectCrew): Promise<Crew>;
   abstract getCrewByRole(roleRef: Snowflake): Promise<Crew>;
   abstract getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake): Promise<Crew[]>;
-  abstract registerCrew(data: InsertCrew): Promise<Crew>;
+  abstract registerCrew(data: InsertCrew, options?: RegisterCrewOptions): Promise<Crew>;
   abstract deregisterCrew(
     channelRef: Snowflake,
     memberRef: Snowflake,
@@ -113,7 +118,7 @@ export class CrewServiceImpl extends CrewService {
     });
   }
 
-  async registerCrew(data: InsertCrew) {
+  async registerCrew(data: InsertCrew, options: RegisterCrewOptions = {}) {
     const teamRef: SelectTeam = { id: data.teamId };
     const team = await this.teamService.getTeam(teamRef);
     const discordGuild = await this.guildManager.fetch(team.guild.guildSf);
@@ -180,10 +185,17 @@ export class CrewServiceImpl extends CrewService {
       id: discordGuild.roles.everyone.id,
       deny: [PermissionsBitField.Flags.ViewChannel],
     };
-    const permissionOverwrites = [];
+
+    const botMember = await discordGuild.members.fetchMe();
+    const permissionOverwrites: OverwriteResolvable[] = [
+      {
+        id: discordGuild.roles.botRoleFor(botMember),
+        allow: [PermissionsBitField.Flags.ViewChannel],
+      },
+    ];
 
     if (team.guild?.config?.crewViewerRole) {
-      if (!permissionOverwrites.length) {
+      if (permissionOverwrites.length <= 1) {
         permissionOverwrites.push(denyEveryone);
       }
 
@@ -194,7 +206,7 @@ export class CrewServiceImpl extends CrewService {
     }
 
     if (team.guild?.config?.crewCreatorRole) {
-      if (!permissionOverwrites.length) {
+      if (permissionOverwrites.length <= 1) {
         permissionOverwrites.push(denyEveryone);
       }
 
@@ -223,6 +235,23 @@ export class CrewServiceImpl extends CrewService {
         teamId: team.id,
       }),
     );
+
+    if (options.createVoice) {
+      const parent = team.guild.config.globalVoiceCategory
+        ? team.guild.config.globalVoiceCategory
+        : team.categorySf;
+      const voiceChannel = await this.discordService.ensureChannel(
+        team.guild.guildSf,
+        data.crewSf,
+        {
+          name: `${prefix}c-${data.slug}`,
+          parent,
+          type: ChannelType.GuildVoice,
+          permissionOverwrites,
+        },
+      );
+      crew.voiceSf = voiceChannel.id;
+    }
 
     // Create audit prompt
     this.logger.debug(JSON.stringify(crew), JSON.stringify(team.guild));
@@ -328,7 +357,6 @@ export class CrewServiceImpl extends CrewService {
       }),
     );
 
-    // TODO: finish refactor
     try {
       const tagTemplate = await this.templateRepo.findOneOrFail({
         where: { crewSf: crew.crewSf },
@@ -344,6 +372,12 @@ export class CrewServiceImpl extends CrewService {
 
     if (!discussion || !discussion.isTextBased()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
+    }
+
+    const voice = crew.voiceSf && (await discordGuild.channels.fetch(crew.voiceSf));
+
+    if (crew.voiceSf && !voice.isVoiceBased()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid voice channel');
     }
 
     const role = await discordGuild.roles.fetch(crew.roleSf);
@@ -378,6 +412,7 @@ export class CrewServiceImpl extends CrewService {
               parent: archiveTargetCategory as CategoryChannel,
             }),
             role.delete(),
+            voice.delete(),
           ]);
         } catch (err) {
           throw new ExternalError('DISCORD_API_ERROR', 'Failed to archive channel', err);
@@ -390,7 +425,7 @@ export class CrewServiceImpl extends CrewService {
       }
     } else {
       try {
-        await Promise.all([discussion.delete(), role.delete()]);
+        await Promise.all([discussion.delete(), role.delete(), voice.delete()]);
       } catch (err) {
         throw new ExternalError('DISCORD_API_ERROR', '');
       }

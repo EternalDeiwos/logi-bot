@@ -80,6 +80,13 @@ export class CreateCrewCommandParams {
     required: false,
   })
   movePrompt: boolean = false;
+
+  @BooleanOption({
+    name: 'voice_channel',
+    description: 'Should the crew have a voice channel?',
+    required: false,
+  })
+  voice: boolean = false;
 }
 
 export class SelectCrewCommandParams {
@@ -236,13 +243,16 @@ export class CrewCommand {
       throw new AuthError('FORBIDDEN', 'Not allowed to create crews').asDisplayable();
     }
 
-    const crew = await this.crewService.registerCrew({
-      name: data.name,
-      shortName: data.shortName,
-      hasMovePrompt: data.movePrompt,
-      teamId: data.team,
-      createdBy: memberRef,
-    });
+    const crew = await this.crewService.registerCrew(
+      {
+        name: data.name,
+        shortName: data.shortName,
+        hasMovePrompt: data.movePrompt,
+        teamId: data.team,
+        createdBy: memberRef,
+      },
+      { createVoice: data.voice },
+    );
 
     await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
 

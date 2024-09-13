@@ -45,6 +45,16 @@ export class SelectGuildCommandParams {
   guild: string;
 }
 
+export class SetCategoryCommandParams {
+  @ChannelOption({
+    name: 'category',
+    description: 'A category to place new channels',
+    channel_types: [ChannelType.GuildCategory],
+    required: true,
+  })
+  category: GuildChannel;
+}
+
 export class SetRoleCommandParams {
   @RoleOption({
     name: 'role',
@@ -233,5 +243,21 @@ export class GuildCommand {
     }
 
     return this.setConfig('globalLogChannel', context, audit.id);
+  }
+
+  @Subcommand({
+    name: 'set_voice_category',
+    description: 'Set the category where voice channels will be created. Guild Admin only',
+    dmPermission: false,
+  })
+  async onGuildSetVoiceCategory(
+    @Context() context: SlashCommandContext,
+    @Options() { category }: SetCategoryCommandParams,
+  ) {
+    if (!category) {
+      throw new ValidationError('VALIDATION_FAILED', 'Category not provided');
+    }
+
+    return this.setConfig('globalVoiceCategory', context, category.id);
   }
 }
