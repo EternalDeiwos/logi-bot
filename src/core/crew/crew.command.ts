@@ -508,11 +508,18 @@ export class CrewCommand {
       throw new AuthError('FORBIDDEN', 'You are not a member of this team').asDisplayable();
     }
 
-    const crewMember = await this.memberRepo.findOne({
-      where: { crewSf: channelRef, memberSf: memberRef },
+    const targetMember = await this.memberRepo.findOne({
+      where: { crewSf: channelRef, memberSf: data.member.id },
     });
 
-    await this.memberService.updateCrewMember(crewMember, {
+    if (!targetMember) {
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        `${data.member} is not a member of this team`,
+      ).asDisplayable();
+    }
+
+    await this.memberService.updateCrewMember(targetMember, {
       access: CrewMemberAccess.ADMIN,
     });
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { DeepPartial, EntityNotFoundError, UpdateResult } from 'typeorm';
+import { EntityNotFoundError, UpdateResult } from 'typeorm';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -9,7 +9,6 @@ import {
   DiscordAPIError,
   EmbedBuilder,
   GuildManager,
-  GuildMember,
   GuildTextBasedChannel,
   PermissionsBitField,
   Snowflake,
