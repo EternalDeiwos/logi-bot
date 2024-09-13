@@ -89,6 +89,22 @@ export const ErrorEmbed = BaseEmbed.factory({
       HowReportBugField,
     ],
   },
+  INSUFFICIENT_PRIVILEGES: {
+    title: '🤖 Insufficient Privileges',
+    description: 'The bot does not have enough access to complete your request',
+    color: Colors.DarkRed,
+    fields: [
+      {
+        name: 'What can I do?',
+        value:
+          'Notify your guild administrators to address this issue. Try to explain what you were trying to do and show them a screenshot of this message.',
+      },
+      {
+        name: `Troubleshooting`,
+        value: `A guild administrator should check the following:\n1. The bot requires the manage channel and manage roles privileges to function, among others. Do not remove permissions that the bot needs.\n2. The bot requires access to channels and categories it uses. Make sure that you have granted the appropriate permissions. You do not have to worry about the channels and roles created by the bot as it will ensure those permissions automatically.\n3. Roles managed by the bot must be ordered below the bot role or they cannot be managed, even if the bot has the manage roles permission.`,
+      },
+    ],
+  },
   ERROR_GENERIC: {
     titlePrefix: '🚫',
     color: Colors.DarkRed,

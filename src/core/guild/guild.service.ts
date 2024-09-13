@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InsertResult } from 'typeorm';
 import { Snowflake } from 'discord.js';
+import { InternalError } from 'src/errors';
 import { GuildRepository } from './guild.repository';
 import { Guild, InsertGuild, SelectGuild } from './guild.entity';
 
@@ -21,7 +22,12 @@ export class GuildServiceImpl extends GuildService {
   }
 
   async getGuild(guildRef: SelectGuild) {
-    return this.guildRepo.findOneOrFail({ where: guildRef, withDeleted: false });
+    if (!guildRef.id && !guildRef.guildSf) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'No guild value supplied');
+    }
+
+    const where = guildRef.id ? { id: guildRef.id } : { guildSf: guildRef.guildSf };
+    return this.guildRepo.findOneOrFail({ where });
   }
 
   async registerGuild(guild: InsertGuild) {

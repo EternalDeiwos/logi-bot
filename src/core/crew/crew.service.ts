@@ -441,6 +441,10 @@ export class CrewServiceImpl extends CrewService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
+    if (crew.isSecureOnly && !(await this.discordService.isChannelPrivate(targetChannel))) {
+      throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
+    }
+
     const fields: { name: string; value: string }[] = [];
     const members = await crew.members;
     const logs = await crew.logs;
@@ -500,25 +504,20 @@ export class CrewServiceImpl extends CrewService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
-    if (!targetChannel || !targetChannel.isTextBased()) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
-    }
-
+    const targetChannelSecure = await this.discordService.isChannelPrivate(targetChannel);
     const fields: { name: string; value: string }[] = [];
 
     const crews = await this.crewRepo.find({ where: { guild: guildRef } });
-    const accessibleCrews = crews.filter((crew) => {
-      try {
-        return member.permissionsIn(crew.crewSf).has(PermissionsBitField.Flags.ViewChannel);
-      } catch (err) {
-        this.logger.warn(
-          `Failed to test channel permissions for crew ${crew.name}: ${err.message}`,
-        );
-        return false;
-      }
-    });
+    for (const crew of crews) {
+      const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
 
-    for (const crew of accessibleCrews) {
+      if (
+        !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||
+        (crew.isSecureOnly && !targetChannelSecure)
+      ) {
+        continue;
+      }
+
       const members = await crew.members;
       const logs = await crew.logs;
 

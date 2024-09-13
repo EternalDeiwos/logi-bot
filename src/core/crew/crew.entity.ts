@@ -40,7 +40,7 @@ export type InsertCrew = DeepPartial<
   >
 >;
 export type SelectCrew = DeepPartial<Pick<Crew, 'crewSf'>>;
-export type UpdateCrew = DeepPartial<Pick<Crew, 'hasMovePrompt' | 'isPermanent'>>;
+export type UpdateCrew = DeepPartial<Pick<Crew, 'hasMovePrompt' | 'isPermanent' | 'isSecureOnly'>>;
 export type DeleteCrew = SelectCrew & { deletedBySf?: Snowflake };
 export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
 
@@ -102,11 +102,29 @@ export class Crew {
   @Index('audit_message_sf_idx_crew')
   auditMessageSf: Snowflake;
 
-  @Column({ type: 'boolean', name: 'enable_move_prompt', default: false })
+  @Column({
+    type: 'boolean',
+    name: 'enable_move_prompt',
+    default: false,
+    comment: 'Tickets for this crew will display the move dialog by default',
+  })
   hasMovePrompt: boolean;
 
-  @Column({ type: 'boolean', name: 'is_permanent', default: false })
+  @Column({
+    type: 'boolean',
+    name: 'is_permanent',
+    default: false,
+    comment: 'Crew will not be archived during a purge',
+  })
   isPermanent: boolean;
+
+  @Column({
+    type: 'boolean',
+    name: 'secure_only',
+    default: true,
+    comment: 'Crew information to be displayed only in private channels',
+  })
+  isSecureOnly: boolean;
 
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: Promise<CrewMember[]>;

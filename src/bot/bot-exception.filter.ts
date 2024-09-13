@@ -2,7 +2,7 @@ import { ExceptionFilter, Catch, Logger, Inject, ArgumentsHost } from '@nestjs/c
 import { NecordArgumentsHost, NecordContextType } from 'necord';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
 import { DiscordAPIError } from 'discord.js';
-import { BaseError, DatabaseError, ExternalError, ValidationError } from 'src/errors';
+import { AuthError, BaseError, DatabaseError, ExternalError, ValidationError } from 'src/errors';
 import { BotService, CommandInteraction } from './bot.service';
 
 type CaughtErrors = Error | BaseError;
@@ -68,6 +68,11 @@ export class DiscordExceptionFilter implements ExceptionFilter<CaughtErrors> {
     // 40061 = Tag name must be unique
     if ([40061].includes(exception.code as number)) {
       return new ValidationError('VALIDATION_FAILED', exception.message).asDisplayable();
+    }
+
+    // 50013 = Missing Permissions
+    if ([50013].includes(exception.code as number)) {
+      return new ExternalError('INSUFFICIENT_PRIVILEGES', 'Bot requires additional privileges');
     }
 
     return new ExternalError('DISCORD_API_ERROR', 'Unknown', exception);

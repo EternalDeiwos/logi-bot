@@ -156,6 +156,22 @@ export class GuildCommand {
   }
 
   @Subcommand({
+    name: 'set_crew_leader_role',
+    description: 'Specify a role to be assigned to crew owners. Guild Admin only',
+    dmPermission: false,
+  })
+  async onGuildSetCrewLeaderRole(
+    @Context() context: SlashCommandContext,
+    @Options() { role }: SetRoleCommandParams,
+  ) {
+    if (!role) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
+    }
+
+    return this.setConfig('crewLeaderRole', context, role.id);
+  }
+
+  @Subcommand({
     name: 'set_crew_creator',
     description: 'Set the role who can create crews. Guild Admin only',
     dmPermission: false,

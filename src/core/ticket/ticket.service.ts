@@ -13,8 +13,11 @@ import {
   channelMention,
   userMention,
 } from 'discord.js';
+import { EntityNotFoundError, InsertResult } from 'typeorm';
 import { AuthError, InternalError, ValidationError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
+import { DiscordService } from 'src/bot/discord.service';
+import { GuildService } from 'src/core/guild/guild.service';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { CrewService } from 'src/core/crew/crew.service';
@@ -25,8 +28,6 @@ import { TeamService } from 'src/core/team/team.service';
 import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
-import { GuildService } from '../guild/guild.service';
-import { EntityNotFoundError, InsertResult } from 'typeorm';
 
 export const ticketProperties = {
   [TicketTag.ACCEPTED]: {
@@ -159,6 +160,7 @@ export class TicketServiceImpl extends TicketService {
 
   constructor(
     private readonly guildManager: GuildManager,
+    private readonly discordService: DiscordService,
     private readonly guildService: GuildService,
     private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
@@ -558,6 +560,10 @@ export class TicketServiceImpl extends TicketService {
       throw new ValidationError('VALIDATION_FAILED', 'Invalid channel').asDisplayable();
     }
 
+    if (crew.isSecureOnly && !(await this.discordService.isChannelPrivate(targetChannel))) {
+      throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
+    }
+
     const tickets = await crew.tickets;
     const members = await crew.members;
     const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
@@ -615,17 +621,8 @@ export class TicketServiceImpl extends TicketService {
       throw new ValidationError('VALIDATION_FAILED', 'Invalid channel').asDisplayable();
     }
 
+    const targetChannelSecure = await this.discordService.isChannelPrivate(targetChannel);
     const crews = await this.crewRepo.find({ where: { guildId: guild.id } });
-    const accessibleCrews = crews.filter((crew) => {
-      try {
-        return member.permissionsIn(crew.crewSf).has(PermissionsBitField.Flags.ViewChannel);
-      } catch (err) {
-        this.logger.warn(
-          `Failed to test channel permissions for crew ${crew.name}: ${err.message}`,
-        );
-        return false;
-      }
-    });
 
     const embed = new EmbedBuilder()
       .setTitle('Ticket Status')
@@ -635,7 +632,17 @@ export class TicketServiceImpl extends TicketService {
 
     const crewSummary: string[] = [];
     const fields: { name: string; value: string }[] = [];
-    for (const crew of accessibleCrews) {
+
+    for (const crew of crews) {
+      const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+
+      if (
+        !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||
+        (crew.isSecureOnly && !targetChannelSecure)
+      ) {
+        continue;
+      }
+
       const members = await crew.members;
       const tickets = await crew.tickets;
       const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);

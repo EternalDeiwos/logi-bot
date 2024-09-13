@@ -7,7 +7,9 @@ import {
   GuildForumTagData,
   RoleCreateOptions,
   Role,
+  GuildChannel,
   GuildBasedChannel,
+  Guild,
 } from 'discord.js';
 import _ from 'lodash';
 import { SelectTag } from 'src/core/tag/tag.entity';
@@ -44,6 +46,9 @@ export abstract class DiscordService {
     forumSf: Snowflake,
     tags: SelectTag[],
   ): Promise<GuildForumTagData[]>;
+
+  abstract isChannelPrivate(channel: GuildBasedChannel): Promise<boolean>;
+  abstract isChannelPrivate(guildRef: Snowflake, channelRef: Snowflake): Promise<boolean>;
 }
 
 @Injectable()
@@ -210,5 +215,25 @@ export class DiscordServiceImpl extends DiscordService {
     await forum.setAvailableTags(keep);
 
     return deleted;
+  }
+
+  async isChannelPrivate(
+    maybeChannel: Snowflake | GuildBasedChannel,
+    channelRef?: Snowflake,
+  ): Promise<boolean> {
+    let channel: GuildBasedChannel;
+    let guild: Guild;
+
+    if (maybeChannel instanceof GuildChannel) {
+      channel = maybeChannel;
+      guild = channel.guild;
+    } else {
+      guild = await this.guildManager.fetch(maybeChannel);
+      channel = await guild.channels.fetch(channelRef);
+    }
+
+    return !channel
+      .permissionsFor(guild.roles.everyone, false)
+      .has(PermissionsBitField.Flags.ViewChannel);
   }
 }

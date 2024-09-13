@@ -31,15 +31,15 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { AuthError, InternalError } from 'src/errors';
-import { CrewMemberAccess } from 'src/types';
 import { BotService } from 'src/bot/bot.service';
-import { ErrorEmbed, PromptEmbed, SuccessEmbed } from 'src/bot/embed';
+import { PromptEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
+import { Crew } from 'src/core/crew/crew.entity';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
@@ -594,17 +594,23 @@ export class TicketCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
+    let crew: Crew;
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const crewRef = data.crew || interaction.channelId;
 
     try {
+      crew = await this.crewService.getCrew({ crewSf: crewRef });
+    } catch {
+      // NOOP
+    }
+
+    if (crew) {
       await this.ticketService.sendIndividualStatus(
         { crewSf: crewRef },
         interaction.channelId,
         memberRef,
       );
-    } catch (err) {
-      this.logger.error(err, err.stack);
+    } else {
       await this.ticketService.sendAllStatus(
         { guildSf: interaction.guildId },
         interaction.channelId,

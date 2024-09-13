@@ -1,14 +1,8 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { GuildManager } from 'discord.js';
 import { DeleteResult, InsertResult } from 'typeorm';
-import { InternalError } from 'src/errors';
-import { BotService } from 'src/bot/bot.service';
-import { DiscordService } from 'src/bot/discord.service';
 import { TagService } from 'src/core/tag/tag.service';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
-import { TagTemplateRepository } from 'src/core/tag/tag-template.repository';
 import { SelectGuild } from 'src/core/guild/guild.entity';
-import { GuildService } from 'src/core/guild/guild.service';
 import { TeamRepository } from './team.repository';
 import { InsertTeam, SelectTeam, Team } from './team.entity';
 
@@ -28,11 +22,7 @@ export class TeamServiceImpl extends TeamService {
   private readonly logger = new Logger(TeamService.name);
 
   constructor(
-    private readonly guildManager: GuildManager,
-    private readonly botService: BotService,
-    private readonly discordService: DiscordService,
     @Inject(forwardRef(() => TagService)) private readonly tagService: TagService,
-    private readonly templateRepo: TagTemplateRepository,
     private readonly teamRepo: TeamRepository,
   ) {
     super();

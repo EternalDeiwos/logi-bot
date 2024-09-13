@@ -18,6 +18,7 @@ export type GuildConfig = {
   ticketTriageCrew?: string;
   crewCreatorRole?: string;
   crewViewerRole?: string;
+  crewLeaderRole?: string;
 };
 
 @Entity()

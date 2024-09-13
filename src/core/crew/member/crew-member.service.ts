@@ -1,8 +1,10 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { DeleteResult, Equal, InsertResult, IsNull } from 'typeorm';
+import { DeleteResult, Equal, InsertResult, IsNull, UpdateResult } from 'typeorm';
 import { GuildManager, GuildMember, PermissionsBitField, Snowflake } from 'discord.js';
 import { DatabaseError, ExternalError, InternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
+import { SelectGuild } from 'src/core/guild/guild.entity';
+import { GuildService } from 'src/core/guild/guild.service';
 import { Crew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
@@ -22,7 +24,7 @@ export abstract class CrewMemberService {
   abstract updateCrewMember(
     crewMember: SelectCrewMember,
     data: UpdateCrewMember,
-  ): Promise<CrewMember>;
+  ): Promise<UpdateResult>;
 
   abstract removeCrewMember(channelRef: Snowflake, memberRef: Snowflake): Promise<DeleteResult>;
 
@@ -42,6 +44,8 @@ export abstract class CrewMemberService {
     access?: CrewMemberAccess,
     checkAdmin?: boolean,
   ): Promise<boolean>;
+
+  abstract reconcileCrewLeaderRole(guildRef: SelectGuild, memberRef: Snowflake): Promise<void>;
 }
 
 @Injectable()
@@ -50,6 +54,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
   constructor(
     private readonly guildManager: GuildManager,
+    private readonly guildService: GuildService,
     @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
     private readonly memberRepo: CrewMemberRepository,
@@ -97,7 +102,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       }
     }
 
-    return await this.memberRepo.upsert(
+    const result = await this.memberRepo.upsert(
       {
         memberSf: memberRef,
         guildId: crew.guildId,
@@ -107,6 +112,17 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       },
       ['crewSf', 'memberSf', 'deletedAt'],
     );
+
+    if (
+      access === CrewMemberAccess.OWNER &&
+      crew.guild.config?.crewLeaderRole &&
+      !member.roles.cache.has(crew.guild.config.crewLeaderRole)
+    ) {
+      await member.roles.add(crew.guild.config.crewLeaderRole);
+      this.logger.log(`${member.displayName} added to crew leaders in ${crew.guild.name}`);
+    }
+
+    return result;
   }
 
   async updateCrewMember(crewMember: SelectCrewMember, data: UpdateCrewMember) {
@@ -120,8 +136,11 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     );
 
     if (result?.affected) {
-      return (result?.raw as CrewMember[]).pop();
+      const { guild_id: guildId } = result?.raw.pop();
+      await this.reconcileCrewLeaderRole({ id: guildId }, crewMember.memberSf);
     }
+
+    return result;
   }
 
   async removeCrewMember(channelRef: Snowflake, memberRef: Snowflake) {
@@ -142,10 +161,14 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       }
     }
 
-    return await this.memberRepo.updateReturning(
+    const result = await this.memberRepo.updateReturning(
       { memberSf: Equal(memberRef), crewSf: Equal(channelRef), deletedAt: IsNull() },
       { deletedAt: new Date() },
     );
+
+    await this.reconcileCrewLeaderRole({ id: crew.guildId }, memberRef);
+
+    return result;
   }
 
   async requireCrewAccess(
@@ -176,5 +199,34 @@ export class CrewMemberServiceImpl extends CrewMemberService {
           member.roles.highest.permissions.has(PermissionsBitField.Flags.Administrator))) ||
       (crewMember && crewMember.access <= access)
     );
+  }
+
+  async reconcileCrewLeaderRole(guildRef: SelectGuild, memberRef: Snowflake) {
+    const guild = await this.guildService.getGuild(guildRef);
+
+    if (!guild.config?.crewLeaderRole) {
+      this.logger.debug('Crew leader not set', JSON.stringify(guild));
+      return; // NOOP if not set
+    }
+
+    const discordGuild = await this.guildManager.fetch(guild.guildSf);
+    const member = await discordGuild.members.fetch(memberRef);
+
+    const [membership, count] = await this.memberRepo.findByAccess(
+      guildRef,
+      memberRef,
+      CrewMemberAccess.OWNER,
+    );
+    this.logger.debug(JSON.stringify([{ count }, membership]));
+
+    if (count && !member.roles.cache.has(guild.config.crewLeaderRole)) {
+      await member.roles.add(guild.config.crewLeaderRole);
+      this.logger.log(`${member.displayName} added to crew leaders in ${guild.name}`);
+    } else if (!count && member.roles.cache.has(guild.config.crewLeaderRole)) {
+      await member.roles.remove(guild.config.crewLeaderRole);
+      this.logger.log(`${member.displayName} removed from crew leaders in ${guild.name}`);
+    } else {
+      this.logger.debug(`No leadership change for ${member.displayName} in ${guild.name}`);
+    }
   }
 }

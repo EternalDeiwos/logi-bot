@@ -29,12 +29,14 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
+import { Equal, Not } from 'typeorm';
 import { compact } from 'lodash';
-import { AuthError, DatabaseError, InternalError, ValidationError } from 'src/errors';
+import { AuthError, DatabaseError, ValidationError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { BotService } from 'src/bot/bot.service';
+import { DiscordService } from 'src/bot/discord.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
 import { TeamService } from 'src/core/team/team.service';
@@ -197,6 +199,7 @@ export class CrewCommand {
 
   constructor(
     private readonly botService: BotService,
+    private readonly discordService: DiscordService,
     private readonly guildManager: GuildManager,
     private readonly guildService: GuildService,
     private readonly teamService: TeamService,
@@ -299,6 +302,35 @@ export class CrewCommand {
 
     await this.crewService.updateCrew(crewRef, {
       isPermanent: data.value,
+    });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew updated')],
+    });
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'set_secure',
+    description: 'Prevents crew information being displayed outside of private channels',
+    dmPermission: false,
+  })
+  async onSetSecure(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SetFlagCommandParams,
+  ) {
+    const crewRef = data.crew || interaction.channelId;
+    const memberRef = interaction?.member?.user?.id ?? interaction?.user?.id;
+
+    if (!(await this.memberService.requireCrewAccess(crewRef, memberRef, CrewMemberAccess.ADMIN))) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew administrator can perform this action',
+      ).asDisplayable();
+    }
+
+    await this.crewService.updateCrew(crewRef, {
+      isSecureOnly: data.value,
     });
 
     await this.botService.replyOrFollowUp(interaction, {
@@ -430,9 +462,27 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.memberService.updateCrewMember(targetMember, {
-      access: CrewMemberAccess.OWNER,
+    await this.memberService.updateCrewMember(
+      { crewSf: channelRef, memberSf: targetMember.memberSf },
+      {
+        access: CrewMemberAccess.OWNER,
+      },
+    );
+
+    const oldOwners = await this.memberRepo.findBy({
+      crewSf: Equal(channelRef),
+      memberSf: Not(Equal(targetMember.memberSf)),
+      access: Equal(CrewMemberAccess.OWNER),
     });
+
+    for (const owner of oldOwners) {
+      await this.memberService.updateCrewMember(
+        { crewSf: owner.crewSf, memberSf: owner.memberSf },
+        {
+          access: CrewMemberAccess.ADMIN,
+        },
+      );
+    }
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew ownership transferred')],
@@ -701,16 +751,23 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
+    let crew: Crew;
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const crewRef = data.crew || interaction.channelId;
 
     try {
+      crew = await this.crewService.getCrew({ crewSf: crewRef });
+    } catch {
+      // NOOP
+    }
+
+    if (crew) {
       await this.crewService.sendIndividualStatus(
         { crewSf: crewRef },
         interaction.channelId,
         memberRef,
       );
-    } catch {
+    } else {
       await this.crewService.sendAllStatus(
         { guildSf: interaction.guildId },
         interaction.channelId,
