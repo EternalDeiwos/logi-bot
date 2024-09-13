@@ -1,13 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Context, ContextOf, On } from 'necord';
-import { ConfigKey } from 'src/app.config';
+import { Equal, IsNull } from 'typeorm';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
-import { TicketService } from './ticket/ticket.service';
-import { TicketRepository } from './ticket/ticket.repository';
-import { CrewRepository } from './crew/crew.repository';
-import { CrewMemberRepository } from './crew/member/crew-member.repository';
-import { GuildService } from './guild/guild.service';
+import { TicketService } from 'src/core/ticket/ticket.service';
+import { TicketRepository } from 'src/core/ticket/ticket.repository';
+import { CrewRepository } from 'src/core/crew/crew.repository';
+import { CrewService } from 'src/core/crew/crew.service';
+import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
+import { CrewMemberRepository } from 'src/core/crew/member/crew-member.repository';
+import { GuildService } from 'src/core/guild/guild.service';
+import { CrewMemberAccess } from 'src/types';
 
 @Injectable()
 export class BotEventListener {
@@ -19,7 +21,9 @@ export class BotEventListener {
     private readonly ticketService: TicketService,
     private readonly ticketRepo: TicketRepository,
     private readonly crewRepo: CrewRepository,
+    private readonly crewService: CrewService,
     private readonly memberRepo: CrewMemberRepository,
+    private readonly memberService: CrewMemberService,
   ) {}
 
   @On('guildCreate')
@@ -113,6 +117,36 @@ export class BotEventListener {
 
   @On('guildMemberRemove')
   async onMemberLeave(@Context() [member]: ContextOf<'guildMemberRemove'>) {
-    await this.memberRepo.delete({ guild: { guildSf: member.guild.id }, memberSf: member.id });
+    await this.memberRepo.update(
+      { guild: { guildSf: member.guild.id }, memberSf: member.id },
+      { deletedAt: new Date() },
+    );
+  }
+
+  @On('guildMemberRoleRemove')
+  async onRoleRemoved(@Context() [member, role]: ContextOf<'guildMemberRoleRemove'>) {
+    try {
+      const roleCrew = await this.crewService.getCrewByRole(role.id);
+      await this.memberService.removeCrewMember(roleCrew, member);
+    } catch {
+      this.logger.debug(
+        `${member.displayName} was removed from ${role.name} in ${member.guild.name}`,
+      );
+    }
+
+    return await this.memberService.reconcileIndividualMembership(
+      { guildSf: member.guild.id },
+      member.id,
+    );
+  }
+
+  @On('guildMemberRoleAdd')
+  async onRoleAdded(@Context() [member, role]: ContextOf<'guildMemberRoleAdd'>) {
+    try {
+      const roleCrew = await this.crewService.getCrewByRole(role.id);
+      await this.memberService.registerCrewMember(roleCrew.crewSf, member.id);
+    } catch {
+      this.logger.debug(`Role ${role.name} is not a crew role`);
+    }
   }
 }

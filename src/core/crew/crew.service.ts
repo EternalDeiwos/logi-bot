@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { EntityNotFoundError, UpdateResult } from 'typeorm';
+import { EntityNotFoundError, Equal, IsNull, UpdateResult } from 'typeorm';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -28,7 +28,7 @@ import { CrewMemberAccess } from 'src/types';
 import { DiscordService } from 'src/bot/discord.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { TeamService } from 'src/core/team/team.service';
-import { TeamRepository } from 'src/core/team/team.repository';
+import { SelectTeam } from 'src/core/team/team.entity';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { TagTemplateRepository } from 'src/core/tag/tag-template.repository';
 import { Ticket } from 'src/core/ticket/ticket.entity';
@@ -38,10 +38,11 @@ import { ArchiveCrew, Crew, InsertCrew, SelectCrew, UpdateCrew } from './crew.en
 import { CrewRepository } from './crew.repository';
 import { CrewMemberService } from './member/crew-member.service';
 import { crewAuditPrompt, newCrewMessage } from './crew.messages';
-import { SelectTeam } from '../team/team.entity';
 
 export abstract class CrewService {
   abstract getCrew(crewRef: SelectCrew): Promise<Crew>;
+  abstract getCrewByRole(roleRef: Snowflake): Promise<Crew>;
+  abstract getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake): Promise<Crew[]>;
   abstract registerCrew(data: InsertCrew): Promise<Crew>;
   abstract deregisterCrew(
     channelRef: Snowflake,
@@ -71,7 +72,6 @@ export class CrewServiceImpl extends CrewService {
     private readonly guildManager: GuildManager,
     private readonly discordService: DiscordService,
     private readonly teamService: TeamService,
-    private readonly teamRepo: TeamRepository,
     private readonly tagService: TagService,
     private readonly templateRepo: TagTemplateRepository,
     @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
@@ -96,6 +96,21 @@ export class CrewServiceImpl extends CrewService {
 
       throw err;
     }
+  }
+
+  async getCrewByRole(roleRef: Snowflake) {
+    return await this.crewRepo.findOneOrFail({ where: { roleSf: roleRef } });
+  }
+
+  async getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake) {
+    const guildWhere = guildRef.id
+      ? { guildId: Equal(guildRef.id) }
+      : { guild: { guildSf: Equal(guildRef.guildSf) } };
+    return await this.crewRepo.findBy({
+      ...guildWhere,
+      deletedAt: IsNull(),
+      members: { memberSf: Equal(memberRef), deletedAt: IsNull() },
+    });
   }
 
   async registerCrew(data: InsertCrew) {

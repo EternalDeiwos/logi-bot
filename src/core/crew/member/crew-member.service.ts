@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { DeleteResult, Equal, InsertResult, IsNull, UpdateResult } from 'typeorm';
 import { GuildManager, GuildMember, PermissionsBitField, Snowflake } from 'discord.js';
-import { DatabaseError, ExternalError, InternalError } from 'src/errors';
+import { ExternalError, InternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
-import { Crew } from 'src/core/crew/crew.entity';
+import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewMemberRepository } from './crew-member.repository';
@@ -26,6 +26,9 @@ export abstract class CrewMemberService {
     data: UpdateCrewMember,
   ): Promise<UpdateResult>;
 
+  abstract removeCrewMember(crew: Crew, member: GuildMember): Promise<DeleteResult>;
+  abstract removeCrewMember(crew: Crew, memberRef: Snowflake): Promise<DeleteResult>;
+  abstract removeCrewMember(channelRef: Snowflake, member: GuildMember): Promise<DeleteResult>;
   abstract removeCrewMember(channelRef: Snowflake, memberRef: Snowflake): Promise<DeleteResult>;
 
   abstract requireCrewAccess(
@@ -46,6 +49,11 @@ export abstract class CrewMemberService {
   ): Promise<boolean>;
 
   abstract reconcileCrewLeaderRole(guildRef: SelectGuild, memberRef: Snowflake): Promise<void>;
+  abstract reconcileCrewMembership(crewRef: SelectCrew): Promise<void>;
+  abstract reconcileIndividualMembership(
+    guildRef: SelectGuild,
+    memberRef: Snowflake,
+  ): Promise<void>;
 }
 
 @Injectable()
@@ -143,15 +151,15 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     return result;
   }
 
-  async removeCrewMember(channelRef: Snowflake, memberRef: Snowflake) {
-    let crew: Crew;
-    try {
-      crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
-    } catch (err) {
-      throw new DatabaseError('QUERY_FAILED', 'Failed to fetch crew', err);
-    }
-
-    const member = await this.resolveGuildMember(memberRef, channelRef);
+  async removeCrewMember(channelRef: Snowflake | Crew, memberRef: Snowflake | GuildMember) {
+    const crew =
+      channelRef instanceof Crew
+        ? channelRef
+        : await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
+    const member =
+      memberRef instanceof GuildMember
+        ? memberRef
+        : await this.resolveGuildMember(memberRef, crew.crewSf);
 
     try {
       await member.roles.remove(crew.roleSf);
@@ -162,11 +170,11 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     }
 
     const result = await this.memberRepo.updateReturning(
-      { memberSf: Equal(memberRef), crewSf: Equal(channelRef), deletedAt: IsNull() },
+      { memberSf: Equal(member.id), crewSf: Equal(crew.crewSf), deletedAt: IsNull() },
       { deletedAt: new Date() },
     );
 
-    await this.reconcileCrewLeaderRole({ id: crew.guildId }, memberRef);
+    await this.reconcileCrewLeaderRole({ id: crew.guildId }, member.id);
 
     return result;
   }
@@ -227,6 +235,83 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       this.logger.log(`${member.displayName} removed from crew leaders in ${guild.name}`);
     } else {
       this.logger.debug(`No leadership change for ${member.displayName} in ${guild.name}`);
+    }
+  }
+
+  async reconcileCrewMembership(crewRef: SelectCrew) {
+    const crew = await this.crewService.getCrew(crewRef);
+    const members = await crew.members;
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+    const channel = await discordGuild.channels.fetch(crew.crewSf);
+
+    for (const crewMember of members) {
+      let member: GuildMember;
+      try {
+        member = await discordGuild.members.fetch(crewMember.memberSf);
+      } catch {
+        await this.removeCrewMember(crewMember.crew, member);
+        continue;
+      }
+
+      if (!channel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel)) {
+        await this.removeCrewMember(crewMember.crew, member);
+        continue;
+      }
+
+      if (!member.roles.cache.has(crew.roleSf)) {
+        await this.removeCrewMember(crewMember.crew, member);
+        continue;
+      }
+
+      if (
+        crew.guild?.config?.crewViewerRole &&
+        crew.isSecureOnly &&
+        !member.roles.cache.has(crew.guild?.config?.crewViewerRole)
+      ) {
+        await this.removeCrewMember(crewMember.crew, member);
+        continue;
+      }
+    }
+  }
+
+  async reconcileIndividualMembership(guildRef: SelectGuild, memberRef: Snowflake) {
+    const guild = await this.guildService.getGuild(guildRef);
+    const discordGuild = await this.guildManager.fetch(guild.guildSf);
+    let member: GuildMember;
+
+    try {
+      member = await discordGuild.members.fetch(memberRef);
+    } catch {
+      const guildWhere = guildRef.id
+        ? { guildId: Equal(guildRef.id) }
+        : { guild: { guildSf: Equal(guildRef.guildSf) } };
+      await this.memberRepo.updateReturning(
+        { ...guildWhere, memberSf: memberRef, deletedAt: IsNull() },
+        { deletedAt: new Date() },
+      );
+    }
+
+    for (const crew of await this.crewService.getMemberCrews(guild, memberRef)) {
+      const channel = await discordGuild.channels.fetch(crew.crewSf);
+
+      if (!channel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel)) {
+        await this.removeCrewMember(crew, member);
+        continue;
+      }
+
+      if (!member.roles.cache.has(crew.roleSf)) {
+        await this.removeCrewMember(crew, member);
+        continue;
+      }
+
+      if (
+        crew.guild?.config?.crewViewerRole &&
+        crew.isSecureOnly &&
+        !member.roles.cache.has(crew.guild?.config?.crewViewerRole)
+      ) {
+        await this.removeCrewMember(crew, member);
+        continue;
+      }
     }
   }
 }

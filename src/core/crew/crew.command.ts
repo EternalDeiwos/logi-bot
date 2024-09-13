@@ -897,4 +897,38 @@ export class CrewCommand {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew shared')],
     });
   }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'prune',
+    description: 'Manually trigger check to remove inactive crew members',
+    dmPermission: false,
+  })
+  async onCrewPrune(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    const channelRef = data.crew || interaction.channelId;
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+
+    if (
+      !(await this.memberService.requireCrewAccess(
+        channelRef,
+        memberRef,
+        CrewMemberAccess.ADMIN,
+        false,
+      ))
+    ) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew administrator can perform this action',
+      ).asDisplayable();
+    }
+
+    await this.memberService.reconcileCrewMembership({ crewSf: channelRef });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew cleaning scheduled')],
+    });
+  }
 }

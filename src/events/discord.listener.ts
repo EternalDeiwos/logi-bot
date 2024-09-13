@@ -2,7 +2,6 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Context, ContextOf, On } from 'necord';
-import { BaseError } from 'src/errors';
 
 @Injectable()
 export class BotEventListener {
@@ -20,43 +19,41 @@ export class BotEventListener {
 
   @On('guildCreate')
   async onGuildCreate(@Context() [guild]: ContextOf<'guildCreate'>) {
-    try {
-      const payload = {
-        guildId: guild.id,
-        name: guild.name,
-        shortName: guild.nameAcronym,
-        icon: guild.iconURL({ extension: 'png', forceStatic: true }),
-      };
-
-      const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
-      await this.rmq.publish('discord', 'discord.rpc.guild.register', payload, {
-        expiration: timeout,
-      });
-    } catch (err) {
-      this.logger.error(
-        new BaseError('INTERNAL_SERVER_ERROR', 'Failed to handle guild create event', err),
-        err.stack,
-      );
-    }
+    // try {
+    //   const payload = {
+    //     guildId: guild.id,
+    //     name: guild.name,
+    //     shortName: guild.nameAcronym,
+    //     icon: guild.iconURL({ extension: 'png', forceStatic: true }),
+    //   };
+    //   const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
+    //   await this.rmq.publish('discord', 'discord.rpc.guild.register', payload, {
+    //     expiration: timeout,
+    //   });
+    // } catch (err) {
+    //   this.logger.error(
+    //     new BaseError('INTERNAL_SERVER_ERROR', 'Failed to handle guild create event', err),
+    //     err.stack,
+    //   );
+    // }
   }
 
   @On('guildDelete')
   async onGuildDelete(@Context() [guild]: ContextOf<'guildDelete'>) {
-    try {
-      const payload = {
-        guildId: guild.id,
-      };
-
-      const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
-      await this.rmq.publish('discord', 'discord.rpc.guild.deregister', payload, {
-        expiration: timeout,
-      });
-    } catch (err) {
-      this.logger.error(
-        new BaseError('INTERNAL_SERVER_ERROR', 'Failed to handle guild delete event', err),
-        err.stack,
-      );
-    }
+    // try {
+    //   const payload = {
+    //     guildId: guild.id,
+    //   };
+    //   const timeout = this.configService.getOrThrow<number>('APP_RPC_TIMEOUT');
+    //   await this.rmq.publish('discord', 'discord.rpc.guild.deregister', payload, {
+    //     expiration: timeout,
+    //   });
+    // } catch (err) {
+    //   this.logger.error(
+    //     new BaseError('INTERNAL_SERVER_ERROR', 'Failed to handle guild delete event', err),
+    //     err.stack,
+    //   );
+    // }
   }
 
   @On('roleDelete')
