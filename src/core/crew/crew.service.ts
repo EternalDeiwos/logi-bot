@@ -242,7 +242,7 @@ export class CrewServiceImpl extends CrewService {
         : team.categorySf;
       const voiceChannel = await this.discordService.ensureChannel(
         team.guild.guildSf,
-        data.crewSf,
+        data.voiceSf,
         {
           name: `${prefix}c-${data.slug}`,
           parent,
@@ -427,7 +427,7 @@ export class CrewServiceImpl extends CrewService {
       try {
         await Promise.all([discussion.delete(), role.delete(), voice.delete()]);
       } catch (err) {
-        throw new ExternalError('DISCORD_API_ERROR', '');
+        throw new ExternalError('DISCORD_API_ERROR', 'Failed to delete channels and role');
       }
     }
 
