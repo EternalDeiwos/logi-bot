@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmbedBuilder, GuildManager, Snowflake, roleMention } from 'discord.js';
 import { InsertResult } from 'typeorm';
-import { AuthError, InternalError } from 'src/errors';
-import { CrewMemberAccess } from 'src/types';
+import { InternalError } from 'src/errors';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';

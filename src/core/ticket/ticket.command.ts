@@ -410,7 +410,7 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'move',
-    description: 'Show the select prompt send this ticket to another crew',
+    description: 'Show the move prompt to send this ticket to another crew',
     dmPermission: false,
   })
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
@@ -520,7 +520,7 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'accept',
-    description: 'Accept a ticket. Team members only',
+    description: 'Accept a ticket. Crew members only',
     dmPermission: false,
   })
   async onTicketAcceptCommand(@Context() context: SlashCommandContext) {
@@ -529,7 +529,7 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'decline',
-    description: 'Decline a ticket. Team members only',
+    description: 'Decline a ticket. Crew members only',
     dmPermission: false,
   })
   async onTicketDeclineCommand(
@@ -541,7 +541,7 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'close',
-    description: 'Mark a ticket as abandoned. Team members only',
+    description: 'Mark a ticket as abandoned. Crew members only',
     dmPermission: false,
   })
   async onTicketCloseCommand(@Context() context: SlashCommandContext) {
@@ -550,7 +550,7 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'abandoned',
-    description: 'Mark a ticket as abandoned. Team members only',
+    description: 'Mark a ticket as abandoned. Crew members only',
     dmPermission: false,
   })
   async onTicketAbandonedCommand(@Context() context: SlashCommandContext) {
@@ -559,7 +559,7 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'start',
-    description: 'Mark a ticket as being in progress. Team members only',
+    description: 'Mark a ticket as being in progress. Crew members only',
     dmPermission: false,
   })
   async onTicketStartCommand(@Context() context: SlashCommandContext) {
@@ -568,7 +568,7 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'repeatable',
-    description: 'Mark a ticket as repeatable. Team members only',
+    description: 'Mark a ticket as repeatable. Crew members only',
     dmPermission: false,
   })
   async onTicketRepeatCommand(@Context() context: SlashCommandContext) {
@@ -577,7 +577,7 @@ export class TicketCommand {
 
   @Subcommand({
     name: 'done',
-    description: 'Complete a ticket. Team members only',
+    description: 'Complete a ticket. Crew members only',
     dmPermission: false,
   })
   async onTicketDoneCommand(@Context() context: SlashCommandContext) {
