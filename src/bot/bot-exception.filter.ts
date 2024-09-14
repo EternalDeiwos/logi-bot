@@ -48,7 +48,10 @@ export class DiscordExceptionFilter implements ExceptionFilter<CaughtErrors> {
         }
       }
     } else {
-      this.logger.error(`${displayable.name}: ${displayable.message}`, displayable.cause);
+      this.logger.error(
+        `${displayable.name}: ${displayable.message}`,
+        displayable.cause instanceof Error ? displayable.cause.stack : displayable.cause,
+      );
     }
 
     const discovery = necord.getDiscovery();
