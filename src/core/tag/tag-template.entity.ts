@@ -24,7 +24,11 @@ export type SelectTagTemplate = DeepPartial<Pick<ForumTagTemplate, 'id'>>;
 @Entity('tag_template')
 @Unique('uk_guild_id_name', ['guildId', 'name'])
 export class ForumTagTemplate {
-  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_tag_template_id' })
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_tag_template_id',
+  })
   id: string;
 
   @Column()
@@ -39,7 +43,7 @@ export class ForumTagTemplate {
   @Column({ nullable: true })
   emoji: string;
 
-  @Column({ type: 'int8', name: 'guild_id' })
+  @Column({ type: 'uuid', name: 'guild_id' })
   @Index('guild_id_idx_tag_template')
   guildId: string;
 

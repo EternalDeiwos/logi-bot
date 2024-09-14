@@ -23,7 +23,11 @@ export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'access'>>;
 @Entity('crew_member')
 @Unique('uk_crew_channel_member_deleted_at', ['crewSf', 'memberSf', 'deletedAt'])
 export class CrewMember {
-  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_crew_member_id' })
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_crew_member_id',
+  })
   id: string;
 
   @Column({
@@ -49,7 +53,7 @@ export class CrewMember {
   @Index('member_sf_idx_crew_member')
   memberSf: string;
 
-  @Column({ type: 'int8', name: 'guild_id' })
+  @Column({ type: 'uuid', name: 'guild_id' })
   @Index('guild_id_idx_crew_member')
   @RelationId((member: CrewMember) => member.guild)
   guildId: string;

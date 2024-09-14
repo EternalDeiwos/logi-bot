@@ -38,14 +38,18 @@ export type SelectTeam = DeepPartial<Pick<Team, 'id'>>;
 @Entity()
 @Unique('uk_name_guild_id_team', ['name', 'guildId', 'deletedAt'])
 export class Team {
-  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_team_id' })
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_team_id',
+  })
   id: string;
 
   @Column()
   @Index('name_idx_team')
   name: string;
 
-  @Column({ type: 'int8', name: 'guild_id' })
+  @Column({ type: 'uuid', name: 'guild_id' })
   @RelationId((team: Team) => team.guild)
   @Index('guild_id_idx_team')
   guildId: string;

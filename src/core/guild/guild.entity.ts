@@ -25,7 +25,11 @@ export type GuildConfig = {
 @Entity()
 @Unique('uk_guild_sf_deleted_at', ['guildSf', 'deletedAt'])
 export class Guild {
-  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_guild_id' })
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_guild_id',
+  })
   id: string;
 
   @Column({ name: 'guild_sf', type: 'int8' })

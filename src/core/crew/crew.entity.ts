@@ -62,7 +62,7 @@ export class Crew {
   @Column({ type: 'int8', name: 'voice_channel_sf', nullable: true })
   voiceSf?: Snowflake;
 
-  @Column({ type: 'int8', name: 'guild_id' })
+  @Column({ type: 'uuid', name: 'guild_id' })
   @RelationId((crew: Crew) => crew.guild)
   @Index('guild_id_idx_crew')
   guildId: string;
@@ -75,7 +75,7 @@ export class Crew {
   })
   guild: Guild;
 
-  @Column({ type: 'int8', name: 'team_id' })
+  @Column({ type: 'uuid', name: 'team_id' })
   @RelationId((crew: Crew) => crew.team)
   @Index('team_id_idx_crew')
   teamId: string;

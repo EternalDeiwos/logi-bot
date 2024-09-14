@@ -25,7 +25,7 @@ export class Ticket {
   @PrimaryColumn({ type: 'int8', name: 'thread_sf', primaryKeyConstraintName: 'pk_thread_sf' })
   threadSf: Snowflake;
 
-  @Column({ type: 'int8', name: 'guild_id' })
+  @Column({ type: 'uuid', name: 'guild_id' })
   @Index('guild_id_idx_ticket')
   guildId: string;
 

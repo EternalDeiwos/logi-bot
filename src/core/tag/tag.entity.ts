@@ -27,7 +27,7 @@ export class ForumTag {
   @Column()
   name: string;
 
-  @Column({ type: 'int8', name: 'guild_id' })
+  @Column({ type: 'uuid', name: 'guild_id' })
   @Index('guild_id_idx_tag')
   guildId: string;
 
@@ -39,7 +39,7 @@ export class ForumTag {
   })
   guild: Guild;
 
-  @Column({ type: 'int8', name: 'team_id' })
+  @Column({ type: 'uuid', name: 'team_id' })
   @RelationId((tag: ForumTag) => tag.team)
   @Index('team_id_idx_tag')
   teamId: Snowflake;
@@ -52,7 +52,7 @@ export class ForumTag {
   })
   team: Promise<Team>;
 
-  @Column({ type: 'int8', name: 'tag_template_id' })
+  @Column({ type: 'uuid', name: 'tag_template_id' })
   @RelationId((tag: ForumTag) => tag.template)
   @Index('tag_template_id_idx_tag')
   templateId: string;

@@ -20,14 +20,18 @@ export type InsertCrewLog = DeepPartial<
 
 @Entity('crew_log')
 export class CrewLog {
-  @PrimaryColumn({ default: () => 'uuidv7()', primaryKeyConstraintName: 'pk_crew_log_id' })
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_crew_log_id',
+  })
   id: string;
 
   @Column({ type: 'int8', name: 'message_sf' })
   @Index('message_sf_idx_crew_log')
   messageSf: Snowflake;
 
-  @Column({ type: 'int8', name: 'guild_id' })
+  @Column({ type: 'uuid', name: 'guild_id' })
   @Index('guild_id_idx_crew_log')
   @RelationId((log: CrewLog) => log.guild)
   guildId: string;
