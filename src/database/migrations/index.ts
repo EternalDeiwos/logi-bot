@@ -6,3 +6,4 @@ export * from './1718539084270-crew-logs-table';
 export * from './1718794822049-crew-sharing';
 export * from './1726260822577-refactor';
 export * from './1726307788459-game-tables';
+export * from './1726315986907-game-views'

@@ -9,10 +9,10 @@ import { CrewLog } from 'src/core/crew/log/crew-log.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { CrewShare } from 'src/core/crew/share/crew-share.entity';
 import { War } from 'src/game/war/war.entity';
-import { Region } from 'src/game/region/region.entity';
-import { RegionLog } from 'src/game/region/region-log.entity';
-import { Poi } from 'src/game/poi/poi.entity';
-import { Catalog } from 'src/game/catalog/catalog.entity';
+import { Region, CurrentRegion } from 'src/game/region/region.entity';
+import { RegionLog, CurrentRegionLog } from 'src/game/region/region-log.entity';
+import { Poi, CurrentPoi } from 'src/game/poi/poi.entity';
+import { Catalog, ExpandedCatalog } from 'src/game/catalog/catalog.entity';
 import * as migrations from 'src/database/migrations';
 
 export const AppDataSource = new DataSource({
@@ -36,9 +36,13 @@ export const AppDataSource = new DataSource({
     CrewShare,
     War,
     Region,
+    CurrentRegion,
     RegionLog,
+    CurrentRegionLog,
     Poi,
+    CurrentPoi,
     Catalog,
+    ExpandedCatalog,
   ],
   subscribers: [],
   migrations,
