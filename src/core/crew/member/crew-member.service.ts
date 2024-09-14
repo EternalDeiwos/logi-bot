@@ -249,7 +249,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       try {
         member = await discordGuild.members.fetch(crewMember.memberSf);
       } catch {
-        await this.removeCrewMember(crewMember.crew, member);
+        await this.removeCrewMember(crewMember.crew, crewMember.memberSf);
         continue;
       }
 
