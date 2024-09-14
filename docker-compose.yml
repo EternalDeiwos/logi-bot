@@ -1,25 +1,27 @@
 services:
+  rmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:15672:15672
+      - 127.0.0.1:5672:5672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?required}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?required}
+
   postgres:
-    image: postgres:16
+    image: ghcr.io/eternaldeiwos/postgresql:16
     restart: unless-stopped
     ports:
       - 127.0.0.1:5432:5432
     volumes:
-      - ./.postgres:/var/lib/postgresql/data
+      - bot-db-data:/var/lib/postgresql/data
       - ./hack/initdb.sh:/docker-entrypoint-initdb.d/initdb.sh
     environment:
       POSTGRES_USER: '${POSTGRES_USER:?required}'
       POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:?required}'
       POSTGRES_DB: '${POSTGRES_DB:?required}'
       POSTGRES_SCHEMA: '${POSTGRES_SCHEMA:?required}'
-  redis:
-    image: redis:7
-    restart: unless-stopped
-    volumes:
-      - ./.redis/data:/data
-    ports:
-      - 127.0.0.1:6379:6379
-    command:
-      - redis-server
-      - --appendonly
-      - 'yes'
+
+volumes:
+  bot-db-data: {}

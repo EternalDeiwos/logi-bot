@@ -1,68 +1,52 @@
-import { Inject, Logger, Module, OnApplicationBootstrap } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bullmq';
-import { DataSource } from 'typeorm';
-import { Config, ConfigModule, ConfigService } from 'src/config';
-import { BotModule } from 'src/bot';
+import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ConfigModule } from '@nestjs/config';
+import { DatabaseModule } from './database/database.module';
+import { CoreModule } from 'src/core/core.module';
+import { EventsModule } from 'src/events/events.module';
 import { AppController } from './app.controller';
 import { PermissionsService } from './permissions.service';
+import { validationSchema } from './app.config';
 
 @Module({
   imports: [
-    ConfigModule,
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.getOrThrow<string>(Config.POSTGRES_HOST),
-        port: configService.getOrThrow<number>(Config.POSTGRES_PORT),
-        username: configService.getOrThrow<string>(Config.POSTGRES_USER),
-        password: configService.getOrThrow<string>(Config.POSTGRES_PASSWORD),
-        database: configService.getOrThrow<string>(Config.POSTGRES_DB),
-        schema: configService.getOrThrow<string>(Config.POSTGRES_SCHEMA),
-        autoLoadEntities: true,
-        synchronize: configService.getOrThrow<string>(Config.NODE_ENV) !== 'production',
-      }),
-    }),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        return {
-          connection: {
-            host: configService.getOrThrow<string>(Config.REDIS_HOST),
-            port: configService.getOrThrow<number>(Config.REDIS_PORT),
-            db: configService.getOrThrow<number>(Config.REDIS_QUEUE_DB),
-          },
-        };
-      },
-    }),
-    BotModule,
+    DatabaseModule,
+    // GameModule,
+    CoreModule,
+    // InventoryModule
   ],
   controllers: [AppController],
   providers: [PermissionsService],
 })
-export class AppModule implements OnApplicationBootstrap {
-  private readonly logger = new Logger(AppModule.name);
+export class AppModule {
+  static getAppModules() {
+    return [
+      ConfigModule.forRoot({
+        envFilePath: [
+          '.env.local',
+          `.env.${process.env.NODE_ENV}.local`,
+          `.env.${process.env.NODE_ENV}`,
+          '.env',
+        ],
+        isGlobal: true,
+        cache: true,
+        validationSchema,
+      }),
+      this,
+    ];
+  }
 
-  @Inject()
-  private readonly configService: ConfigService;
-
-  @Inject()
-  private readonly dataSource: DataSource;
-
-  async onApplicationBootstrap() {
-    const env = this.configService.getOrThrow<string>(Config.NODE_ENV);
-    this.logger.warn(`Running in ${env} mode`);
-
-    if (env !== 'production') {
-      return;
-    }
-
-    this.logger.log('Running migrations');
-    return this.dataSource.runMigrations({
-      transaction: 'all',
-    });
+  static getServerModules() {
+    return [...this.getAppModules(), ScheduleModule.forRoot(), EventsModule];
   }
 }
+
+@Module({
+  imports: AppModule.getServerModules(),
+})
+export class ServerModule {}
+
+@Module({
+  imports: AppModule.getAppModules(),
+})
+export class ReplModule {}
