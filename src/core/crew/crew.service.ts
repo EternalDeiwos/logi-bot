@@ -156,7 +156,9 @@ export class CrewServiceImpl extends CrewService {
     }
 
     if (
-      await this.templateRepo.exists({ where: { guildId: discordGuild.id, name: data.shortName } })
+      await this.templateRepo.exists({
+        where: { guild: { guildSf: discordGuild.id }, name: data.shortName },
+      })
     ) {
       throw new ValidationError(
         'VALIDATION_FAILED',

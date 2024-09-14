@@ -2,21 +2,13 @@ import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common'
 import {
   ChannelOption,
   Context,
-  MentionableOption,
   Options,
   SlashCommandContext,
   SlashCommandMeta,
   StringOption,
   Subcommand,
 } from 'necord';
-import {
-  ChannelType,
-  GuildChannel,
-  GuildMember,
-  PermissionsBitField,
-  Role,
-  User,
-} from 'discord.js';
+import { ChannelType, GuildChannel, PermissionsBitField } from 'discord.js';
 import { AuthError } from 'src/errors';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { SuccessEmbed } from 'src/bot/embed';
@@ -42,13 +34,6 @@ export class CreateTeamCommandParams {
     required: true,
   })
   forum: GuildChannel;
-
-  @MentionableOption({
-    name: 'role',
-    description: 'Select a general access role for this team',
-    required: true,
-  })
-  role: GuildMember | Role | User;
 }
 
 export class SelectTeamCommandParams {
