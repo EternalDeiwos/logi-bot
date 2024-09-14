@@ -76,7 +76,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     memberRef: Snowflake | CrewMember,
     channelRef?: Snowflake,
   ): Promise<GuildMember> {
-    if (typeof memberRef !== 'string' && memberRef instanceof CrewMember) {
+    if (memberRef instanceof CrewMember) {
       channelRef = memberRef.crewSf;
       memberRef = memberRef.memberSf;
     }
@@ -156,13 +156,23 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       channelRef instanceof Crew
         ? channelRef
         : await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
-    const member =
-      memberRef instanceof GuildMember
-        ? memberRef
-        : await this.resolveGuildMember(memberRef, crew.crewSf);
+
+    let member: GuildMember;
+    try {
+      member =
+        memberRef instanceof GuildMember
+          ? memberRef
+          : await this.resolveGuildMember(memberRef, crew.crewSf);
+
+      memberRef = member.id
+    } catch {
+      this.logger.debug(`Guild member ${memberRef} has already left the guild`)
+    }
 
     try {
-      await member.roles.remove(crew.roleSf);
+      if (member) {
+        await member.roles.remove(crew.roleSf);
+      }
     } catch (err) {
       if (member.roles.cache.has(crew.roleSf)) {
         throw new ExternalError('DISCORD_API_ERROR', 'Failed to remove member role', err);
@@ -170,7 +180,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     }
 
     const result = await this.memberRepo.updateReturning(
-      { memberSf: Equal(member.id), crewSf: Equal(crew.crewSf), deletedAt: IsNull() },
+      { memberSf: Equal(memberRef as Snowflake), crewSf: Equal(crew.crewSf), deletedAt: IsNull() },
       { deletedAt: new Date() },
     );
 
