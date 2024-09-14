@@ -50,7 +50,7 @@ export class WarService {
         this.warRepo.create({
           warNumber,
           id: warId,
-          winner: WarFaction[winner],
+          winner: winner as WarFaction,
           startedAt: DateTime.fromMillis(conquestStartTime).toJSDate(),
           endedAt: conquestEndTime ? DateTime.fromMillis(conquestEndTime).toJSDate() : null,
         }),

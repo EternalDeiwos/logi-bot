@@ -1,19 +1,23 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   Unique,
   DeleteDateColumn,
   Index,
   ViewEntity,
   ViewColumn,
+  PrimaryColumn,
 } from 'typeorm';
 
 @Entity()
 // REMEMBER TO MODIFY THIS FOR "NULLS NOT DISTINCT"
 @Unique('uk_hex_major_minor_deleted_at', ['hexId', 'majorName', 'minorName', 'deletedAt'])
 export class Region {
-  @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_region_id' })
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_region_id',
+  })
   id: string;
 
   @Column({ name: 'hex_id', type: 'int8' })

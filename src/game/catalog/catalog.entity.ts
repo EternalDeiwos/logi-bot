@@ -1,18 +1,22 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   Unique,
   CreateDateColumn,
   ViewEntity,
   ViewColumn,
+  PrimaryColumn,
 } from 'typeorm';
 import { WarFaction } from 'src/game/war/war.entity';
 
 @Entity()
 @Unique('uk_foxhole_catalog_name', ['gameVersion', 'catalogVersion', 'name'])
 export class Catalog {
-  @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_catalog_id' })
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_catalog_id',
+  })
   id: string;
 
   @Column({ name: 'foxhole_version' })

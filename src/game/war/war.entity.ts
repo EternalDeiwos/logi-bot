@@ -1,4 +1,4 @@
-import { Entity, Column, Unique, PrimaryColumn, ViewEntity, ViewColumn } from 'typeorm';
+import { Entity, Column, Unique, PrimaryColumn } from 'typeorm';
 
 export enum WarFaction {
   Warden = 'WARDENS',

@@ -19,6 +19,11 @@ export class Poi {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_poi_id' })
   id: string;
 
+  @Column({ type: 'uuid', name: 'region_id' })
+  @RelationId((poi: Poi) => poi.region)
+  @Index('region_idx_poi')
+  regionId: string;
+
   @ManyToOne(() => Region, { onDelete: 'RESTRICT', lazy: true })
   @JoinColumn({
     name: 'region_id',
@@ -27,10 +32,10 @@ export class Poi {
   })
   region: Promise<Region>;
 
-  @Column({ name: 'region_id', type: 'int8' })
-  @RelationId((poi: Poi) => poi.region)
-  @Index('region_idx_poi')
-  regionId: string;
+  @Column({ name: 'war_number', type: 'int8' })
+  @RelationId((poi: Poi) => poi.war)
+  @Index('war_number_idx_poi')
+  warNumber: string;
 
   @ManyToOne(() => War, { onDelete: 'RESTRICT', lazy: true })
   @JoinColumn({
@@ -39,11 +44,6 @@ export class Poi {
     foreignKeyConstraintName: 'fk_poi_war_number',
   })
   war: Promise<War>;
-
-  @Column({ name: 'war_number', type: 'int8' })
-  @RelationId((poi: Poi) => poi.war)
-  @Index('war_number_idx_poi')
-  warNumber: string;
 
   @Column({ name: 'marker_type', type: 'int4' })
   @Index('marker_type_idx_poi')
