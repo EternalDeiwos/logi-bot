@@ -513,7 +513,7 @@ export class CrewServiceImpl extends CrewService {
 
     fields.push({
       name: 'Members',
-      value: members.map((member) => `- ${userMention(member.memberSf)}`).join('\n'),
+      value: members.map((member) => `- ${userMention(member.memberSf)}`).join('\n') || 'None',
     });
 
     if (logs.length) {
