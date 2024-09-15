@@ -26,6 +26,11 @@ export abstract class CrewMemberService {
     data: UpdateCrewMember,
   ): Promise<UpdateResult>;
 
+  abstract removeGuildMemberCrews(
+    guildRef: SelectGuild,
+    memberRef: Snowflake,
+  ): Promise<UpdateResult>;
+
   abstract removeCrewMember(crew: Crew, member: GuildMember): Promise<DeleteResult>;
   abstract removeCrewMember(crew: Crew, memberRef: Snowflake): Promise<DeleteResult>;
   abstract removeCrewMember(channelRef: Snowflake, member: GuildMember): Promise<DeleteResult>;
@@ -151,6 +156,19 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     return result;
   }
 
+  async removeGuildMemberCrews(guildRef: SelectGuild, memberRef: Snowflake) {
+    const guildWhere = guildRef.id
+      ? { id: Equal(guildRef.id) }
+      : { guild: { guildSf: Equal(guildRef.guildSf) } };
+    return this.memberRepo.updateReturning(
+      {
+        ...guildWhere,
+        memberSf: memberRef,
+      },
+      { deletedAt: new Date() },
+    );
+  }
+
   async removeCrewMember(channelRef: Snowflake | Crew, memberRef: Snowflake | GuildMember) {
     const crew =
       channelRef instanceof Crew
@@ -164,9 +182,9 @@ export class CrewMemberServiceImpl extends CrewMemberService {
           ? memberRef
           : await this.resolveGuildMember(memberRef, crew.crewSf);
 
-      memberRef = member.id
+      memberRef = member.id;
     } catch {
-      this.logger.debug(`Guild member ${memberRef} has already left the guild`)
+      this.logger.debug(`Guild member ${memberRef} has already left the guild`);
     }
 
     try {

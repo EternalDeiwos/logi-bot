@@ -2,7 +2,7 @@ import { ExceptionFilter, Catch, Logger, Inject, ArgumentsHost } from '@nestjs/c
 import { NecordArgumentsHost, NecordContextType } from 'necord';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
 import { DiscordAPIError } from 'discord.js';
-import { AuthError, BaseError, DatabaseError, ExternalError, ValidationError } from 'src/errors';
+import { BaseError, DatabaseError, ExternalError, ValidationError } from 'src/errors';
 import { BotService, CommandInteraction } from './bot.service';
 
 type CaughtErrors = Error | BaseError;
@@ -57,8 +57,8 @@ export class DiscordExceptionFilter implements ExceptionFilter<CaughtErrors> {
     const discovery = necord.getDiscovery();
 
     if (discovery.isListener()) {
-      const err = new Error(`Interaction is not a discord command`);
-      return this.logger.error(err, err.stack);
+      this.logger.debug('Error handled in listener');
+      return;
     }
 
     await this.botService.reportCommandError(

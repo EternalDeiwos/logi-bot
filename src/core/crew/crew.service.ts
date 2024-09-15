@@ -46,6 +46,7 @@ type RegisterCrewOptions = Partial<{
 
 export abstract class CrewService {
   abstract getCrew(crewRef: SelectCrew): Promise<Crew>;
+  abstract getCrew(crewRef: SelectCrew, withDeleted: boolean): Promise<Crew>;
   abstract getCrewByRole(roleRef: Snowflake): Promise<Crew>;
   abstract getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake): Promise<Crew[]>;
   abstract registerCrew(data: InsertCrew, options?: RegisterCrewOptions): Promise<Crew>;
@@ -87,9 +88,9 @@ export class CrewServiceImpl extends CrewService {
     super();
   }
 
-  async getCrew(crewRef: SelectCrew) {
+  async getCrew(crewRef: SelectCrew, withDeleted: boolean = false) {
     try {
-      return await this.crewRepo.findOneOrFail({ where: crewRef });
+      return await this.crewRepo.findOneOrFail({ where: crewRef, withDeleted });
     } catch (err) {
       if (err instanceof EntityNotFoundError) {
         throw new ValidationError(

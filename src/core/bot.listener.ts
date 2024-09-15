@@ -1,17 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UseFilters } from '@nestjs/common';
 import { Context, ContextOf, On } from 'necord';
-import { Equal, IsNull } from 'typeorm';
+import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { TicketService } from 'src/core/ticket/ticket.service';
-import { TicketRepository } from 'src/core/ticket/ticket.repository';
-import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
-import { CrewMemberRepository } from 'src/core/crew/member/crew-member.repository';
 import { GuildService } from 'src/core/guild/guild.service';
-import { CrewMemberAccess } from 'src/types';
 
 @Injectable()
+@UseFilters(DiscordExceptionFilter)
 export class BotEventListener {
   private readonly logger = new Logger(BotEventListener.name);
 
@@ -19,10 +16,7 @@ export class BotEventListener {
     private readonly guildService: GuildService,
     private readonly tagService: TagService,
     private readonly ticketService: TicketService,
-    private readonly ticketRepo: TicketRepository,
-    private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
-    private readonly memberRepo: CrewMemberRepository,
     private readonly memberService: CrewMemberService,
   ) {}
 
@@ -56,17 +50,14 @@ export class BotEventListener {
   async onThreadUpdate(@Context() [oldThread, newThread]: ContextOf<'threadUpdate'>) {
     const guild = newThread.guild;
     const member = await guild.members.fetchMe();
-    const ticket = await this.ticketRepo.findOne({ where: { threadSf: oldThread.id } });
+    const ticket = await this.ticketService.getTicket({ threadSf: oldThread.id });
 
     if (!ticket) {
       this.logger.debug(`No ticket for thread update on ${oldThread.name} (${oldThread.id})`);
       return;
     }
 
-    const crew = await this.crewRepo.findOne({
-      where: { crewSf: ticket.crewSf },
-      withDeleted: true,
-    });
+    const crew = await this.crewService.getCrew({ crewSf: ticket.crewSf }, true);
 
     const tagMap = await crew.team.getTagMap();
 
@@ -98,7 +89,7 @@ export class BotEventListener {
   async onThreadCreate(@Context() [thread]: ContextOf<'threadCreate'>) {
     // This is a hack to delay the event to ensure the Ticket record is written to the database before proceeding.
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    const ticket = await this.ticketRepo.findOne({ where: { threadSf: thread.id } });
+    const ticket = await this.ticketService.getTicket({ threadSf: thread.id });
 
     if (!ticket?.crew) {
       return;
@@ -117,9 +108,12 @@ export class BotEventListener {
 
   @On('guildMemberRemove')
   async onMemberLeave(@Context() [member]: ContextOf<'guildMemberRemove'>) {
-    await this.memberRepo.update(
-      { guild: { guildSf: member.guild.id }, memberSf: member.id },
-      { deletedAt: new Date() },
+    const result = await this.memberService.removeGuildMemberCrews(
+      { guildSf: member.guild.id },
+      member.id,
+    );
+    this.logger.log(
+      `${member.displayName} has left ${member.guild.name}. Removed ${result.affected} crew memberships.`,
     );
   }
 
