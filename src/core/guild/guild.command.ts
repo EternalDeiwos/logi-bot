@@ -242,7 +242,7 @@ export class GuildCommand {
       throw new ValidationError('VALIDATION_FAILED', 'Audit channel not provided');
     }
 
-    return this.setConfig('globalLogChannel', context, audit.id);
+    return this.setConfig('crewAuditChannel', context, audit.id);
   }
 
   @Subcommand({
