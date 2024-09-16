@@ -184,24 +184,23 @@ export class CrewServiceImpl extends CrewService {
       }
     }
 
-    const denyEveryone = {
-      id: discordGuild.roles.everyone.id,
-      deny: [PermissionsBitField.Flags.ViewChannel],
-    };
-
-    const botMember = await discordGuild.members.fetchMe();
     const permissionOverwrites: OverwriteResolvable[] = [
       {
-        id: discordGuild.roles.botRoleFor(botMember),
-        allow: [PermissionsBitField.Flags.ViewChannel],
+        id: discordGuild.roles.everyone.id,
+        deny: [PermissionsBitField.Flags.ViewChannel],
       },
     ];
 
-    if (team.guild?.config?.crewViewerRole) {
-      if (permissionOverwrites.length <= 1) {
-        permissionOverwrites.push(denyEveryone);
-      }
+    const botMember = await discordGuild.members.fetchMe();
+    const botRole = discordGuild.roles.botRoleFor(botMember);
+    if (botRole) {
+      permissionOverwrites.push({
+        id: botRole.id,
+        allow: [PermissionsBitField.Flags.ViewChannel],
+      });
+    }
 
+    if (team.guild?.config?.crewViewerRole) {
       permissionOverwrites.push({
         id: team.guild.config.crewViewerRole,
         allow: [PermissionsBitField.Flags.ViewChannel],
@@ -209,10 +208,6 @@ export class CrewServiceImpl extends CrewService {
     }
 
     if (team.guild?.config?.crewCreatorRole) {
-      if (permissionOverwrites.length <= 1) {
-        permissionOverwrites.push(denyEveryone);
-      }
-
       permissionOverwrites.push({
         id: team.guild.config.crewCreatorRole,
         allow: [PermissionsBitField.Flags.ViewChannel],
@@ -389,6 +384,26 @@ export class CrewServiceImpl extends CrewService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid role');
     }
 
+    const result = await this.crewRepo.updateReturning(
+      { crewSf: channelRef },
+      { deletedAt: new Date(), deletedBy: memberRef },
+    );
+
+    if (crew.guild?.config?.crewAuditChannel && crew.auditMessageSf) {
+      const audit = await discordGuild.channels.fetch(crew.guild.config.crewAuditChannel);
+
+      if (audit.isTextBased()) {
+        try {
+          await audit.messages.delete(crew.auditMessageSf);
+        } catch (err) {
+          if ((err as DiscordAPIError).code !== 10008) {
+            // Unknown message
+            throw err;
+          }
+        }
+      }
+    }
+
     if (options.archiveSf) {
       let archiveTargetCategory;
 
@@ -415,7 +430,7 @@ export class CrewServiceImpl extends CrewService {
               parent: archiveTargetCategory as CategoryChannel,
             }),
             role.delete(),
-            voice.delete(),
+            crew.voiceSf && voice.delete(),
           ]);
         } catch (err) {
           throw new ExternalError('DISCORD_API_ERROR', 'Failed to archive channel', err);
@@ -428,29 +443,9 @@ export class CrewServiceImpl extends CrewService {
       }
     } else {
       try {
-        await Promise.all([discussion.delete(), role.delete(), voice.delete()]);
+        await Promise.all([discussion.delete(), role.delete(), crew.voiceSf && voice.delete()]);
       } catch (err) {
         throw new ExternalError('DISCORD_API_ERROR', 'Failed to delete channels and role');
-      }
-    }
-
-    const result = await this.crewRepo.updateReturning(
-      { crewSf: channelRef },
-      { deletedAt: new Date(), deletedBy: memberRef },
-    );
-
-    if (crew.guild?.config?.crewAuditChannel && crew.auditMessageSf) {
-      const audit = await discordGuild.channels.fetch(crew.guild.config.crewAuditChannel);
-
-      if (audit.isTextBased()) {
-        try {
-          await audit.messages.delete(crew.auditMessageSf);
-        } catch (err) {
-          if ((err as DiscordAPIError).code !== 10008) {
-            // Unknown message
-            throw err;
-          }
-        }
       }
     }
 

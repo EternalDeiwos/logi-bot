@@ -102,7 +102,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   async registerCrewMember(
     channelRef: Snowflake,
     memberRef: Snowflake,
-    access: CrewMemberAccess = CrewMemberAccess.MEMBER,
+    access?: CrewMemberAccess,
   ): Promise<InsertResult> {
     const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
     const member = await this.resolveGuildMember(memberRef, crew.crewSf);
@@ -328,7 +328,12 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       where: { ...guildWhere, memberSf: memberRef },
     });
     for (const crewMember of members) {
-      const channel = await discordGuild.channels.fetch(crewMember.crew.crewSf);
+      const channel = await discordGuild.channels.fetch(crewMember.crewSf);
+
+      if (!channel) {
+        await this.removeCrewMember(crewMember.crewSf, member);
+        continue;
+      }
 
       if (
         !channel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) &&
