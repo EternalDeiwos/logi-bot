@@ -281,7 +281,10 @@ export class CrewMemberServiceImpl extends CrewMemberService {
         continue;
       }
 
-      if (!channel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel)) {
+      if (
+        !channel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) &&
+        crewMember.access >= CrewMemberAccess.MEMBER
+      ) {
         await this.removeCrewMember(crewMember.crew, member);
         continue;
       }
@@ -294,7 +297,8 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       if (
         crew.guild?.config?.crewViewerRole &&
         crew.isSecureOnly &&
-        !member.roles.cache.has(crew.guild?.config?.crewViewerRole)
+        !member.roles.cache.has(crew.guild?.config?.crewViewerRole) &&
+        crewMember.access >= CrewMemberAccess.MEMBER
       ) {
         await this.removeCrewMember(crewMember.crew, member);
         continue;
@@ -319,25 +323,33 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       );
     }
 
-    for (const crew of await this.crewService.getMemberCrews(guild, memberRef)) {
-      const channel = await discordGuild.channels.fetch(crew.crewSf);
+    const guildWhere = guildRef.id ? { id: guildRef.id } : { guild: { guildSf: guildRef.guildSf } };
+    const members = await this.memberRepo.find({
+      where: { ...guildWhere, memberSf: memberRef },
+    });
+    for (const crewMember of members) {
+      const channel = await discordGuild.channels.fetch(crewMember.crew.crewSf);
 
-      if (!channel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel)) {
-        await this.removeCrewMember(crew, member);
+      if (
+        !channel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) &&
+        crewMember.access >= CrewMemberAccess.MEMBER
+      ) {
+        await this.removeCrewMember(crewMember.crew, member);
         continue;
       }
 
-      if (!member.roles.cache.has(crew.roleSf)) {
-        await this.removeCrewMember(crew, member);
+      if (!member.roles.cache.has(crewMember.crew.roleSf)) {
+        await this.removeCrewMember(crewMember.crew, member);
         continue;
       }
 
       if (
-        crew.guild?.config?.crewViewerRole &&
-        crew.isSecureOnly &&
-        !member.roles.cache.has(crew.guild?.config?.crewViewerRole)
+        crewMember.crew.guild?.config?.crewViewerRole &&
+        crewMember.crew.isSecureOnly &&
+        !member.roles.cache.has(crewMember.crew.guild?.config?.crewViewerRole) &&
+        crewMember.access >= CrewMemberAccess.MEMBER
       ) {
-        await this.removeCrewMember(crew, member);
+        await this.removeCrewMember(crewMember.crew, member);
         continue;
       }
     }
