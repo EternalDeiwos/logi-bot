@@ -8,6 +8,7 @@ import {
   ChannelType,
   DiscordAPIError,
   EmbedBuilder,
+  GuildBasedChannel,
   GuildManager,
   GuildTextBasedChannel,
   OverwriteResolvable,
@@ -556,7 +557,13 @@ export class CrewServiceImpl extends CrewService {
 
     const crews = await this.crewRepo.find({ where: { guild: guildRef } });
     for (const crew of crews) {
-      const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+      let crewChannel: GuildBasedChannel;
+      try {
+        crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+      } catch (err) {
+        this.logger.warn(`Failed to display crew status for ${crew.name} in ${crew.guild.name}`);
+        continue;
+      }
 
       if (
         !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||
