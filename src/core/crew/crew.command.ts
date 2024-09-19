@@ -875,6 +875,34 @@ export class CrewCommand {
     });
   }
 
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'set_triage',
+    description: 'Set the crew that will receive tickets by default. Guild Admin only',
+    dmPermission: false,
+  })
+  async onGuildSetTriageCrew(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() { crew }: SelectCrewCommandParams,
+  ) {
+    if (!crew) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
+    }
+
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a guild administrator can perform this action',
+      ).asDisplayable();
+    }
+
+    await this.guildService.setConfig({ guildSf: interaction.guildId }, 'ticketTriageCrew', crew);
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Configuration updated')],
+    });
+  }
+
   @UseInterceptors(CrewShareAutocompleteInterceptor)
   @Subcommand({
     name: 'share',

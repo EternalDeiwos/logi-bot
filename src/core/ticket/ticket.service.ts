@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { uniq } from 'lodash';
 import {
   ActionRowBuilder,
@@ -22,9 +22,7 @@ import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
-import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
-import { TeamService } from 'src/core/team/team.service';
 import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
@@ -162,7 +160,7 @@ export class TicketServiceImpl extends TicketService {
     private readonly guildManager: GuildManager,
     private readonly discordService: DiscordService,
     private readonly guildService: GuildService,
-    private readonly crewService: CrewService,
+    @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
     private readonly ticketRepo: TicketRepository,
   ) {
