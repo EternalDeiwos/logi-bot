@@ -42,6 +42,7 @@ const schema = {
   APP_QUEUE_RETRY_BACKOFF_MULTIPLIER: Joi.number().default(1000),
   APP_QUEUE_MAX_RETRY_COUNT: Joi.number().default(3),
   APP_QUEUE_RPC_EXPIRE: Joi.number().default(1000),
+  APP_API_KEY_SECRET: Joi.string().required().example('keyboard_cat,keyboard_cat2'),
 };
 
 export type ConfigKey = keyof typeof schema;

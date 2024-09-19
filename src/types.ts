@@ -92,3 +92,9 @@ export type ConsumerResponsePayload<C = any> = {
   content?: C;
   error?: ConsumerResponseError;
 };
+
+export type APITokenPayload = {
+  aud: string;
+  sub: string;
+  iat: number;
+};
