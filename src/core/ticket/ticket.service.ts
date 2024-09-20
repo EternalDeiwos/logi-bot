@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { uniq } from 'lodash';
 import {
   ActionRowBuilder,
@@ -22,9 +22,7 @@ import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
-import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
-import { TeamService } from 'src/core/team/team.service';
 import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { newTicketMessage, ticketTriageMessage } from './ticket.messages';
@@ -102,6 +100,8 @@ export const ticketProperties = {
 
 export abstract class TicketService {
   abstract getTicket(ticket: SelectTicket): Promise<Ticket>;
+  abstract searchForGuild(guildRef: SelectGuild, query: string): Promise<Ticket[]>;
+  abstract searchForCrew(crewRef: SelectCrew, query: string): Promise<Ticket[]>;
   abstract createTicket(crewRef: SelectCrew, ticket?: InsertTicket): Promise<InsertResult>;
 
   // Move to Ticket Control
@@ -162,7 +162,7 @@ export class TicketServiceImpl extends TicketService {
     private readonly guildManager: GuildManager,
     private readonly discordService: DiscordService,
     private readonly guildService: GuildService,
-    private readonly crewService: CrewService,
+    @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
     private readonly crewRepo: CrewRepository,
     private readonly ticketRepo: TicketRepository,
   ) {
@@ -171,7 +171,14 @@ export class TicketServiceImpl extends TicketService {
 
   async getTicket(ticketRef: SelectTicket) {
     try {
-      return await this.ticketRepo.findOneOrFail({ where: ticketRef, withDeleted: true });
+      return await this.ticketRepo
+        .createQueryBuilder('ticket')
+        .leftJoinAndSelect('ticket.crew', 'crew')
+        .leftJoinAndSelect('ticket.guild', 'guild')
+        .withDeleted()
+        .leftJoinAndSelect('ticket.previous', 'previous')
+        .where('ticket.thread_sf=:threadSf', ticketRef)
+        .getOneOrFail();
     } catch (err) {
       if (err instanceof EntityNotFoundError) {
         throw new ValidationError(
@@ -180,6 +187,14 @@ export class TicketServiceImpl extends TicketService {
         ).asDisplayable();
       }
     }
+  }
+
+  async searchForGuild(guildRef: SelectGuild, query: string) {
+    return this.ticketRepo.searchByGuild(guildRef, query);
+  }
+
+  async searchForCrew(crewRef: SelectCrew, query: string) {
+    return this.ticketRepo.searchByCrew(crewRef, query);
   }
 
   async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {

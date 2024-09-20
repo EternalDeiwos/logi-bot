@@ -12,6 +12,7 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
+import { Expose } from 'class-transformer';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
@@ -22,6 +23,7 @@ export type SelectTicket = DeepPartial<Pick<Ticket, 'threadSf'>>;
 
 @Entity()
 export class Ticket {
+  @Expose()
   @PrimaryColumn({ type: 'int8', name: 'thread_sf', primaryKeyConstraintName: 'pk_thread_sf' })
   threadSf: Snowflake;
 
@@ -29,6 +31,7 @@ export class Ticket {
   @Index('guild_id_idx_ticket')
   guildId: string;
 
+  @Expose()
   @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'guild_id',
@@ -42,18 +45,20 @@ export class Ticket {
   @Index('previous_thread_sf_idx_ticket')
   previousThreadSf: Snowflake;
 
-  @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true })
+  @Expose()
+  @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true, eager: true })
   @JoinColumn({
     name: 'previous_thread_sf',
     referencedColumnName: 'threadSf',
     foreignKeyConstraintName: 'fk_ticket_previous_thread_sf',
   })
-  previous: Promise<Ticket>;
+  previous: Ticket;
 
   /**
    * Snowflake for crew Discord channel
    * @type Snowflake
    */
+  @Expose()
   @Column({ type: 'int8', name: 'crew_channel_sf' })
   @RelationId((ticket: Ticket) => ticket.crew)
   @Index('crew_channel_sf_idx_ticket')
@@ -67,28 +72,36 @@ export class Ticket {
   })
   crew: Crew;
 
+  @Expose()
   @Column({ name: 'content', type: 'text' })
   content: string;
 
+  @Expose()
   @Column()
   name: string;
 
+  @Expose()
   @Column({ name: 'sort_order', default: '' })
   @Index('sort_order_idx_ticket')
   sortOrder: string;
 
+  @Expose()
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 
+  @Expose()
   @Column({ type: 'int8', name: 'updated_by_sf' })
   updatedBy: Snowflake;
 
+  @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;
 
+  @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
+  @Expose()
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
 }

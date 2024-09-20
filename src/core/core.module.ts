@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BotModule } from 'src/bot/bot.module';
 import { RMQModule } from 'src/rmq/rmq.module';
+import { ApiModule } from './api/api.module';
+import { GuildModule } from './guild/guild.module';
 import { Team } from './team/team.entity';
 import { Crew } from './crew/crew.entity';
 import { CrewMember } from './crew/member/crew-member.entity';
@@ -24,6 +26,7 @@ import { CrewLogService, CrewLogServiceImpl } from './crew/log/crew-log.service'
 import { CrewLogRepository } from './crew/log/crew-log.repository';
 import { CrewShareService, CrewShareServiceImpl } from './crew/share/crew-share.service';
 import { CrewShareRepository } from './crew/share/crew-share.repository';
+import { CrewController } from './crew/crew.controller';
 import { TagService, TagServiceImpl } from './tag/tag.service';
 import { TagCommand } from './tag/tag.command';
 import { TagRepository } from './tag/tag.repository';
@@ -31,14 +34,14 @@ import { TagTemplateRepository } from './tag/tag-template.repository';
 import { TicketService, TicketServiceImpl } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
 import { TicketRepository } from './ticket/ticket.repository';
-import { GuildService, GuildServiceImpl } from './guild/guild.service';
-import { GuildCommand } from './guild/guild.command';
-import { GuildRepository } from './guild/guild.repository';
+import { TicketController } from './ticket/ticket.controller';
 
 @Module({
   imports: [
     RMQModule,
     BotModule,
+    GuildModule,
+    ApiModule,
     TypeOrmModule.forFeature([
       Team,
       Crew,
@@ -53,8 +56,6 @@ import { GuildRepository } from './guild/guild.repository';
   ],
   providers: [
     BotEventListener,
-    GuildRepository,
-    GuildCommand,
     TeamCommand,
     TeamRepository,
     CrewRepository,
@@ -67,7 +68,6 @@ import { GuildRepository } from './guild/guild.repository';
     TagTemplateRepository,
     TicketCommand,
     TicketRepository,
-    { provide: GuildService, useClass: GuildServiceImpl },
     { provide: TeamService, useClass: TeamServiceImpl },
     { provide: CrewService, useClass: CrewServiceImpl },
     { provide: CrewMemberService, useClass: CrewMemberServiceImpl },
@@ -76,9 +76,10 @@ import { GuildRepository } from './guild/guild.repository';
     { provide: TagService, useClass: TagServiceImpl },
     { provide: TicketService, useClass: TicketServiceImpl },
   ],
+  controllers: [CrewController, TicketController],
   exports: [
     TypeOrmModule,
-    GuildService,
+    ApiModule,
     TeamService,
     CrewService,
     CrewMemberService,

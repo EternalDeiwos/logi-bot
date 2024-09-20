@@ -13,6 +13,7 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
+import { Expose, Type } from 'class-transformer';
 import { CrewMemberAccess } from 'src/types';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
@@ -52,6 +53,7 @@ export class Crew {
    * Snowflake for crew Discord channel
    * @type Snowflake
    */
+  @Expose()
   @PrimaryColumn({
     type: 'int8',
     name: 'crew_channel_sf',
@@ -59,6 +61,7 @@ export class Crew {
   })
   crewSf: Snowflake;
 
+  @Expose()
   @Column({ type: 'int8', name: 'voice_channel_sf', nullable: true })
   voiceSf?: Snowflake;
 
@@ -67,6 +70,7 @@ export class Crew {
   @Index('guild_id_idx_crew')
   guildId: string;
 
+  @Expose()
   @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'guild_id',
@@ -80,6 +84,7 @@ export class Crew {
   @Index('team_id_idx_crew')
   teamId: string;
 
+  @Expose()
   @ManyToOne(() => Team, (team) => team.crews, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'team_id',
@@ -88,15 +93,19 @@ export class Crew {
   })
   team: Team;
 
+  @Expose()
   @Column()
   name: string;
 
+  @Expose()
   @Column({ name: 'name_short' })
   shortName: string;
 
+  @Expose()
   @Column()
   slug: string;
 
+  @Expose()
   @Column({ type: 'int8', name: 'role_sf' })
   @Index('role_sf_idx_crew')
   roleSf: Snowflake;
@@ -105,6 +114,7 @@ export class Crew {
   @Index('audit_message_sf_idx_crew')
   auditMessageSf: Snowflake;
 
+  @Expose()
   @Column({
     type: 'boolean',
     name: 'enable_move_prompt',
@@ -113,6 +123,7 @@ export class Crew {
   })
   hasMovePrompt: boolean;
 
+  @Expose()
   @Column({
     type: 'boolean',
     name: 'is_permanent',
@@ -121,6 +132,7 @@ export class Crew {
   })
   isPermanent: boolean;
 
+  @Expose()
   @Column({
     type: 'boolean',
     name: 'secure_only',
@@ -129,6 +141,8 @@ export class Crew {
   })
   isSecureOnly: boolean;
 
+  @Expose()
+  @Type(() => CrewMember)
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: Promise<CrewMember[]>;
 
@@ -144,15 +158,19 @@ export class Crew {
   @OneToMany(() => CrewShare, (share) => share.crew)
   shared: Promise<CrewShare[]>;
 
+  @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;
 
+  @Expose()
   @Column({ type: 'int8', name: 'deleted_by_sf', nullable: true })
   deletedBy: Snowflake;
 
+  @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
+  @Expose()
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
 

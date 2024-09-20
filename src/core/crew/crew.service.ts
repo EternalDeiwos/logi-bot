@@ -50,6 +50,7 @@ export abstract class CrewService {
   abstract getCrew(crewRef: SelectCrew, withDeleted: boolean): Promise<Crew>;
   abstract getCrewByRole(roleRef: Snowflake): Promise<Crew>;
   abstract getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake): Promise<Crew[]>;
+  abstract search(guildRef: SelectGuild, query: string, includeShared?: boolean): Promise<Crew[]>;
   abstract registerCrew(data: InsertCrew, options?: RegisterCrewOptions): Promise<Crew>;
   abstract deregisterCrew(
     channelRef: Snowflake,
@@ -118,6 +119,10 @@ export class CrewServiceImpl extends CrewService {
       deletedAt: IsNull(),
       members: { memberSf: Equal(memberRef), deletedAt: IsNull() },
     });
+  }
+
+  async search(guildRef: SelectGuild, query: string, includeShared?: boolean) {
+    return await this.crewRepo.search(guildRef, query, includeShared).getMany();
   }
 
   async registerCrew(data: InsertCrew, options: RegisterCrewOptions = {}) {

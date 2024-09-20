@@ -8,6 +8,7 @@ import {
   OneToMany,
   PrimaryColumn,
 } from 'typeorm';
+import { Expose } from 'class-transformer';
 import { CrewShare } from 'src/core/crew/share/crew-share.entity';
 
 export type InsertGuild = DeepPartial<Omit<Guild, 'createdAt' | 'deletedAt'>>;
@@ -32,15 +33,19 @@ export class Guild {
   })
   id: string;
 
+  @Expose()
   @Column({ name: 'guild_sf', type: 'int8' })
   guildSf: string;
 
+  @Expose()
   @Column({ name: 'name' })
   name: string;
 
+  @Expose()
   @Column({ name: 'short_name' })
   shortName: string;
 
+  @Expose()
   @Column({ name: 'icon', nullable: true })
   icon?: string;
 
@@ -50,9 +55,11 @@ export class Guild {
   @OneToMany(() => CrewShare, (share) => share.guild)
   shared: Promise<CrewShare[]>;
 
+  @Expose()
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
+  @Expose()
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt: Date;
 }

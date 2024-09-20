@@ -142,27 +142,9 @@ export class GuildCommand {
 
     await this.guildService.setConfig({ guildSf: interaction.guildId }, key, value);
 
-    await interaction.reply({
+    await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Configuration updated')],
-      ephemeral: true,
     });
-  }
-
-  @UseInterceptors(CrewSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'set_triage',
-    description: 'Set the crew that will receive tickets by default. Guild Admin only',
-    dmPermission: false,
-  })
-  async onGuildSetTriageCrew(
-    @Context() context: SlashCommandContext,
-    @Options() { crew }: SelectCrewCommandParams,
-  ) {
-    if (!crew) {
-      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
-    }
-
-    return this.setConfig('ticketTriageCrew', context, crew);
   }
 
   @Subcommand({

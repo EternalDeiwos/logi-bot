@@ -12,6 +12,7 @@ import {
   DeleteDateColumn,
   Unique,
 } from 'typeorm';
+import { Expose } from 'class-transformer';
 import { CrewMemberAccess, SkipAccessControlOptions } from 'src/types';
 import { Crew } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
@@ -46,6 +47,7 @@ export class CrewMember {
   })
   crew: Crew;
 
+  @Expose()
   @Column({
     type: 'int8',
     name: 'member_sf',
@@ -66,9 +68,11 @@ export class CrewMember {
   })
   guild: Guild;
 
+  @Expose()
   @Column()
   name: string;
 
+  @Expose()
   @Column({
     type: 'enum',
     enum: CrewMemberAccess,
@@ -76,9 +80,11 @@ export class CrewMember {
   })
   access: CrewMemberAccess;
 
+  @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
+  @Expose()
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
 
