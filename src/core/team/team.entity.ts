@@ -13,6 +13,7 @@ import {
   RelationId,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
+import { Expose } from 'class-transformer';
 import { TicketTag } from 'src/types';
 import { ForumTag } from 'src/core/tag/tag.entity';
 import { Guild } from 'src/core/guild/guild.entity';
@@ -45,6 +46,7 @@ export class Team {
   })
   id: string;
 
+  @Expose()
   @Column()
   @Index('name_idx_team')
   name: string;
@@ -62,6 +64,7 @@ export class Team {
   })
   guild: Guild;
 
+  @Expose()
   @Column({
     type: 'int8',
     name: 'forum_channel_sf',
@@ -70,6 +73,7 @@ export class Team {
   @Index('forum_channel_sf_idx_team')
   forumSf: Snowflake;
 
+  @Expose()
   @Column({
     type: 'int8',
     name: 'category_channel_sf',
@@ -84,9 +88,11 @@ export class Team {
   @OneToMany(() => Crew, (crew) => crew.team)
   crews: Promise<Crew[]>;
 
+  @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
+  @Expose()
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
 

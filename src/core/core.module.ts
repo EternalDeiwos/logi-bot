@@ -26,6 +26,7 @@ import { CrewLogService, CrewLogServiceImpl } from './crew/log/crew-log.service'
 import { CrewLogRepository } from './crew/log/crew-log.repository';
 import { CrewShareService, CrewShareServiceImpl } from './crew/share/crew-share.service';
 import { CrewShareRepository } from './crew/share/crew-share.repository';
+import { CrewController } from './crew/crew.controller';
 import { TagService, TagServiceImpl } from './tag/tag.service';
 import { TagCommand } from './tag/tag.command';
 import { TagRepository } from './tag/tag.repository';
@@ -33,6 +34,7 @@ import { TagTemplateRepository } from './tag/tag-template.repository';
 import { TicketService, TicketServiceImpl } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
 import { TicketRepository } from './ticket/ticket.repository';
+import { TicketController } from './ticket/ticket.controller';
 
 @Module({
   imports: [
@@ -74,6 +76,7 @@ import { TicketRepository } from './ticket/ticket.repository';
     { provide: TagService, useClass: TagServiceImpl },
     { provide: TicketService, useClass: TicketServiceImpl },
   ],
+  controllers: [CrewController, TicketController],
   exports: [
     TypeOrmModule,
     ApiModule,

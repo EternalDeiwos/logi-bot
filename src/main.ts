@@ -1,4 +1,5 @@
-import { NestFactory } from '@nestjs/core';
+import { ClassSerializerInterceptor, VersioningType } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { default as helmet } from 'helmet';
@@ -16,6 +17,15 @@ async function bootstrap() {
         ? ['fatal', 'error', 'warn', 'log']
         : ['fatal', 'error', 'warn', 'log', 'debug'],
   });
+
+  app.useGlobalInterceptors(
+    new ClassSerializerInterceptor(app.get(Reflector), {
+      strategy: 'excludeAll',
+    }),
+  );
+
+  app.enableVersioning({ defaultVersion: '1', type: VersioningType.URI });
+
   const configService = app.get(ConfigService<Record<ConfigKey, unknown>>);
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Logi Bot')
@@ -23,8 +33,13 @@ async function bootstrap() {
     .setVersion(process.env.NODE_ENV === 'production' ? pkg.version : 'unstable')
     .addBearerAuth()
     .build();
+
   const swaggerDoc = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api', app, swaggerDoc);
+  SwaggerModule.setup('api', app, swaggerDoc, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
 
   (app.getHttpAdapter() as any).disable('x-powered-by');
   app.use(helmet());

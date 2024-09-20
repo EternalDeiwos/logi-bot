@@ -1,4 +1,4 @@
-import { Controller, Get, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Request, UseGuards, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { ConfigKey } from 'src/app.config';
@@ -11,7 +11,7 @@ import { ApplicationInformationDto } from './app-info.dto';
 import * as pkg from '../package.json';
 @ApiTags('info')
 @ApiBearerAuth()
-@Controller()
+@Controller({ version: VERSION_NEUTRAL })
 @UseGuards(AuthGuard)
 export class AppController {
   constructor(
