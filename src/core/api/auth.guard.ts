@@ -8,8 +8,8 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { jwtVerify } from 'jose';
-import { APITokenPayload } from 'src/types';
 import { ApiService } from './api.service';
+import { APITokenPayload } from './api-token.dto';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -43,10 +43,16 @@ export class AuthGuard implements CanActivate {
         }
 
         return k[1];
-      }).then((v) => {
-        request.auth = v;
-        return true;
-      });
+      })
+        .then((v) => {
+          request.auth = v;
+          return true;
+        })
+        .catch((cause) => {
+          throw new HttpException('Authentication Failed', HttpStatus.UNAUTHORIZED, {
+            cause,
+          });
+        });
     }
 
     return false;
