@@ -26,7 +26,7 @@ export class TicketController {
 
   @Get()
   @ApiQuery({ name: 'q', description: 'query', required: false })
-  @ApiResponse({ status: 200, description: 'Get all tickets', type: TicketDto })
+  @ApiResponse({ status: 200, description: 'Get all tickets', type: [TicketDto] })
   @ApiResponse({ status: 401, description: 'Authentication Failed' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Not Found' })
