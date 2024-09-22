@@ -10,7 +10,6 @@ import {
 } from 'typeorm';
 
 @Entity()
-// REMEMBER TO MODIFY THIS FOR "NULLS NOT DISTINCT"
 @Unique('uk_hex_major_minor_deleted_at', ['hexId', 'majorName', 'minorName', 'deletedAt'])
 export class Region {
   @PrimaryColumn({

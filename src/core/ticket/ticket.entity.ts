@@ -12,7 +12,7 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Expose } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
@@ -40,13 +40,15 @@ export class Ticket {
   })
   guild: Guild;
 
+  @Expose()
   @Column({ type: 'int8', name: 'previous_thread_sf', nullable: true })
   @RelationId((ticket: Ticket) => ticket.previous)
   @Index('previous_thread_sf_idx_ticket')
   previousThreadSf: Snowflake;
 
   @Expose()
-  @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true, eager: true })
+  @Transform(({ value }) => (value && 'threadSf' in value ? value : null))
+  @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({
     name: 'previous_thread_sf',
     referencedColumnName: 'threadSf',
@@ -64,6 +66,7 @@ export class Ticket {
   @Index('crew_channel_sf_idx_ticket')
   crewSf: Snowflake;
 
+  @Expose()
   @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
     name: 'crew_channel_sf',

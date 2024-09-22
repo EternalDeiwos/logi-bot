@@ -83,10 +83,10 @@ export class Team {
   categorySf: Snowflake;
 
   @OneToMany(() => ForumTag, (tag) => tag.team)
-  tags: Promise<ForumTag[]>;
+  tags: ForumTag[];
 
   @OneToMany(() => Crew, (crew) => crew.team)
-  crews: Promise<Crew[]>;
+  crews: Crew[];
 
   @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

@@ -13,7 +13,7 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Expose, Type } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import { CrewMemberAccess } from 'src/types';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
@@ -143,20 +143,21 @@ export class Crew {
 
   @Expose()
   @Type(() => CrewMember)
+  @Transform(({ value }) => (value && 'threadSf' in value ? value : null))
   @OneToMany(() => CrewMember, (member) => member.crew)
-  members: Promise<CrewMember[]>;
+  members: CrewMember[];
 
   @OneToMany(() => ForumTagTemplate, (tag) => tag.crew)
-  tags: Promise<ForumTagTemplate[]>;
+  tags: ForumTagTemplate[];
 
   @OneToMany(() => Ticket, (ticket) => ticket.crew)
-  tickets: Promise<Ticket[]>;
+  tickets: Ticket[];
 
   @OneToMany(() => CrewLog, (log) => log.crew)
-  logs: Promise<CrewLog[]>;
+  logs: CrewLog[];
 
   @OneToMany(() => CrewShare, (share) => share.crew)
-  shared: Promise<CrewShare[]>;
+  shared: CrewShare[];
 
   @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })

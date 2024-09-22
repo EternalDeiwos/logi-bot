@@ -78,7 +78,7 @@ export class ForumTagTemplate {
   crew: Crew;
 
   @OneToMany(() => ForumTag, (tag) => tag.template)
-  tags: Promise<ForumTag[]>;
+  tags: ForumTag[];
 
   @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;

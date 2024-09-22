@@ -32,13 +32,13 @@ export class RegionLog {
   @Column({ name: 'version', type: 'int8' })
   version: string;
 
-  @ManyToOne(() => War, { onDelete: 'RESTRICT', lazy: true })
+  @ManyToOne(() => War, { onDelete: 'RESTRICT' })
   @JoinColumn({
     name: 'war_number',
     referencedColumnName: 'warNumber',
     foreignKeyConstraintName: 'fk_region_log_war_number',
   })
-  war: Promise<War>;
+  war: War;
 
   @Column({ name: 'war_number', type: 'int8' })
   @RelationId((update: RegionLog) => update.war)
@@ -58,7 +58,6 @@ export class RegionLog {
   expression: (ds) =>
     ds
       .createQueryBuilder()
-      .select()
       .distinctOn(['hex_id'])
       .from(RegionLog, 'log')
       .orderBy('hex_id')
@@ -80,7 +79,7 @@ export class CurrentRegionLog {
     referencedColumnName: 'warNumber',
     foreignKeyConstraintName: 'fk_poi_war_number',
   })
-  war: Promise<War>;
+  war: War;
 
   @ViewColumn({ name: 'war_number' })
   warNumber: string;
