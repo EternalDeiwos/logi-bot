@@ -16,18 +16,12 @@ import {
   Subcommand,
 } from 'necord';
 import {
-  ActionRowBuilder,
   ChannelType,
-  EmbedBuilder,
   GuildChannel,
-  GuildChannelResolvable,
   GuildManager,
   GuildMember,
-  ModalBuilder,
   PermissionsBitField,
   Snowflake,
-  TextInputBuilder,
-  TextInputStyle,
 } from 'discord.js';
 import { Equal, Not } from 'typeorm';
 import { compact } from 'lodash';
@@ -50,6 +44,9 @@ import { CrewMemberRepository } from './member/crew-member.repository';
 import { CrewShareService } from './share/crew-share.service';
 import { CrewLogService } from './log/crew-log.service';
 import { Crew } from './crew.entity';
+import { CrewDeletePromptBuilder } from './crew-delete.prompt';
+import { CrewDeleteModalBuilder } from './crew-delete.modal';
+import { CrewLogModalBuilder } from './crew-log.modal';
 
 export class CreateCrewCommandParams {
   @StringOption({
@@ -705,20 +702,8 @@ export class CrewCommand {
     @Context() [interaction]: ButtonContext,
     @ComponentParam('crew') crewRef: Snowflake,
   ) {
-    const modal = this.buildDeleteCrewModal(crewRef);
+    const modal = new CrewDeleteModalBuilder().addForm({ crewSf: crewRef });
     return interaction.showModal(modal);
-  }
-
-  buildDeleteCrewModal(crewRef: GuildChannelResolvable) {
-    const reason = new TextInputBuilder()
-      .setCustomId('crew/delete/reason')
-      .setLabel('Reason')
-      .setStyle(TextInputStyle.Paragraph);
-
-    return new ModalBuilder()
-      .setCustomId(`crew/delete/${crewRef}`)
-      .setTitle('Delete Crew')
-      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(reason));
   }
 
   @Modal('crew/delete/:crew')
@@ -739,22 +724,9 @@ export class CrewCommand {
     const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
 
     if (result) {
-      const message = reason
-        .split('\n')
-        .map((r) => `> ${r}`)
-        .join('\n');
-
-      const embed = new EmbedBuilder()
-        .setTitle('Crew Removed')
-        .setColor('DarkRed')
-        .setDescription(
-          `Crew **${result.name}** was removed by ${member} for the following reason:\n\n${message}`,
-        )
-        .setThumbnail(member.avatarURL() ?? member.user.avatarURL());
-
-      await interaction.channel.send({
-        embeds: [embed],
-      });
+      await interaction.channel.send(
+        new CrewDeletePromptBuilder().addCrewDeleteMessage(result, member, reason).build(),
+      );
     }
   }
 
@@ -824,28 +796,13 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    const modal = this.buildLogModal(channelRef);
+    const modal = new CrewLogModalBuilder().addForm({ crewSf: channelRef });
     return interaction.showModal(modal);
-  }
-
-  buildLogModal(channelRef: Snowflake) {
-    const log = new TextInputBuilder()
-      .setCustomId('crew/log/content')
-      .setLabel('Crew Status')
-      .setPlaceholder(
-        'This will replace the last log on status updates so please keep it relevant.',
-      )
-      .setStyle(TextInputStyle.Paragraph);
-
-    return new ModalBuilder()
-      .setCustomId(`crew/log/${channelRef}`)
-      .setTitle('New Crew Log')
-      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(log));
   }
 
   @Button('crew/log')
   async onCrewLogButton(@Context() [interaction]: ButtonContext) {
-    const modal = this.buildLogModal(interaction.channel.id);
+    const modal = new CrewLogModalBuilder().addForm({ crewSf: interaction.channelId });
     return interaction.showModal(modal);
   }
 

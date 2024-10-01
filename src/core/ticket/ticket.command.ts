@@ -18,21 +18,10 @@ import {
   Subcommand,
   TargetMessage,
 } from 'necord';
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  EmbedBuilder,
-  GuildChannelResolvable,
-  Message,
-  ModalBuilder,
-  Snowflake,
-  TextInputBuilder,
-  TextInputStyle,
-} from 'discord.js';
+import { Message, Snowflake } from 'discord.js';
 import { AuthError, InternalError } from 'src/errors';
 import { BotService } from 'src/bot/bot.service';
-import { PromptEmbed, SuccessEmbed } from 'src/bot/embed';
+import { SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
@@ -44,16 +33,11 @@ import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
-import {
-  crewPromptStatusInstructions,
-  proxyTicketMessage,
-  ticketPromptCrewCreateInstructions,
-  ticketPromptCrewJoinInstructions,
-  ticketPromptDescription,
-  ticketPromptStatusInstructions,
-  ticketPromptTriageHelp,
-} from './ticket.messages';
 import { SelectTicket } from './ticket.entity';
+import { TicketCreatePromptBuilder } from './ticket-create.prompt';
+import { TicketInfoPromptBuilder } from './ticket-info.prompt';
+import { TicketCreateModalBuilder } from './ticket-create.modal';
+import { TicketDeclineModalBuilder } from './ticket-decline.modal';
 
 export const TicketActionToTag: Record<string, TicketTag> = {
   accept: TicketTag.ACCEPTED,
@@ -107,78 +91,21 @@ export class TicketCommand {
       return interaction.reply({ ephemeral: true, content: 'Invalid crew selected' });
     }
 
-    const prompt = new EmbedBuilder()
-      .setColor('DarkGold')
-      .setTitle('Create a Ticket')
-      .setDescription(ticketPromptDescription())
-      .addFields(
-        {
-          name: 'Triage Process',
-          value: ticketPromptTriageHelp(),
-          inline: false,
-        },
-        {
-          name: 'Crews',
-          value: ticketPromptCrewJoinInstructions(),
-          inline: false,
-        },
-        {
-          name: 'Crew Status',
-          value: crewPromptStatusInstructions(),
-          inline: false,
-        },
-        {
-          name: 'Ticket Status',
-          value: ticketPromptStatusInstructions(),
-          inline: false,
-        },
-        {
-          name: 'Create a Crew',
-          value: ticketPromptCrewCreateInstructions(),
-          inline: false,
-        },
-      );
+    const prompt = new TicketCreatePromptBuilder();
 
-    const maybeCrew = await this.crewRepo.findOne({ where: { crewSf: data.crew } });
-
-    // Use selected crew
     if (data.crew) {
-      const crew = await this.crewRepo.findOne({ where: { crewSf: data.crew } });
-
-      if (!crew) {
-        return interaction.reply({ content: 'Invalid crew', ephemeral: true });
-      }
-
-      const create = new ButtonBuilder()
-        .setCustomId(`ticket/start/${data.crew}`)
-        .setLabel('Create Ticket')
-        .setStyle(ButtonStyle.Primary);
-
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(create);
-
-      await interaction.channel.send({
-        components: [this.ticketService.createTicketButton(data.crew)],
-        embeds: [prompt],
-      });
-      // Try infer crew from interaction channel
-    } else if (maybeCrew) {
-      await interaction.channel.send({
-        components: [this.ticketService.createTicketButton(maybeCrew.crewSf)],
-        embeds: [prompt],
-      });
-
-      // Show global ticket status
+      // Use selected crew
+      prompt.addCreateTicketMessage().addCreateButton({ crewSf: data.crew });
     } else {
-      prompt.setDescription(ticketPromptDescription(true));
+      // Show crew selector
       const crews = await this.crewRepo.find({
         where: { guild: { guildSf: interaction.guildId } },
       });
 
-      await interaction.channel.send({
-        components: [this.ticketService.createCrewMenu(crews)],
-        embeds: [prompt],
-      });
+      prompt.addCreateTicketMessage(true).addCrewSelector(crews);
     }
+
+    await interaction.channel.send(prompt.build());
 
     return interaction.reply({ content: 'Done', ephemeral: true });
   }
@@ -193,9 +120,10 @@ export class TicketCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    return interaction.showModal(
-      this.buildTicketModal(data.crew ? data.crew : interaction.channelId),
-    );
+    const modal = new TicketCreateModalBuilder().addForm({
+      crewSf: data.crew || interaction.channelId,
+    });
+    return interaction.showModal(modal);
   }
 
   @Button('ticket/start/:crew')
@@ -203,7 +131,9 @@ export class TicketCommand {
     @Context() [interaction]: ButtonContext,
     @ComponentParam('crew') channelRef: Snowflake,
   ) {
-    const modal = this.buildTicketModal(channelRef);
+    const modal = new TicketCreateModalBuilder().addForm({
+      crewSf: interaction.channelId,
+    });
     return interaction.showModal(modal);
   }
 
@@ -212,7 +142,9 @@ export class TicketCommand {
     @Context() [interaction]: StringSelectContext,
     @SelectedStrings() [selected]: string[],
   ) {
-    const modal = this.buildTicketModal(selected);
+    const modal = new TicketCreateModalBuilder().addForm({
+      crewSf: selected,
+    });
     return interaction.showModal(modal);
   }
 
@@ -229,69 +161,27 @@ export class TicketCommand {
     let channelRef = message.channelId;
 
     try {
-      const crew = await this.crewService.getCrew({ crewSf: channelRef });
+      await this.crewService.getCrew({ crewSf: channelRef });
     } catch {
       const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
       channelRef = guild.config.ticketTriageCrew;
     }
 
-    const modal = this.buildTicketModal(channelRef, {
-      what: proxyTicketMessage(message.content, memberRef, authorRef, channelRef, message.id),
-    });
+    const modal = new TicketCreateModalBuilder().addForm(
+      { crewSf: channelRef },
+      {
+        what: {
+          value: TicketCreateModalBuilder.makeProxyTicketMessage(
+            message.content,
+            memberRef,
+            authorRef,
+            channelRef,
+            message.id,
+          ),
+        },
+      },
+    );
     interaction.showModal(modal);
-  }
-
-  buildTicketModal(
-    channelRef: GuildChannelResolvable,
-    values: {
-      title?: string;
-      what?: string;
-      where?: string;
-      when?: string;
-    } = {},
-    emoji: {
-      title?: string;
-      what?: string;
-      where?: string;
-      when?: string;
-    } = {},
-  ) {
-    const titleInput = new TextInputBuilder()
-      .setCustomId('ticket/form/title')
-      .setLabel((emoji.title ? `${emoji.title} ` : '') + 'Title')
-      .setPlaceholder('Summary of your request')
-      .setValue(values.title || '')
-      .setStyle(TextInputStyle.Short);
-
-    const whatInput = new TextInputBuilder()
-      .setCustomId('ticket/form/what')
-      .setLabel((emoji.what ? `${emoji.what} ` : '') + 'What do you need?')
-      .setPlaceholder(
-        'Please be as detailed as possible and use exact quantities to prevent delays.',
-      )
-      .setValue(values.what || '')
-      .setStyle(TextInputStyle.Paragraph);
-
-    const whereInput = new TextInputBuilder()
-      .setCustomId('ticket/form/where')
-      .setLabel((emoji.where ? `${emoji.where} ` : '') + 'Where do you need it?')
-      .setValue(values.where || 'We will fetch it when it is done')
-      .setStyle(TextInputStyle.Paragraph);
-
-    const whenInput = new TextInputBuilder()
-      .setCustomId('ticket/form/when')
-      .setLabel((emoji.when ? `${emoji.when} ` : '') + 'When do you need it?')
-      .setValue(values.when || 'ASAP')
-      .setStyle(TextInputStyle.Short);
-
-    return new ModalBuilder()
-      .setCustomId(`ticket/create/${channelRef}`)
-      .setTitle('Create a Ticket')
-      .addComponents(
-        [titleInput, whatInput, whereInput, whenInput].map((input) =>
-          new ActionRowBuilder<TextInputBuilder>().addComponents(input),
-        ),
-      );
   }
 
   @StringSelect('ticket/move/:thread')
@@ -359,24 +249,12 @@ export class TicketCommand {
     });
   }
 
-  buildDeclineModal(threadRef: GuildChannelResolvable) {
-    const reason = new TextInputBuilder()
-      .setCustomId('ticket/decline/reason')
-      .setLabel('Reason')
-      .setStyle(TextInputStyle.Paragraph);
-
-    return new ModalBuilder()
-      .setCustomId(`ticket/decline/${threadRef}`)
-      .setTitle('Decline Ticket')
-      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(reason));
-  }
-
   @Button('ticket/reqdecline/:thread')
   async onTicketRequestDecline(
     @Context() [interaction]: ButtonContext,
     @ComponentParam('thread') threadRef: Snowflake,
   ) {
-    const modal = this.buildDeclineModal(threadRef);
+    const modal = new TicketDeclineModalBuilder().addForm({ threadSf: threadRef });
     interaction.showModal(modal);
   }
 
@@ -425,12 +303,16 @@ export class TicketCommand {
       ).asDisplayable();
     }
 
-    const row = await this.ticketService.createMovePrompt(ticketRef, [{ crewSf: ticket.crewSf }]);
+    const crews = await this.crewService.getCrews({ guildSf: ticket.guild.guildSf }, true);
+    const prompt = new TicketInfoPromptBuilder()
+      .addGenericMessage('Select destination')
+      .addMoveSelector(
+        ticket,
+        ticket.guild.guildSf,
+        crews.filter((crew) => ![ticket.crewSf].includes(crew.crewSf)),
+      );
 
-    await this.botService.replyOrFollowUp(interaction, {
-      embeds: [new PromptEmbed('PROMPT_GENERIC').setTitle('Select destination')],
-      components: [row],
-    });
+    await this.botService.replyOrFollowUp(interaction, prompt.build());
   }
 
   @Subcommand({
@@ -449,12 +331,10 @@ export class TicketCommand {
       ).asDisplayable();
     }
 
-    const row = await this.ticketService.createTriageControl(ticket);
-
-    await this.botService.replyOrFollowUp(interaction, {
-      embeds: [new PromptEmbed('PROMPT_GENERIC').setTitle('Select action')],
-      components: [row],
-    });
+    const prompt = new TicketInfoPromptBuilder()
+      .addGenericMessage('Select action')
+      .addTriageControls(ticket);
+    await this.botService.replyOrFollowUp(interaction, prompt.build());
   }
 
   @Button('ticket/action/:action/:thread')

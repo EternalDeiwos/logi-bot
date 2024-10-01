@@ -11,17 +11,17 @@ import {
 import { ApiBearerAuth, ApiExtraModels, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from 'src/core/api/auth.guard';
 import { Auth } from 'src/core/api/auth.decorator';
-import { APITokenPayload } from 'src/core/api/api-token.dto';
-import { GuildDto } from 'src/core/guild/guild.dto';
+import { APITokenPayload } from 'src/core/api/api.service';
+import { Guild } from 'src/core/guild/guild.entity';
+import { Ticket } from 'src/core/ticket/ticket.entity';
 import { TicketService } from 'src/core/ticket/ticket.service';
-import { TicketDto } from 'src/core/ticket/ticket.dto';
 import { CrewService } from './crew.service';
-import { CrewDto } from './crew.dto';
+import { Crew } from './crew.entity';
 
 @ApiTags('crew')
 @ApiBearerAuth()
 @Controller('crew')
-@ApiExtraModels(CrewDto, GuildDto)
+@ApiExtraModels(Crew, Guild)
 @UseGuards(AuthGuard)
 export class CrewController {
   private readonly logger = new Logger(CrewController.name);
@@ -36,20 +36,20 @@ export class CrewController {
   @ApiResponse({
     status: 200,
     description: 'Diagnostic information for the service',
-    type: [CrewDto],
+    type: [Crew],
   })
   @ApiResponse({ status: 401, description: 'Authentication Failed' })
   async getCrew(@Auth() auth: APITokenPayload, @Query('q') query: string = '') {
     const crews = await this.crewService.search({ guildSf: auth.aud }, query, true);
     return Promise.all(
       crews.map(async (crew) => {
-        return Object.assign(new CrewDto(), crew, { members: await crew.members });
+        return Object.assign(new Crew(), crew, { members: await crew.members });
       }),
     );
   }
 
   @Get(':crew')
-  @ApiResponse({ status: 200, description: 'Get a specific crew', type: CrewDto })
+  @ApiResponse({ status: 200, description: 'Get a specific crew', type: Crew })
   @ApiResponse({ status: 401, description: 'Authentication Failed' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Not Found' })
@@ -64,12 +64,12 @@ export class CrewController {
       throw new HttpException('Not Found', HttpStatus.NOT_FOUND);
     }
 
-    return Object.assign(new CrewDto(), crew, { members: await crew.members });
+    return Object.assign(new Crew(), crew, { members: await crew.members });
   }
 
   @Get(':crew/ticket')
   @ApiQuery({ name: 'q', description: 'query', required: false })
-  @ApiResponse({ status: 200, description: 'Get crew tickets', type: [TicketDto] })
+  @ApiResponse({ status: 200, description: 'Get crew tickets', type: [Ticket] })
   @ApiResponse({ status: 401, description: 'Authentication Failed' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Not Found' })
@@ -81,13 +81,13 @@ export class CrewController {
     const tickets = await this.ticketService.searchForCrew({ crewSf }, query);
 
     if (!tickets.length) {
-      return tickets;
+      return [];
     }
 
     if (tickets[0].guild.guildSf !== auth.aud) {
       throw new HttpException('Not Found', HttpStatus.NOT_FOUND);
     }
 
-    return tickets.map((ticket) => Object.assign(new TicketDto(), ticket));
+    return tickets;
   }
 }

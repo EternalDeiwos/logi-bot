@@ -11,7 +11,7 @@ import { GuildService } from 'src/core/guild/guild.service';
 import { ForumTagTemplate } from './tag-template.entity';
 import { TagTemplateRepository } from './tag-template.repository';
 import { TagRepository } from './tag.repository';
-import { ForumTag } from './tag.entity';
+import { ForumTag, SelectTag } from './tag.entity';
 
 export enum TicketTag {
   TRIAGE = 'Triage',
@@ -25,6 +25,9 @@ export enum TicketTag {
 }
 
 export abstract class TagService {
+  abstract getTag(tagRef: SelectTag): Promise<ForumTag>;
+  abstract getTagsByTeam(teamRef: SelectTeam): Promise<ForumTag[]>;
+  abstract getTagByName(teamRef: SelectTeam, name: string): Promise<ForumTag>;
   abstract getTagByGuild(guildRef: SelectGuild): Promise<ForumTag[]>;
   abstract getTemplateByGuild(guildRef: SelectGuild): Promise<ForumTagTemplate[]>;
   abstract createTicketTags(guildRef: SelectGuild, memberRef: Snowflake): Promise<InsertResult[]>;
@@ -55,6 +58,27 @@ export class TagServiceImpl extends TagService {
     private readonly templateRepo: TagTemplateRepository,
   ) {
     super();
+  }
+
+  async getTag(tagRef: SelectTag) {
+    const { tagSf } = tagRef;
+    return this.tagRepo.findOneOrFail({ where: { tagSf } });
+  }
+
+  async getTagsByTeam(teamRef: SelectTeam) {
+    return this.tagRepo
+      .createQueryBuilder('tag')
+      .leftJoinAndSelect('tag.template', 'template')
+      .where('tag.team_id=:id', teamRef)
+      .getMany();
+  }
+
+  async getTagByName(teamRef: SelectTeam, name: string) {
+    return this.tagRepo
+      .createQueryBuilder('tag')
+      .leftJoinAndSelect('tag.template', 'template')
+      .where('tag.team_id=:id AND tag.name=:name', { ...teamRef, name })
+      .getOneOrFail();
   }
 
   async getTagByGuild(guildRef: SelectGuild): Promise<ForumTag[]> {

@@ -2,13 +2,30 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CommonRepository } from 'src/database/util';
 import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectCrew } from 'src/core/crew/crew.entity';
 import { SelectTicket, Ticket } from './ticket.entity';
-import { SelectCrew } from '../crew/crew.entity';
 
 @Injectable()
 export class TicketRepository extends CommonRepository<Ticket> {
   constructor(private readonly dataSource: DataSource) {
     super(Ticket, dataSource.createEntityManager());
+  }
+
+  findTickets() {
+    return this.createQueryBuilder('ticket')
+      .withDeleted()
+      .leftJoinAndSelect('ticket.guild', 'guild')
+      .leftJoinAndSelect('ticket.previous', 'previous');
+  }
+
+  findOneTicket(ticketRef: SelectTicket) {
+    return this.findTickets()
+      .leftJoinAndSelect('ticket.crew', 'crew')
+      .where('ticket.threadSf=:threadSf', ticketRef);
+  }
+
+  findCrewTickets(crewRef: SelectCrew) {
+    return this.findTickets().where('ticket.deleted_at IS NULL AND ticket.crewSf=:crewSf', crewRef);
   }
 
   async getOriginalGuild(ticketRef: SelectTicket): Promise<SelectGuild> {
@@ -42,16 +59,13 @@ export class TicketRepository extends CommonRepository<Ticket> {
     return { id: guildId };
   }
 
-  private searchBase() {
-    return this.createQueryBuilder('ticket')
-      .leftJoinAndSelect('ticket.guild', 'guild')
-      .withDeleted()
-      .leftJoinAndSelect('ticket.previous', 'previous')
-      .where('ticket.deleted_at IS NULL');
-  }
-
   searchByGuild(guildRef: SelectGuild, query: string) {
-    const qb = this.searchBase();
+    const qb = this.createQueryBuilder('ticket')
+      .withDeleted()
+      .leftJoinAndSelect('ticket.guild', 'guild')
+      .leftJoinAndSelect('ticket.previous', 'previous')
+      .where('ticket.deleted_at IS NULL')
+      .andWhere('ticket.name ILIKE :query');
 
     if (guildRef.id) {
       qb.andWhere('ticket.guild_id=:id', { ...guildRef, query: `%${query}%` });
@@ -59,25 +73,20 @@ export class TicketRepository extends CommonRepository<Ticket> {
       qb.andWhere('guild.guild_sf=:guildSf', { ...guildRef, query: `%${query}%` });
     }
 
-    if (query) {
-      qb.andWhere('ticket.name ILIKE :query');
-    }
-
     return qb.getMany();
   }
 
   searchByCrew(crewRef: SelectCrew, query: string) {
-    const qb = this.searchBase()
+    return this.createQueryBuilder('ticket')
+      .withDeleted()
+      .leftJoinAndSelect('ticket.guild', 'guild')
+      .leftJoinAndSelect('ticket.previous', 'previous')
+      .where('ticket.deleted_at IS NULL')
       .leftJoin('ticket.crew', 'crew')
-      .andWhere('crew.crew_channel_sf=:crewSf', {
+      .andWhere('crew.crew_channel_sf=:crewSf AND (ticket.name ILIKE :query)', {
         ...crewRef,
-        query,
-      });
-
-    if (query) {
-      qb.andWhere('ticket.name ILIKE :query');
-    }
-
-    return qb.getMany();
+        query: `%${query}%`,
+      })
+      .getMany();
   }
 }

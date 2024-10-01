@@ -12,6 +12,8 @@ import { CrewMemberRepository } from './crew-member.repository';
 import { CrewMember, SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
 
 export abstract class CrewMemberService {
+  abstract getMembersForCrew(crewRef: SelectCrew): Promise<CrewMember[]>;
+
   abstract resolveGuildMember(member: CrewMember): Promise<GuildMember>;
   abstract resolveGuildMember(memberRef: Snowflake, channelRef: Snowflake): Promise<GuildMember>;
 
@@ -73,6 +75,10 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     private readonly memberRepo: CrewMemberRepository,
   ) {
     super();
+  }
+
+  async getMembersForCrew(crewRef: SelectCrew): Promise<CrewMember[]> {
+    return this.memberRepo.findMembersForCrew(crewRef).getMany();
   }
 
   async resolveGuildMember(member: CrewMember): Promise<GuildMember>;

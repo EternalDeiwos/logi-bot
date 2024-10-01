@@ -1,21 +1,14 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { EntityNotFoundError, Equal, IsNull, UpdateResult } from 'typeorm';
+import { Equal, IsNull, UpdateResult } from 'typeorm';
 import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   CategoryChannel,
   ChannelType,
   DiscordAPIError,
-  EmbedBuilder,
-  GuildBasedChannel,
   GuildManager,
   GuildTextBasedChannel,
   OverwriteResolvable,
   PermissionsBitField,
   Snowflake,
-  channelMention,
-  messageLink,
   userMention,
 } from 'discord.js';
 import { toSlug } from 'src/util';
@@ -39,7 +32,9 @@ import { TicketRepository } from 'src/core/ticket/ticket.repository';
 import { ArchiveCrew, Crew, InsertCrew, SelectCrew, UpdateCrew } from './crew.entity';
 import { CrewRepository } from './crew.repository';
 import { CrewMemberService } from './member/crew-member.service';
-import { crewAuditPrompt, newCrewMessage } from './crew.messages';
+import { CrewAuditPromptBuilder } from './crew-audit.prompt';
+import { CrewInfoPromptBuilder } from './crew-info.prompt';
+import { CrewStatusPromptBuilder } from './crew-status.prompt';
 
 type RegisterCrewOptions = Partial<{
   createVoice: boolean;
@@ -48,7 +43,19 @@ type RegisterCrewOptions = Partial<{
 export abstract class CrewService {
   abstract getCrew(crewRef: SelectCrew): Promise<Crew>;
   abstract getCrew(crewRef: SelectCrew, withDeleted: boolean): Promise<Crew>;
+  abstract getCrew(
+    crewRef: SelectCrew,
+    withDeleted: boolean,
+    relations: Parameters<CrewRepository['findOne']>[0]['relations'],
+  ): Promise<Crew>;
   abstract getCrewByRole(roleRef: Snowflake): Promise<Crew>;
+  abstract getCrews(guildRef: SelectGuild): Promise<Crew[]>;
+  abstract getCrews(guildRef: SelectGuild, includeShared: boolean): Promise<Crew[]>;
+  abstract getCrews(
+    guildRef: SelectGuild,
+    includeShared: boolean,
+    relations: Parameters<CrewRepository['findOne']>[0]['relations'],
+  ): Promise<Crew[]>;
   abstract getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake): Promise<Crew[]>;
   abstract search(guildRef: SelectGuild, query: string, includeShared?: boolean): Promise<Crew[]>;
   abstract registerCrew(data: InsertCrew, options?: RegisterCrewOptions): Promise<Crew>;
@@ -69,7 +76,6 @@ export abstract class CrewService {
     memberRef: Snowflake,
   ): Promise<void>;
   abstract crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel): Promise<void>;
-  abstract createCrewActions(): ActionRowBuilder<ButtonBuilder>;
 }
 
 @Injectable()
@@ -90,24 +96,42 @@ export class CrewServiceImpl extends CrewService {
     super();
   }
 
-  async getCrew(crewRef: SelectCrew, withDeleted: boolean = false) {
-    try {
-      return await this.crewRepo.findOneOrFail({ where: crewRef, withDeleted });
-    } catch (err) {
-      if (err instanceof EntityNotFoundError) {
-        throw new ValidationError(
-          'VALIDATION_FAILED',
-          'Please select a crew, or run the command inside the relevant crew channel.',
-          [err],
-        ).asDisplayable();
-      }
+  async getCrew(
+    crewRef: SelectCrew,
+    withDeleted: boolean = false,
+    relations: Parameters<CrewRepository['findOne']>[0]['relations'] = {},
+  ) {
+    // try {
+    return await this.crewRepo.findOneOrFail({ where: crewRef, withDeleted, relations });
+    // } catch (err) {
+    //   if (err instanceof EntityNotFoundError) {
+    //     throw new ValidationError(
+    //       'VALIDATION_FAILED',
+    //       'Please select a crew, or run the command inside the relevant crew channel.',
+    //       [err],
+    //     ).asDisplayable();
+    //   }
 
-      throw err;
-    }
+    //   throw err;
+    // }
   }
 
   async getCrewByRole(roleRef: Snowflake) {
     return await this.crewRepo.findOneOrFail({ where: { roleSf: roleRef } });
+  }
+
+  async getCrews(
+    guildRef: SelectGuild,
+    includeShared: boolean = false,
+    relations: Parameters<CrewRepository['find']>[0]['relations'] = {},
+  ): Promise<Crew[]> {
+    let qb = this.crewRepo.getByGuild(guildRef, includeShared);
+    for (const [k, v] of Object.entries(relations)) {
+      if (v) {
+        qb = qb.leftJoinAndSelect(`crew.${k}`, k);
+      }
+    }
+    return qb.getMany();
   }
 
   async getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake) {
@@ -264,22 +288,10 @@ export class CrewServiceImpl extends CrewService {
         const audit = await discordGuild.channels.fetch(team.guild.config.crewAuditChannel);
 
         if (audit.isTextBased()) {
-          const embed = new EmbedBuilder()
-            .setTitle(
-              `New Crew: ${crew.name}` +
-                (crew.name !== crew.shortName ? ` (${crew.shortName})` : ''),
-            )
-            .setDescription(crewAuditPrompt(crew, team))
-            .setTimestamp()
-            .setColor('DarkGold');
-
-          const deleteButton = new ButtonBuilder()
-            .setCustomId(`crew/reqdelete/${crew.crewSf}`)
-            .setLabel('Delete')
-            .setStyle(ButtonStyle.Danger);
-
-          const row = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteButton);
-          const message = await audit.send({ embeds: [embed], components: [row] });
+          const prompt = new CrewAuditPromptBuilder()
+            .addAuditMessage(crew)
+            .addCrewDeleteButton(crew);
+          const message = await audit.send(prompt.build());
           crew.auditMessageSf = message.id;
         }
       } catch (err) {
@@ -342,9 +354,12 @@ export class CrewServiceImpl extends CrewService {
             throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid thread');
           }
 
-          const triageSnowflake = await crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE);
+          const triageTag = await this.tagService.getTagByName(
+            { id: ticket.crew.teamId },
+            TicketTag.TRIAGE,
+          );
 
-          if (thread.appliedTags.includes(triageSnowflake)) {
+          if (thread.appliedTags.includes(triageTag.tagSf)) {
             return this.ticketService.updateTicket(
               { threadSf: ticket.threadSf, updatedBy: memberRef },
               TicketTag.ABANDONED,
@@ -477,7 +492,7 @@ export class CrewServiceImpl extends CrewService {
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
-    const crew = await this.getCrew(crewRef);
+    const crew = await this.getCrew(crewRef, false, { guild: true, logs: true, members: true });
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const crewChannel = await discordGuild.channels.fetch(crewRef.crewSf);
 
@@ -498,50 +513,13 @@ export class CrewServiceImpl extends CrewService {
       throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
     }
 
-    const fields: { name: string; value: string }[] = [];
-    const members = await crew.members;
-    const logs = await crew.logs;
+    const prompt = new CrewStatusPromptBuilder().addIndividualCrewStatus(discordGuild, crew);
 
-    const owner = await members.find((member) => member.access === CrewMemberAccess.OWNER);
-    const embed = new EmbedBuilder()
-      .setTitle(`Crew: ${crew.name}`)
-      .setColor('DarkGreen')
-      .setThumbnail(discordGuild.iconURL())
-      .setTimestamp()
-      .setDescription(
-        `${channelMention(crewRef.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'}.`,
-      );
-
-    fields.push({
-      name: 'Members',
-      value: members.map((member) => `- ${userMention(member.memberSf)}`).join('\n') || 'None',
-    });
-
-    if (logs.length) {
-      const { content, crewSf: channel, messageSf: message } = logs.pop();
-      const redirectText = `See the full status here: ${messageLink(channel, message)}`;
-      const value =
-        content?.length > 400 ? `${content.substring(0, 400)}...\n\n${redirectText}` : content;
-
-      if (value) {
-        fields.push({
-          name: 'Status',
-          value,
-        });
-      }
+    if (targetChannel.id === crew.crewSf) {
+      prompt.add(new CrewInfoPromptBuilder().addCrewControls());
     }
 
-    embed.addFields(...fields);
-
-    try {
-      if (targetChannel.id === crew.crewSf) {
-        await targetChannel.send({ embeds: [embed], components: [this.createCrewActions()] });
-      } else {
-        await targetChannel.send({ embeds: [embed] });
-      }
-    } catch (err) {
-      throw new ExternalError('DISCORD_API_ERROR', 'Failed to publish crew status', err);
-    }
+    await targetChannel.send(prompt.build());
   }
 
   public async sendAllStatus(
@@ -558,17 +536,10 @@ export class CrewServiceImpl extends CrewService {
     }
 
     const targetChannelSecure = await this.discordService.isChannelPrivate(targetChannel);
-    const fields: { name: string; value: string }[] = [];
+    const crews = [];
 
-    const crews = await this.crewRepo.find({ where: { guild: guildRef } });
-    for (const crew of crews) {
-      let crewChannel: GuildBasedChannel;
-      try {
-        crewChannel = await discordGuild.channels.fetch(crew.crewSf);
-      } catch (err) {
-        this.logger.warn(`Failed to display crew status for ${crew.name} in ${crew.guild.name}`);
-        continue;
-      }
+    for (const crew of await this.crewRepo.find({ where: { guild: guildRef } })) {
+      const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
 
       if (
         !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||
@@ -577,42 +548,11 @@ export class CrewServiceImpl extends CrewService {
         continue;
       }
 
-      const members = await crew.members;
-      const logs = await crew.logs;
-
-      const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
-      const description = `${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'} and has ${members.length} ${members.length > 1 || !members.length ? 'members' : 'member'}.`;
-
-      if (logs.length) {
-        const { content, crewSf: channel, messageSf: message } = logs.pop();
-        const redirectText = `See the full status here: ${messageLink(channel, message)}`;
-        const value =
-          content?.length > 400
-            ? `${description}\n\n${content.substring(0, 400)}...\n\n${redirectText}`
-            : `${description}\n\n${content}`;
-
-        if (value) {
-          fields.push({
-            name: crew.name,
-            value,
-          });
-        }
-      }
+      crews.push(crew);
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle('Crew Status')
-      .setColor('DarkGreen')
-      .setThumbnail(discordGuild.iconURL())
-      .setTimestamp();
-
-    if (fields.length) {
-      embed.addFields(...fields);
-    } else {
-      embed.setDescription('No data');
-    }
-
-    await targetChannel.send({ embeds: [embed] });
+    const prompt = new CrewStatusPromptBuilder().addGlobalCrewStatus(discordGuild, crews);
+    await targetChannel.send(prompt.build());
   }
 
   async crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel) {
@@ -632,29 +572,10 @@ export class CrewServiceImpl extends CrewService {
       channel = c;
     }
 
-    const members = await crew.members;
-    const owner = await members.find((member) => member.access === CrewMemberAccess.OWNER);
-    const embed = new EmbedBuilder()
-      .setTitle(`Join ${crew.name}`)
-      // TODO: refactor to use crew repo
-      .setDescription(newCrewMessage(owner ? userMention(owner.memberSf) : 'nobody'))
-      .setColor('DarkGreen');
-
-    const message = await channel.send({ embeds: [embed], components: [this.createCrewActions()] });
+    const members = await this.memberService.getMembersForCrew(crew);
+    const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
+    const prompt = new CrewInfoPromptBuilder().addCrewPromptMessage(crew, owner).addCrewControls();
+    const message = await channel.send(prompt.build());
     await message.pin();
-  }
-
-  createCrewActions() {
-    const join = new ButtonBuilder()
-      .setCustomId('crew/join')
-      .setLabel('Join Crew')
-      .setStyle(ButtonStyle.Primary);
-
-    const log = new ButtonBuilder()
-      .setCustomId('crew/log')
-      .setLabel('Log')
-      .setStyle(ButtonStyle.Secondary);
-
-    return new ActionRowBuilder<ButtonBuilder>().addComponents(join, log);
   }
 }
