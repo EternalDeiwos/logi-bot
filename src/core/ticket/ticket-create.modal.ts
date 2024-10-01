@@ -12,25 +12,6 @@ import { SelectCrew } from 'src/core/crew/crew.entity';
 type TicketFormFields = 'title' | 'what' | 'where' | 'when';
 type TicketFormProperties = { [K in TicketFormFields]?: { emoji?: string; value?: string } };
 
-export const proxyTicketMessage = (
-  body: string,
-  member: Snowflake,
-  author: Snowflake,
-  channel: Snowflake,
-  message: Snowflake,
-) =>
-  `
-This ticket was created by ${userMention(member)} on behalf of ${userMention(author)} from this message: ${messageLink(channel, message)}.
-
-${
-  body &&
-  body
-    .split('\n')
-    .map((line) => `> ${line}`)
-    .join('\n')
-}
-`.trim();
-
 export class TicketCreateModalBuilder extends ModalBuilder {
   static makeProxyTicketMessage(
     body: string,
