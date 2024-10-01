@@ -6,6 +6,8 @@ import { TicketService } from 'src/core/ticket/ticket.service';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { GuildService } from 'src/core/guild/guild.service';
+import { TicketInfoPromptBuilder } from './ticket/ticket-info.prompt';
+import { Team } from './team/team.entity';
 
 @Injectable()
 @UseFilters(DiscordExceptionFilter)
@@ -58,8 +60,8 @@ export class BotEventListener {
     }
 
     const crew = await this.crewService.getCrew({ crewSf: ticket.crewSf }, true);
-
-    const tagMap = await crew.team.getTagMap();
+    const tags = await this.tagService.getTagsByTeam({ id: crew.teamId });
+    const tagMap = await Team.getTagMap(tags);
 
     const toDeleteFlag = newThread.appliedTags.reduce((state, snowflake) => {
       return (
@@ -95,15 +97,29 @@ export class BotEventListener {
       return;
     }
 
-    if (
-      thread.appliedTags.includes(await ticket.crew.team.resolveSnowflakeFromTag(TicketTag.TRIAGE))
-    ) {
-      await this.ticketService.addTriageControlToThread(thread);
+    const message = await thread.fetchStarterMessage();
+    const prompt = new TicketInfoPromptBuilder({ components: message.components });
+    const triageTag = await this.tagService.getTagByName(
+      { id: ticket.crew.teamId },
+      TicketTag.TRIAGE,
+    );
+
+    if (thread.appliedTags.includes(triageTag.tagSf)) {
+      prompt.addTriageControls(ticket);
     }
 
     if (ticket.crew.hasMovePrompt) {
-      await this.ticketService.addMovePromptToTicket(thread);
+      const crews = await this.crewService.getCrews({ guildSf: thread.guildId }, true);
+      prompt.addMoveSelector(
+        { threadSf: thread.id },
+        thread.guildId,
+        crews.filter((crew) => ![ticket.crewSf].includes(crew.crewSf)),
+      );
     }
+
+    this.logger.debug(JSON.stringify(prompt.build(), null, 2));
+
+    await message.edit(prompt.build());
   }
 
   @On('guildMemberRemove')

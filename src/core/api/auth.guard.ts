@@ -8,8 +8,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { jwtVerify } from 'jose';
-import { ApiService } from './api.service';
-import { APITokenPayload } from './api-token.dto';
+import { ApiService, APITokenPayload } from './api.service';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -45,7 +44,7 @@ export class AuthGuard implements CanActivate {
         return k[1];
       })
         .then((v) => {
-          request.auth = v;
+          request.auth = APITokenPayload.from(v?.payload);
           return true;
         })
         .catch((cause) => {
