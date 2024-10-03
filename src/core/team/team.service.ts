@@ -55,7 +55,7 @@ export class TeamServiceImpl extends TeamService {
 
   async reconcileTeamForumTags(teamRef: SelectTeam, templates: ForumTagTemplate[]) {
     const team: Team = teamRef instanceof Team ? teamRef : await this.getTeam(teamRef);
-    const tags = await team.tags;
+    const tags = await this.tagService.getTagsByTeam(team);
     const filteredTemplates = templates.filter((template) => {
       return (
         // Crew tags only appear on their team's forum
