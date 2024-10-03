@@ -1,8 +1,27 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiProperty } from '@nestjs/swagger';
+import { Expose } from 'class-transformer';
 import { createHash } from 'crypto';
 import { CompactSign } from 'jose';
-import { APITokenPayload } from './api-token.dto';
+
+export class APITokenPayload {
+  @ApiProperty()
+  @Expose()
+  aud: string;
+
+  @ApiProperty()
+  @Expose()
+  sub: string;
+
+  @ApiProperty()
+  @Expose()
+  iat: number;
+
+  static from(data: APITokenPayload) {
+    return Object.assign(new APITokenPayload(), data);
+  }
+}
 
 export abstract class ApiService {
   abstract getSigningKeys(): [string, Buffer][];

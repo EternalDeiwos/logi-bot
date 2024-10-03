@@ -12,6 +12,8 @@ import { CrewMemberRepository } from './crew-member.repository';
 import { CrewMember, SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
 
 export abstract class CrewMemberService {
+  abstract getMembersForCrew(crewRef: SelectCrew): Promise<CrewMember[]>;
+
   abstract resolveGuildMember(member: CrewMember): Promise<GuildMember>;
   abstract resolveGuildMember(memberRef: Snowflake, channelRef: Snowflake): Promise<GuildMember>;
 
@@ -73,6 +75,10 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     private readonly memberRepo: CrewMemberRepository,
   ) {
     super();
+  }
+
+  async getMembersForCrew(crewRef: SelectCrew): Promise<CrewMember[]> {
+    return this.memberRepo.findMembersForCrew(crewRef).getMany();
   }
 
   async resolveGuildMember(member: CrewMember): Promise<GuildMember>;
@@ -219,7 +225,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       access = CrewMemberAccess.MEMBER;
     }
 
-    const crew = await this.crewService.getCrew({ crewSf: channelRef });
+    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const member = await discordGuild.members.fetch(memberRef);
 
@@ -253,7 +259,6 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       memberRef,
       CrewMemberAccess.OWNER,
     );
-    this.logger.debug(JSON.stringify([{ count }, membership]));
 
     if (count && !member.roles.cache.has(guild.config.crewLeaderRole)) {
       await member.roles.add(guild.config.crewLeaderRole);
@@ -267,17 +272,16 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   }
 
   async reconcileCrewMembership(crewRef: SelectCrew) {
-    const crew = await this.crewService.getCrew(crewRef);
-    const members = await crew.members;
+    const crew = await this.crewService.query().byCrew(crewRef).withMembers().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
 
-    for (const crewMember of members) {
+    for (const crewMember of crew.members) {
       let member: GuildMember;
       try {
         member = await discordGuild.members.fetch(crewMember.memberSf);
       } catch {
-        await this.removeCrewMember(crewMember.crew, crewMember.memberSf);
+        await this.removeCrewMember(crew, crewMember.memberSf);
         continue;
       }
 
@@ -285,12 +289,12 @@ export class CrewMemberServiceImpl extends CrewMemberService {
         !channel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) &&
         crewMember.access >= CrewMemberAccess.MEMBER
       ) {
-        await this.removeCrewMember(crewMember.crew, member);
+        await this.removeCrewMember(crew, member);
         continue;
       }
 
       if (!member.roles.cache.has(crew.roleSf)) {
-        await this.removeCrewMember(crewMember.crew, member);
+        await this.removeCrewMember(crew, member);
         continue;
       }
 

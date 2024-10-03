@@ -12,7 +12,7 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Expose } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
@@ -31,8 +31,9 @@ export class Ticket {
   @Index('guild_id_idx_ticket')
   guildId: string;
 
-  @Expose()
   @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'guild_id',
     referencedColumnName: 'id',
@@ -40,13 +41,15 @@ export class Ticket {
   })
   guild: Guild;
 
+  @Expose()
   @Column({ type: 'int8', name: 'previous_thread_sf', nullable: true })
   @RelationId((ticket: Ticket) => ticket.previous)
   @Index('previous_thread_sf_idx_ticket')
   previousThreadSf: Snowflake;
 
+  @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true })
   @Expose()
-  @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true, eager: true })
+  @Transform(({ value }) => (value && 'threadSf' in value ? value : null))
   @JoinColumn({
     name: 'previous_thread_sf',
     referencedColumnName: 'threadSf',
@@ -58,13 +61,15 @@ export class Ticket {
    * Snowflake for crew Discord channel
    * @type Snowflake
    */
-  @Expose()
   @Column({ type: 'int8', name: 'crew_channel_sf' })
+  @Expose()
   @RelationId((ticket: Ticket) => ticket.crew)
   @Index('crew_channel_sf_idx_ticket')
   crewSf: Snowflake;
 
   @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', eager: true })
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'crew_channel_sf',
     referencedColumnName: 'crewSf',

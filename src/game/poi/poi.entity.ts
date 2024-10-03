@@ -24,26 +24,26 @@ export class Poi {
   @Index('region_idx_poi')
   regionId: string;
 
-  @ManyToOne(() => Region, { onDelete: 'RESTRICT', lazy: true })
+  @ManyToOne(() => Region, { onDelete: 'RESTRICT' })
   @JoinColumn({
     name: 'region_id',
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_poi_region_id',
   })
-  region: Promise<Region>;
+  region: Region;
 
   @Column({ name: 'war_number', type: 'int8' })
   @RelationId((poi: Poi) => poi.war)
   @Index('war_number_idx_poi')
   warNumber: string;
 
-  @ManyToOne(() => War, { onDelete: 'RESTRICT', lazy: true })
+  @ManyToOne(() => War, { onDelete: 'RESTRICT' })
   @JoinColumn({
     name: 'war_number',
     referencedColumnName: 'warNumber',
     foreignKeyConstraintName: 'fk_poi_war_number',
   })
-  war: Promise<War>;
+  war: War;
 
   @Column({ name: 'marker_type', type: 'int4' })
   @Index('marker_type_idx_poi')
@@ -92,14 +92,6 @@ export class CurrentPoi {
 
   @ViewColumn({ name: 'region_id' })
   regionId: string;
-
-  @ManyToOne(() => Region)
-  @JoinColumn({ name: 'region_id', referencedColumnName: 'id' })
-  region: Promise<Region>;
-
-  @ManyToOne(() => War)
-  @JoinColumn({ name: 'war_number', referencedColumnName: 'warNumber' })
-  war: Promise<War>;
 
   @ViewColumn({ name: 'war_number' })
   warNumber: string;

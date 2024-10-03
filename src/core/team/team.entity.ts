@@ -14,7 +14,6 @@ import {
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Expose } from 'class-transformer';
-import { TicketTag } from 'src/types';
 import { ForumTag } from 'src/core/tag/tag.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
@@ -83,10 +82,10 @@ export class Team {
   categorySf: Snowflake;
 
   @OneToMany(() => ForumTag, (tag) => tag.team)
-  tags: Promise<ForumTag[]>;
+  tags: ForumTag[];
 
   @OneToMany(() => Crew, (crew) => crew.team)
-  crews: Promise<Crew[]>;
+  crews: Crew[];
 
   @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
@@ -96,18 +95,7 @@ export class Team {
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
 
-  async resolveSnowflakeFromTag(tag: TicketTag): Promise<Snowflake> {
-    const tags = await this.tags;
-    return tags.find((t) => t.name === tag)?.tagSf;
-  }
-
-  async resolveNameFromSnowflake(snowflake: Snowflake): Promise<string> {
-    const tags = await this.tags;
-    return tags.find((t) => t.tagSf === snowflake)?.name;
-  }
-
-  async getTagMap() {
-    const tags = await this.tags;
+  static getTagMap(tags: ForumTag[]) {
     return tags.reduce(
       (accumulator, tag) => {
         accumulator[tag.tagSf] = tag.name;
@@ -117,8 +105,7 @@ export class Team {
     );
   }
 
-  async getSnowflakeMap() {
-    const tags = await this.tags;
+  static getSnowflakeMap(tags: ForumTag[]) {
     return tags.reduce(
       (accumulator, tag) => {
         accumulator[tag.name] = tag.tagSf;
@@ -128,15 +115,10 @@ export class Team {
     );
   }
 
-  async getDefaultTags() {
-    const tags = await this.tags;
-    return (
-      await Promise.all(
-        tags.map(async (tag) => [tag.tagSf, (await tag.template).default] as [string, boolean]),
-      )
-    ).reduce((acc, [tag_sf, isDefault]) => {
-      if (isDefault) {
-        acc.push(tag_sf);
+  static getDefaultTags(tags: ForumTag[]) {
+    return tags.reduce((acc, tag) => {
+      if (tag.template.default) {
+        acc.push(tag.tagSf);
       }
       return acc;
     }, [] as string[]);

@@ -50,7 +50,7 @@ export class ForumTag {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_tag_team_id',
   })
-  team: Promise<Team>;
+  team: Team;
 
   @Column({ type: 'uuid', name: 'tag_template_id' })
   @RelationId((tag: ForumTag) => tag.template)
@@ -63,7 +63,7 @@ export class ForumTag {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_tag_tag_template_id',
   })
-  template: Promise<ForumTagTemplate>;
+  template: ForumTagTemplate;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;

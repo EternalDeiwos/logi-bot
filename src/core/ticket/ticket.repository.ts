@@ -3,7 +3,6 @@ import { DataSource } from 'typeorm';
 import { CommonRepository } from 'src/database/util';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { SelectTicket, Ticket } from './ticket.entity';
-import { SelectCrew } from '../crew/crew.entity';
 
 @Injectable()
 export class TicketRepository extends CommonRepository<Ticket> {
@@ -40,44 +39,5 @@ export class TicketRepository extends CommonRepository<Ticket> {
     );
 
     return { id: guildId };
-  }
-
-  private searchBase() {
-    return this.createQueryBuilder('ticket')
-      .leftJoinAndSelect('ticket.guild', 'guild')
-      .withDeleted()
-      .leftJoinAndSelect('ticket.previous', 'previous')
-      .where('ticket.deleted_at IS NULL');
-  }
-
-  searchByGuild(guildRef: SelectGuild, query: string) {
-    const qb = this.searchBase();
-
-    if (guildRef.id) {
-      qb.andWhere('ticket.guild_id=:id', { ...guildRef, query: `%${query}%` });
-    } else {
-      qb.andWhere('guild.guild_sf=:guildSf', { ...guildRef, query: `%${query}%` });
-    }
-
-    if (query) {
-      qb.andWhere('ticket.name ILIKE :query');
-    }
-
-    return qb.getMany();
-  }
-
-  searchByCrew(crewRef: SelectCrew, query: string) {
-    const qb = this.searchBase()
-      .leftJoin('ticket.crew', 'crew')
-      .andWhere('crew.crew_channel_sf=:crewSf', {
-        ...crewRef,
-        query,
-      });
-
-    if (query) {
-      qb.andWhere('ticket.name ILIKE :query');
-    }
-
-    return qb.getMany();
   }
 }

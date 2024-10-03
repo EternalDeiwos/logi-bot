@@ -1,4 +1,12 @@
-import { Snowflake, messageLink, roleMention, userMention } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  StringSelectMenuBuilder,
+} from 'discord.js';
+import { BasePromptBuilder } from 'src/bot/prompt';
+import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
 
 export const ticketPromptDescription = (multi = false) =>
   `${multi ? 'Select a crew that will receive your ticket' : 'Create a ticket by clicking the button below'}. Please be patient for a member to discuss the ticket with you. If you are unsure of how to fill in a ticket then ask for help in any channel.`;
@@ -23,38 +31,71 @@ Any verified members may create a crew using the slash command \`/echo crew crea
 Once your crew channel has been created, check the prompt for further instructions.
 `;
 
-export const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
-Welcome to our ticket system ${userMention(member)}. The members of our ${roleMention(role)} crew will be along as soon as possible to review your request. In the meanwhile, please make sure that you review the following instructions:
+export class TicketCreatePromptBuilder extends BasePromptBuilder {
+  addCreateTicketMessage(selector: boolean = false) {
+    const embed = new EmbedBuilder()
+      .setColor('DarkGold')
+      .setTitle('Create a Ticket')
+      .setDescription(ticketPromptDescription(selector))
+      .addFields(
+        {
+          name: 'Triage Process',
+          value: ticketPromptTriageHelp(),
+          inline: false,
+        },
+        {
+          name: 'Crews',
+          value: ticketPromptCrewJoinInstructions(),
+          inline: false,
+        },
+        {
+          name: 'Crew Status',
+          value: crewPromptStatusInstructions(),
+          inline: false,
+        },
+        {
+          name: 'Ticket Status',
+          value: ticketPromptStatusInstructions(),
+          inline: false,
+        },
+        {
+          name: 'Create a Crew',
+          value: ticketPromptCrewCreateInstructions(),
+          inline: false,
+        },
+      );
 
-- You may be required to provide resources for us to complete this ticket. When the ticket is complete, please post proof, such as a screenshot, or ask the member who completed the request to post information so the ticket can be closed.
-- Crew members can accept or decline the ticket using the controls provided.
-- Once accepted, crew members can update the ticket using the buttons which will inform you of any progress, for example: when your request has been started if you are waiting in a queue.
-- Only once a request is **completed, delivered, and proof is posted to this channel** should the ticket be marked as _Done_.
-- At any point if you no longer need this ticket then you can close the ticket yourself by clicking the _Close_ button below.
-- If the ticket is left unattended then it will be closed to keep our work area clean.
-`;
+    return this.add({ embeds: [embed] });
+  }
 
-export const newTicketMessage = (body: string, member: Snowflake, role: Snowflake) => `
-${roleMention(role)} here is a new ticket from ${userMention(member)}. Please see details below.
+  addCreateButton(crewRef: SelectCrew) {
+    const create = new ButtonBuilder()
+      .setCustomId(`ticket/start/${crewRef}`)
+      .setLabel('Create Ticket')
+      .setStyle(ButtonStyle.Primary);
 
-${body}
-`;
+    return this.add({ components: [new ActionRowBuilder<ButtonBuilder>().addComponents(create)] });
+  }
 
-export const proxyTicketMessage = (
-  body: string,
-  member: Snowflake,
-  author: Snowflake,
-  channel: Snowflake,
-  message: Snowflake,
-) =>
-  `
-This ticket was created by ${userMention(member)} on behalf of ${userMention(author)} from this message: ${messageLink(channel, message)}.
+  addCrewSelector(targetCrews: Crew[]) {
+    const select = new StringSelectMenuBuilder().setCustomId('ticket/start');
 
-${
-  body &&
-  body
-    .split('\n')
-    .map((line) => `> ${line}`)
-    .join('\n')
+    if (targetCrews.length) {
+      select.setPlaceholder('Select a crew').setOptions(
+        targetCrews.map((crew) => ({
+          label: `${crew.team.name}: ${crew.name}`,
+          value: crew.crewSf,
+        })),
+      );
+    } else {
+      select
+        .addOptions({ label: 'placeholder', value: 'placeholder' })
+        .setPlaceholder('No crews available')
+        .setDisabled(true);
+    }
+
+    return this.add({
+      components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select)],
+    });
+  }
 }
-`.trim();

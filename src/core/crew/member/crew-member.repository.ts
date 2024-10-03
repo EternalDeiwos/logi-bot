@@ -5,11 +5,20 @@ import { CrewMemberAccess } from 'src/types';
 import { CommonRepository } from 'src/database/util';
 import { CrewMember } from './crew-member.entity';
 import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectCrew } from '../crew.entity';
 
 @Injectable()
 export class CrewMemberRepository extends CommonRepository<CrewMember> {
   constructor(private readonly dataSource: DataSource) {
     super(CrewMember, dataSource.createEntityManager());
+  }
+
+  findMembers() {
+    return this.createQueryBuilder('member').withDeleted();
+  }
+
+  findMembersForCrew(crewRef: SelectCrew) {
+    return this.findMembers().where('member.crewSf=:crewSf', crewRef);
   }
 
   findByAccess(guildRef: SelectGuild, memberRef: Snowflake, access: CrewMemberAccess) {

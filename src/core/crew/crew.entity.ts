@@ -13,7 +13,7 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Expose, Type } from 'class-transformer';
+import { Exclude, Expose, Transform, Type } from 'class-transformer';
 import { CrewMemberAccess } from 'src/types';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
@@ -70,8 +70,9 @@ export class Crew {
   @Index('guild_id_idx_crew')
   guildId: string;
 
-  @Expose()
   @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'guild_id',
     referencedColumnName: 'id',
@@ -143,20 +144,27 @@ export class Crew {
 
   @Expose()
   @Type(() => CrewMember)
+  @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => CrewMember, (member) => member.crew)
-  members: Promise<CrewMember[]>;
+  members: CrewMember[];
 
   @OneToMany(() => ForumTagTemplate, (tag) => tag.crew)
-  tags: Promise<ForumTagTemplate[]>;
+  tags: ForumTagTemplate[];
 
+  @Expose()
+  @Type(() => Ticket)
+  @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => Ticket, (ticket) => ticket.crew)
-  tickets: Promise<Ticket[]>;
+  tickets: Ticket[];
 
+  @Expose()
+  @Type(() => CrewLog)
+  @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => CrewLog, (log) => log.crew)
-  logs: Promise<CrewLog[]>;
+  logs: CrewLog[];
 
   @OneToMany(() => CrewShare, (share) => share.crew)
-  shared: Promise<CrewShare[]>;
+  shared: CrewShare[];
 
   @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })
