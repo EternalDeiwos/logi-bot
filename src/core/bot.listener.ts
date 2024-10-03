@@ -52,15 +52,18 @@ export class BotEventListener {
   async onThreadUpdate(@Context() [oldThread, newThread]: ContextOf<'threadUpdate'>) {
     const guild = newThread.guild;
     const member = await guild.members.fetchMe();
-    const ticket = await this.ticketService.getTicket({ threadSf: oldThread.id });
+    const ticket = await this.ticketService
+      .query()
+      .byThread({ threadSf: oldThread.id })
+      .withCrew()
+      .getOneOrFail();
 
     if (!ticket) {
       this.logger.debug(`No ticket for thread update on ${oldThread.name} (${oldThread.id})`);
       return;
     }
 
-    const crew = await this.crewService.getCrew({ crewSf: ticket.crewSf }, true);
-    const tags = await this.tagService.getTagsByTeam({ id: crew.teamId });
+    const tags = await this.tagService.getTagsByTeam({ id: ticket.crew.teamId });
     const tagMap = await Team.getTagMap(tags);
 
     const toDeleteFlag = newThread.appliedTags.reduce((state, snowflake) => {
@@ -91,11 +94,11 @@ export class BotEventListener {
   async onThreadCreate(@Context() [thread]: ContextOf<'threadCreate'>) {
     // This is a hack to delay the event to ensure the Ticket record is written to the database before proceeding.
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    const ticket = await this.ticketService.getTicket({ threadSf: thread.id });
-
-    if (!ticket?.crew) {
-      return;
-    }
+    const ticket = await this.ticketService
+      .query()
+      .byThread({ threadSf: thread.id })
+      .withCrew()
+      .getOneOrFail();
 
     const message = await thread.fetchStarterMessage();
     const prompt = new TicketInfoPromptBuilder({ components: message.components });
@@ -109,7 +112,11 @@ export class BotEventListener {
     }
 
     if (ticket.crew.hasMovePrompt) {
-      const crews = await this.crewService.getCrews({ guildSf: thread.guildId }, true);
+      const crews = await this.crewService
+        .query()
+        .withDeleted()
+        .byGuildAndShared({ guildSf: thread.guildId })
+        .getMany();
       prompt.addMoveSelector(
         { threadSf: thread.id },
         thread.guildId,
@@ -136,7 +143,7 @@ export class BotEventListener {
   @On('guildMemberRoleRemove')
   async onRoleRemoved(@Context() [member, role]: ContextOf<'guildMemberRoleRemove'>) {
     try {
-      const roleCrew = await this.crewService.getCrewByRole(role.id);
+      const roleCrew = await this.crewService.query().byRole(role.id).getOneOrFail();
       await this.memberService.removeCrewMember(roleCrew, member);
     } catch {
       this.logger.debug(
@@ -153,7 +160,7 @@ export class BotEventListener {
   @On('guildMemberRoleAdd')
   async onRoleAdded(@Context() [member, role]: ContextOf<'guildMemberRoleAdd'>) {
     try {
-      const roleCrew = await this.crewService.getCrewByRole(role.id);
+      const roleCrew = await this.crewService.query().byRole(role.id).getOneOrFail();
       await this.memberService.registerCrewMember(roleCrew.crewSf, member.id);
     } catch {
       this.logger.debug(`Role ${role.name} is not a crew role`);
