@@ -14,11 +14,11 @@ export class CrewSelectAutocompleteInterceptor extends AutocompleteInterceptor {
     const focused = interaction.options.getFocused(true);
 
     if (focused.name === 'crew') {
-      const results = await this.crewService.search(
-        { guildSf: interaction.guildId },
-        focused.value.toString(),
-        true,
-      );
+      const results = await this.crewService
+        .query()
+        .withTeam()
+        .searchByGuildWithShared({ guildSf: interaction.guildId }, focused.value.toString())
+        .getMany();
       return interaction.respond(
         results.map((result) => {
           const teamName =

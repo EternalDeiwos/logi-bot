@@ -35,29 +35,14 @@ import { CrewMemberService } from './member/crew-member.service';
 import { CrewAuditPromptBuilder } from './crew-audit.prompt';
 import { CrewInfoPromptBuilder } from './crew-info.prompt';
 import { CrewStatusPromptBuilder } from './crew-status.prompt';
+import { CrewQueryBuilder } from './crew.query';
 
 type RegisterCrewOptions = Partial<{
   createVoice: boolean;
 }>;
 
 export abstract class CrewService {
-  abstract getCrew(crewRef: SelectCrew): Promise<Crew>;
-  abstract getCrew(crewRef: SelectCrew, withDeleted: boolean): Promise<Crew>;
-  abstract getCrew(
-    crewRef: SelectCrew,
-    withDeleted: boolean,
-    relations: Parameters<CrewRepository['findOne']>[0]['relations'],
-  ): Promise<Crew>;
-  abstract getCrewByRole(roleRef: Snowflake): Promise<Crew>;
-  abstract getCrews(guildRef: SelectGuild): Promise<Crew[]>;
-  abstract getCrews(guildRef: SelectGuild, includeShared: boolean): Promise<Crew[]>;
-  abstract getCrews(
-    guildRef: SelectGuild,
-    includeShared: boolean,
-    relations: Parameters<CrewRepository['findOne']>[0]['relations'],
-  ): Promise<Crew[]>;
-  abstract getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake): Promise<Crew[]>;
-  abstract search(guildRef: SelectGuild, query: string, includeShared?: boolean): Promise<Crew[]>;
+  abstract query(): CrewQueryBuilder;
   abstract registerCrew(data: InsertCrew, options?: RegisterCrewOptions): Promise<Crew>;
   abstract deregisterCrew(
     channelRef: Snowflake,
@@ -96,57 +81,8 @@ export class CrewServiceImpl extends CrewService {
     super();
   }
 
-  async getCrew(
-    crewRef: SelectCrew,
-    withDeleted: boolean = false,
-    relations: Parameters<CrewRepository['findOne']>[0]['relations'] = {},
-  ) {
-    // try {
-    return await this.crewRepo.findOneOrFail({ where: crewRef, withDeleted, relations });
-    // } catch (err) {
-    //   if (err instanceof EntityNotFoundError) {
-    //     throw new ValidationError(
-    //       'VALIDATION_FAILED',
-    //       'Please select a crew, or run the command inside the relevant crew channel.',
-    //       [err],
-    //     ).asDisplayable();
-    //   }
-
-    //   throw err;
-    // }
-  }
-
-  async getCrewByRole(roleRef: Snowflake) {
-    return await this.crewRepo.findOneOrFail({ where: { roleSf: roleRef } });
-  }
-
-  async getCrews(
-    guildRef: SelectGuild,
-    includeShared: boolean = false,
-    relations: Parameters<CrewRepository['find']>[0]['relations'] = {},
-  ): Promise<Crew[]> {
-    let qb = this.crewRepo.getByGuild(guildRef, includeShared);
-    for (const [k, v] of Object.entries(relations)) {
-      if (v) {
-        qb = qb.leftJoinAndSelect(`crew.${k}`, k);
-      }
-    }
-    return qb.getMany();
-  }
-
-  async getMemberCrews(guildRef: SelectGuild, memberRef: Snowflake) {
-    const guildWhere = guildRef.id
-      ? { guildId: Equal(guildRef.id) }
-      : { guild: { guildSf: Equal(guildRef.guildSf) } };
-    return await this.crewRepo.findBy({
-      ...guildWhere,
-      deletedAt: IsNull(),
-      members: { memberSf: Equal(memberRef), deletedAt: IsNull() },
-    });
-  }
-
-  async search(guildRef: SelectGuild, query: string, includeShared?: boolean) {
-    return await this.crewRepo.search(guildRef, query, includeShared).getMany();
+  query() {
+    return new CrewQueryBuilder(this.crewRepo);
   }
 
   async registerCrew(data: InsertCrew, options: RegisterCrewOptions = {}) {
@@ -492,7 +428,7 @@ export class CrewServiceImpl extends CrewService {
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
-    const crew = await this.getCrew(crewRef, false, { guild: true, logs: true, members: true });
+    const crew = await this.query().byCrew(crewRef).withLogs().withMembers().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const crewChannel = await discordGuild.channels.fetch(crewRef.crewSf);
 
@@ -536,9 +472,15 @@ export class CrewServiceImpl extends CrewService {
     }
 
     const targetChannelSecure = await this.discordService.isChannelPrivate(targetChannel);
+    const srcCrews = await this.query()
+      .byGuild(guildRef)
+      .withTeam()
+      .withMembers()
+      .withTickets()
+      .getMany();
     const crews = [];
 
-    for (const crew of await this.crewRepo.find({ where: { guild: guildRef } })) {
+    for (const crew of srcCrews) {
       const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
 
       if (

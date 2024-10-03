@@ -398,7 +398,10 @@ export class CrewCommand {
     dmPermission: false,
   })
   async onCrewJoinPrompt(@Context() [interaction]: SlashCommandContext) {
-    const crew = await this.crewService.getCrew({ crewSf: interaction.channelId });
+    const crew = await this.crewService
+      .query()
+      .byCrew({ crewSf: interaction.channelId })
+      .getOneOrFail();
     await this.crewService.crewJoinPrompt(crew);
 
     await this.botService.replyOrFollowUp(interaction, {
@@ -744,11 +747,7 @@ export class CrewCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const crewRef = data.crew || interaction.channelId;
 
-    try {
-      crew = await this.crewService.getCrew({ crewSf: crewRef });
-    } catch {
-      // NOOP
-    }
+    crew = await this.crewService.query().byCrew({ crewSf: crewRef }).getOne();
 
     if (crew) {
       await this.crewService.sendIndividualStatus(

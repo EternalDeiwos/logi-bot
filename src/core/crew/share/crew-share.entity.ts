@@ -56,7 +56,7 @@ export class CrewShare {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_crew_share_guild_id',
   })
-  guild: Promise<Guild>;
+  guild: Guild;
 
   @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;
