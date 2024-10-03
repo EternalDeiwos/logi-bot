@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EmbedBuilder, GuildManager, Snowflake, roleMention } from 'discord.js';
+import { GuildManager, Snowflake } from 'discord.js';
 import { InsertResult } from 'typeorm';
 import { InternalError } from 'src/errors';
-import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { CrewLogRepository } from './crew-log.repository';
 import { InsertCrewLog } from './crew-log.entity';
+import { CrewLogPromptBuilder } from './crew-log.prompt';
 
 export abstract class CrewLogService {
   /**
@@ -29,7 +29,6 @@ export class CrewLogServiceImpl extends CrewLogService {
 
   constructor(
     private readonly guildManager: GuildManager,
-    private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
     private readonly memberService: CrewMemberService,
     private readonly logRepo: CrewLogRepository,
@@ -38,7 +37,7 @@ export class CrewLogServiceImpl extends CrewLogService {
   }
 
   async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLog) {
-    const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
+    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
 
@@ -47,24 +46,17 @@ export class CrewLogServiceImpl extends CrewLogService {
     }
 
     const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
-
     const createdAt = new Date();
-    const embed = new EmbedBuilder()
-      .setTitle('Crew Update')
-      .setColor('DarkGreen')
-      .setThumbnail(discordGuild.iconURL())
-      .setDescription(data.content)
-      .setFooter({
-        iconURL: member.avatarURL() ?? member.user.avatarURL(),
-        text: `Submitted by ${member.displayName}`,
-      })
-      .setTimestamp(createdAt);
 
-    const message = await channel.send({
-      content: roleMention(crew.roleSf),
-      embeds: [embed],
-      allowedMentions: { roles: [crew.roleSf] },
-    });
+    const prompt = new CrewLogPromptBuilder().addCrewDeleteMessage(
+      discordGuild,
+      crew,
+      member,
+      data.content,
+      createdAt,
+    );
+
+    const message = await channel.send(prompt.build());
 
     if (crew.guild?.config?.globalLogChannel) {
       const logChannel = await discordGuild.channels.fetch(crew.guild.config.globalLogChannel);
@@ -73,9 +65,7 @@ export class CrewLogServiceImpl extends CrewLogService {
         throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
       }
 
-      await logChannel.send({
-        embeds: [embed.setTitle(crew.name)],
-      });
+      await logChannel.send(prompt.build());
     }
 
     await message.pin();
