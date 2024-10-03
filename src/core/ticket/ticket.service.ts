@@ -114,27 +114,6 @@ export class TicketServiceImpl extends TicketService {
     return new TicketQueryBuilder(this.ticketRepo);
   }
 
-  // async getTicket(ticketRef: SelectTicket) {
-  //   return this.ticketRepo.findOneTicket(ticketRef).getOneOrFail();
-  //   // TODO Remove when factored into command handlers
-  //   // throw new ValidationError(
-  //   //   'VALIDATION_FAILED',
-  //   //   'This action can only be performed inside a ticket thread.',
-  //   // ).asDisplayable();
-  // }
-
-  // async searchForGuild(guildRef: SelectGuild, query: string) {
-  //   return this.ticketRepo.searchByGuild(guildRef, query);
-  // }
-
-  // async getTicketsForCrew(crewRef: SelectCrew) {
-  //   return this.ticketRepo.findCrewTickets(crewRef).getMany();
-  // }
-
-  // async searchForCrew(crewRef: SelectCrew, query: string) {
-  //   return this.ticketRepo.searchByCrew(crewRef, query);
-  // }
-
   async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
     const crew = await this.crewService
       .query()
