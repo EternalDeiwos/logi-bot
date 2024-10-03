@@ -161,7 +161,7 @@ export class TicketCommand {
     let channelRef = message.channelId;
 
     try {
-      await this.crewService.getCrew({ crewSf: channelRef });
+      await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     } catch {
       const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
       channelRef = guild.config.ticketTriageCrew;
@@ -191,7 +191,10 @@ export class TicketCommand {
     @SelectedStrings() [selected]: string[],
   ) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const ticket = await this.ticketService.getTicket({ threadSf: threadRef });
+    const ticket = await this.ticketService
+      .query()
+      .byThread({ threadSf: threadRef })
+      .getOneOrFail();
 
     if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
       throw new AuthError(
@@ -200,7 +203,7 @@ export class TicketCommand {
       ).asDisplayable();
     }
 
-    const crew = await this.crewService.getCrew({ crewSf: selected });
+    const crew = await this.crewService.query().byCrew({ crewSf: selected }).getOneOrFail();
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Moving ticket')],
@@ -264,7 +267,10 @@ export class TicketCommand {
     @ModalParam('thread') threadRef: Snowflake,
   ) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const ticket = await this.ticketService.getTicket({ threadSf: threadRef });
+    const ticket = await this.ticketService
+      .query()
+      .byThread({ threadSf: threadRef })
+      .getOneOrFail();
 
     if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
       throw new AuthError(
@@ -294,7 +300,7 @@ export class TicketCommand {
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
     const ticketRef: SelectTicket = { threadSf: interaction.channelId };
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const ticket = await this.ticketService.getTicket(ticketRef);
+    const ticket = await this.ticketService.query().byThread(ticketRef).getOneOrFail();
 
     if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
       throw new AuthError(
@@ -303,7 +309,11 @@ export class TicketCommand {
       ).asDisplayable();
     }
 
-    const crews = await this.crewService.getCrews({ guildSf: ticket.guild.guildSf }, true);
+    const crews = await this.crewService
+      .query()
+      .byGuildAndShared({ guildSf: ticket.guild.guildSf })
+      .withTeam()
+      .getMany();
     const prompt = new TicketInfoPromptBuilder()
       .addGenericMessage('Select destination')
       .addMoveSelector(
@@ -322,7 +332,10 @@ export class TicketCommand {
   })
   async onTicketTriagePrompt(@Context() [interaction]: SlashCommandContext) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const ticket = await this.ticketService.getTicket({ threadSf: interaction.channelId });
+    const ticket = await this.ticketService
+      .query()
+      .byThread({ threadSf: interaction.channelId })
+      .getOneOrFail();
 
     if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
       throw new AuthError(
@@ -344,7 +357,10 @@ export class TicketCommand {
     @ComponentParam('thread') threadRef: Snowflake,
   ) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const ticket = await this.ticketService.getTicket({ threadSf: threadRef });
+    const ticket = await this.ticketService
+      .query()
+      .byThread({ threadSf: threadRef })
+      .getOneOrFail();
     const tag = TicketActionToTag[action];
 
     if (!tag) {
@@ -374,7 +390,10 @@ export class TicketCommand {
 
   async lifecycleCommand([interaction]: SlashCommandContext, tag: TicketTag, reason?: string) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const ticket = await this.ticketService.getTicket({ threadSf: interaction.channelId });
+    const ticket = await this.ticketService
+      .query()
+      .byThread({ threadSf: interaction.channelId })
+      .getOneOrFail();
 
     if (
       // Ticket owner can close their own tickets
@@ -474,15 +493,9 @@ export class TicketCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    let crew: Crew;
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const crewRef = data.crew || interaction.channelId;
-
-    try {
-      crew = await this.crewService.getCrew({ crewSf: crewRef });
-    } catch {
-      // NOOP
-    }
+    const crew = await this.crewService.query().byCrew({ crewSf: crewRef }).getOne();
 
     if (crew) {
       await this.ticketService.sendIndividualStatus(

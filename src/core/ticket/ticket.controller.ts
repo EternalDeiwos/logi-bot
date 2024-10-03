@@ -31,7 +31,17 @@ export class TicketController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Not Found' })
   async getGuildTickets(@Auth() auth: APITokenPayload, @Query('q') query: string = '') {
-    return await this.ticketService.searchForGuild({ guildSf: auth.aud }, query);
+    return await this.ticketService
+      .query()
+      .byGuild({ guildSf: auth.aud })
+      .withCrew()
+      .withTeam()
+      .withPreviousCrew()
+      .withPreviousGuild()
+      .withPreviousTeam()
+      .search(query)
+      .withActiveOnly()
+      .getMany();
   }
 
   @Get(':thread')
@@ -40,8 +50,15 @@ export class TicketController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Not Found' })
   async getOneTicket(@Auth() auth: APITokenPayload, @Param('thread') threadSf: string) {
-    const ticket = await this.ticketService.getTicket({ threadSf });
-    this.logger.debug(JSON.stringify(ticket));
+    const ticket = await this.ticketService
+      .query()
+      .byThread({ threadSf })
+      .withCrew()
+      .withTeam()
+      .withPreviousCrew()
+      // .withPreviousGuild()
+      .withPreviousTeam()
+      .getOneOrFail();
 
     if (ticket.guild.guildSf !== auth.aud) {
       throw new HttpException('Not Found', HttpStatus.NOT_FOUND);

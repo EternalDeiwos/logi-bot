@@ -1,114 +1,82 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { uniq } from 'lodash';
 import { InsertResult } from 'typeorm';
-import { Colors, GuildManager, PermissionsBitField, Snowflake } from 'discord.js';
+import { GuildManager, PermissionsBitField, Snowflake } from 'discord.js';
 import { AuthError, InternalError, ValidationError } from 'src/errors';
 import { DiscordService } from 'src/bot/discord.service';
 import { GuildService } from 'src/core/guild/guild.service';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { Team } from 'src/core/team/team.entity';
+import { CrewInfoPromptBuilder } from 'src/core/crew/crew-info.prompt';
 import { CrewService } from 'src/core/crew/crew.service';
-import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { SelectCrew } from 'src/core/crew/crew.entity';
 import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
-import { TicketProperties, TicketUpdatePromptBuilder } from './ticket-update.prompt';
+import { TicketUpdatePromptBuilder } from './ticket-update.prompt';
 import { TicketClosedPromptBuilder } from './ticket-closed.prompt';
 import { TicketStatusPromptBuilder } from './ticket-status.prompt';
-import { CrewInfoPromptBuilder } from '../crew/crew-info.prompt';
+import { TicketQueryBuilder } from './ticket.query';
 
-export const ticketProperties: { [K in TicketTag]: TicketProperties } = {
-  [TicketTag.TRIAGE]: {
-    color: Colors.DarkGreen,
-    action: 'returned to triage',
-    title: 'Ticket Reset',
-    tagsRemoved: [
-      TicketTag.ACCEPTED,
-      TicketTag.DECLINED,
-      TicketTag.ABANDONED,
-      TicketTag.IN_PROGRESS,
-      TicketTag.REPEATABLE,
-      TicketTag.MOVED,
-      TicketTag.DONE,
-    ],
-  },
-  [TicketTag.ACCEPTED]: {
-    color: Colors.DarkGreen,
-    action: 'accepted',
-    title: 'Ticket Accepted',
-    tagsRemoved: [
-      TicketTag.TRIAGE,
-      TicketTag.DECLINED,
-      TicketTag.ABANDONED,
-      TicketTag.IN_PROGRESS,
-      TicketTag.REPEATABLE,
-      TicketTag.DONE,
-      TicketTag.MOVED,
-    ],
-  },
-  [TicketTag.DECLINED]: {
-    color: Colors.DarkRed,
-    action: 'declined',
-    title: 'Ticket Declined',
-    tagsRemoved: [
-      TicketTag.TRIAGE,
-      TicketTag.ACCEPTED,
-      TicketTag.ABANDONED,
-      TicketTag.DONE,
-      TicketTag.MOVED,
-    ],
-  },
-  [TicketTag.ABANDONED]: {
-    color: Colors.LightGrey,
-    action: 'closed',
-    title: 'Ticket Abandoned',
-    tagsRemoved: [TicketTag.DONE, TicketTag.DECLINED, TicketTag.MOVED],
-  },
-  [TicketTag.DONE]: {
-    color: Colors.DarkGreen,
-    action: 'completed',
-    title: 'Ticket Done',
-    tagsRemoved: [
-      TicketTag.IN_PROGRESS,
-      TicketTag.REPEATABLE,
-      TicketTag.ABANDONED,
-      TicketTag.DECLINED,
-      TicketTag.MOVED,
-    ],
-  },
-  [TicketTag.IN_PROGRESS]: {
-    color: Colors.DarkGold,
-    action: 'started',
-    title: 'In Progress',
-    tagsRemoved: [TicketTag.REPEATABLE, TicketTag.DONE, TicketTag.ABANDONED, TicketTag.MOVED],
-  },
-  [TicketTag.REPEATABLE]: {
-    color: Colors.Aqua,
-    action: 'marked repeatable',
-    title: 'Repeatable Ticket / Chore',
-    tagsRemoved: [TicketTag.IN_PROGRESS, TicketTag.DONE, TicketTag.ABANDONED, TicketTag.MOVED],
-  },
-  [TicketTag.MOVED]: {
-    color: Colors.Aqua,
-    action: 'moved',
-    title: 'Moved',
-    tagsRemoved: [
-      TicketTag.TRIAGE,
-      TicketTag.ACCEPTED,
-      TicketTag.DECLINED,
-      TicketTag.IN_PROGRESS,
-      TicketTag.DONE,
-      TicketTag.ABANDONED,
-    ],
-  },
+export const tagsRemoved: { [K in TicketTag]: TicketTag[] } = {
+  [TicketTag.TRIAGE]: [
+    TicketTag.ACCEPTED,
+    TicketTag.DECLINED,
+    TicketTag.ABANDONED,
+    TicketTag.IN_PROGRESS,
+    TicketTag.REPEATABLE,
+    TicketTag.MOVED,
+    TicketTag.DONE,
+  ],
+  [TicketTag.ACCEPTED]: [
+    TicketTag.TRIAGE,
+    TicketTag.DECLINED,
+    TicketTag.ABANDONED,
+    TicketTag.IN_PROGRESS,
+    TicketTag.REPEATABLE,
+    TicketTag.DONE,
+    TicketTag.MOVED,
+  ],
+  [TicketTag.DECLINED]: [
+    TicketTag.TRIAGE,
+    TicketTag.ACCEPTED,
+    TicketTag.ABANDONED,
+    TicketTag.DONE,
+    TicketTag.MOVED,
+  ],
+  [TicketTag.ABANDONED]: [TicketTag.DONE, TicketTag.DECLINED, TicketTag.MOVED],
+  [TicketTag.DONE]: [
+    TicketTag.IN_PROGRESS,
+    TicketTag.REPEATABLE,
+    TicketTag.ABANDONED,
+    TicketTag.DECLINED,
+    TicketTag.MOVED,
+  ],
+  [TicketTag.IN_PROGRESS]: [
+    TicketTag.REPEATABLE,
+    TicketTag.DONE,
+    TicketTag.ABANDONED,
+    TicketTag.MOVED,
+  ],
+  [TicketTag.REPEATABLE]: [
+    TicketTag.IN_PROGRESS,
+    TicketTag.DONE,
+    TicketTag.ABANDONED,
+    TicketTag.MOVED,
+  ],
+  [TicketTag.MOVED]: [
+    TicketTag.TRIAGE,
+    TicketTag.ACCEPTED,
+    TicketTag.DECLINED,
+    TicketTag.IN_PROGRESS,
+    TicketTag.DONE,
+    TicketTag.ABANDONED,
+  ],
 };
 
 export abstract class TicketService {
-  abstract getTicket(ticket: SelectTicket): Promise<Ticket>;
-  abstract searchForGuild(guildRef: SelectGuild, query: string): Promise<Ticket[]>;
-  abstract searchForCrew(crewRef: SelectCrew, query: string): Promise<Ticket[]>;
+  abstract query(): TicketQueryBuilder;
   abstract createTicket(crewRef: SelectCrew, ticket?: InsertTicket): Promise<InsertResult>;
   abstract moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket);
   abstract deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake);
@@ -136,36 +104,44 @@ export class TicketServiceImpl extends TicketService {
     private readonly discordService: DiscordService,
     private readonly guildService: GuildService,
     @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
-    private readonly memberService: CrewMemberService,
     private readonly tagService: TagService,
     private readonly ticketRepo: TicketRepository,
   ) {
     super();
   }
 
-  async getTicket(ticketRef: SelectTicket) {
-    return this.ticketRepo.findOneTicket(ticketRef).getOneOrFail();
-    // TODO Remove when factored into command handlers
-    // throw new ValidationError(
-    //   'VALIDATION_FAILED',
-    //   'This action can only be performed inside a ticket thread.',
-    // ).asDisplayable();
+  query() {
+    return new TicketQueryBuilder(this.ticketRepo);
   }
 
-  async searchForGuild(guildRef: SelectGuild, query: string) {
-    return this.ticketRepo.searchByGuild(guildRef, query);
-  }
+  // async getTicket(ticketRef: SelectTicket) {
+  //   return this.ticketRepo.findOneTicket(ticketRef).getOneOrFail();
+  //   // TODO Remove when factored into command handlers
+  //   // throw new ValidationError(
+  //   //   'VALIDATION_FAILED',
+  //   //   'This action can only be performed inside a ticket thread.',
+  //   // ).asDisplayable();
+  // }
 
-  async getTicketsForCrew(crewRef: SelectCrew) {
-    return this.ticketRepo.findCrewTickets(crewRef).getMany();
-  }
+  // async searchForGuild(guildRef: SelectGuild, query: string) {
+  //   return this.ticketRepo.searchByGuild(guildRef, query);
+  // }
 
-  async searchForCrew(crewRef: SelectCrew, query: string) {
-    return this.ticketRepo.searchByCrew(crewRef, query);
-  }
+  // async getTicketsForCrew(crewRef: SelectCrew) {
+  //   return this.ticketRepo.findCrewTickets(crewRef).getMany();
+  // }
+
+  // async searchForCrew(crewRef: SelectCrew, query: string) {
+  //   return this.ticketRepo.searchByCrew(crewRef, query);
+  // }
 
   async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
-    const crew = await this.crewService.getCrew(crewRef, true);
+    const crew = await this.crewService
+      .query()
+      .withDeleted()
+      .byCrew(crewRef)
+      .withTeam()
+      .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const forum = await discordGuild.channels.fetch(crew.team.forumSf);
 
@@ -224,7 +200,11 @@ export class TicketServiceImpl extends TicketService {
 
     if (crew.hasMovePrompt) {
       const message = await thread.fetchStarterMessage();
-      const crews = await this.crewService.getCrews({ id: ticket.guildId }, true);
+      const crews = await this.crewService
+        .query()
+        .byGuildAndShared({ id: ticket.guildId })
+        .withTeam()
+        .getMany();
       await message.edit(
         new TicketInfoPromptBuilder({ components: message.components })
           .addMoveSelector(
@@ -313,15 +293,17 @@ export class TicketServiceImpl extends TicketService {
     );
 
     const tags = await this.tagService.getTagsByTeam({ id: ticket.crew.teamId });
-    const properties = ticketProperties[tag];
     const tagSnowflakeMap = Team.getSnowflakeMap(tags);
-    const tagsRemovedSf = properties.tagsRemoved.map((tagName) => tagSnowflakeMap[tagName]);
+    const tagsRemovedSf = tagsRemoved[tag].map((tagName) => tagSnowflakeMap[tagName]);
     const tagAdd = tagSnowflakeMap[tag];
-    const prompt = new TicketUpdatePromptBuilder()
-      .addTicketUpdateMessage(member, ticket, properties, reason)
-      .build();
+    const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(
+      member,
+      ticket,
+      tag,
+      reason,
+    );
 
-    await thread.send(prompt);
+    await thread.send(prompt.build());
 
     const starterMessage = await thread.fetchStarterMessage();
     switch (tag) {
@@ -385,7 +367,7 @@ export class TicketServiceImpl extends TicketService {
       try {
         const creator = await thread.guild.members.fetch(ticket.createdBy);
         const dm = await creator.createDM();
-        await dm.send(prompt);
+        await dm.send(prompt.build());
       } catch (err) {
         this.logger.error(
           `Failed to DM ticket creator for ${ticket.name} in ${discordGuild.name}: ${err.message}`,
@@ -404,7 +386,13 @@ export class TicketServiceImpl extends TicketService {
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
-    const crew = await this.crewService.getCrew(crewRef, false, { tickets: true, members: true });
+    const crew = await this.crewService
+      .query()
+      .byCrew(crewRef)
+      .withTeam()
+      .withTickets()
+      .withMembers()
+      .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
 
@@ -446,10 +434,17 @@ export class TicketServiceImpl extends TicketService {
     }
 
     const targetChannelSecure = await this.discordService.isChannelPrivate(targetChannel);
+    const srcCrews = await this.crewService
+      .query()
+      .withDeleted()
+      .byGuild(guild)
+      .withTeam()
+      .withMembers()
+      .withTickets()
+      .getMany();
     const crews = [];
 
-    // TODO NEED TO JOIN TICKETS AND MEMBERS FOR CREWS
-    for (const crew of await this.crewService.getCrews(guild, true)) {
+    for (const crew of srcCrews) {
       const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
 
       if (

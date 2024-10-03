@@ -4,25 +4,64 @@ import {
   GuildMember,
   ColorResolvable,
   userMention,
+  Colors,
 } from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
 import { TicketTag } from 'src/types';
 import { Ticket } from './ticket.entity';
 
-export type TicketProperties = {
+type TicketProperties = {
   color: ColorResolvable;
   action: string;
   title: string;
-  tagsRemoved: TicketTag[];
+};
+
+export const ticketProperties: { [K in TicketTag]: TicketProperties } = {
+  [TicketTag.TRIAGE]: {
+    color: Colors.DarkGreen,
+    action: 'returned to triage',
+    title: 'Ticket Reset',
+  },
+  [TicketTag.ACCEPTED]: {
+    color: Colors.DarkGreen,
+    action: 'accepted',
+    title: 'Ticket Accepted',
+  },
+  [TicketTag.DECLINED]: {
+    color: Colors.DarkRed,
+    action: 'declined',
+    title: 'Ticket Declined',
+  },
+  [TicketTag.ABANDONED]: {
+    color: Colors.LightGrey,
+    action: 'closed',
+    title: 'Ticket Abandoned',
+  },
+  [TicketTag.DONE]: {
+    color: Colors.DarkGreen,
+    action: 'completed',
+    title: 'Ticket Done',
+  },
+  [TicketTag.IN_PROGRESS]: {
+    color: Colors.DarkGold,
+    action: 'started',
+    title: 'In Progress',
+  },
+  [TicketTag.REPEATABLE]: {
+    color: Colors.Aqua,
+    action: 'marked repeatable',
+    title: 'Repeatable Ticket / Chore',
+  },
+  [TicketTag.MOVED]: {
+    color: Colors.Aqua,
+    action: 'moved',
+    title: 'Moved',
+  },
 };
 
 export class TicketUpdatePromptBuilder extends BasePromptBuilder {
-  addTicketUpdateMessage(
-    updatedBy: GuildMember,
-    ticket: Ticket,
-    properties: TicketProperties,
-    reason?: string,
-  ) {
+  addTicketUpdateMessage(updatedBy: GuildMember, ticket: Ticket, tag: TicketTag, reason?: string) {
+    const properties = ticketProperties[tag];
     const message =
       reason &&
       reason
