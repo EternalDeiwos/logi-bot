@@ -317,7 +317,7 @@ export class CrewServiceImpl extends CrewService {
         where: { crewSf: crew.crewSf },
       });
       const botMember = await discordGuild.members.fetchMe();
-      await this.tagService.deleteTags(botMember, [tagTemplate]);
+      await this.tagService.deleteTagsByTemplate(botMember, [tagTemplate]);
       await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
     } catch (err) {
       this.logger.error(`Failed to update ticket tags: ${err.message}`, err.stack);

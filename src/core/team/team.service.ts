@@ -40,8 +40,10 @@ export class TeamServiceImpl extends TeamService {
     return this.teamRepo.upsert(team, ['name', 'guildId', 'deletedAt']);
   }
 
-  async deleteTeam(team: SelectTeam) {
-    return await this.teamRepo.updateReturning(team, { deletedAt: new Date() });
+  async deleteTeam(teamRef: SelectTeam) {
+    const team = await this.getTeam(teamRef);
+    await this.tagService.deleteTags(team.tags);
+    return await this.teamRepo.updateReturning(teamRef, { deletedAt: new Date() });
   }
 
   async reconcileGuildForumTags(guildRef: SelectGuild) {

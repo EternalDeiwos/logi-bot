@@ -160,7 +160,10 @@ export class TicketServiceImpl extends TicketService {
       });
 
       if (originalGuildRef.id !== crew.guildId) {
-        const originalGuild = await this.guildService.getGuild(originalGuildRef);
+        const originalGuild = await this.guildService
+          .query()
+          .byGuild(originalGuildRef)
+          .getOneOrFail();
         prompt.addCrossGuildEmbed(originalGuild);
       }
     }
@@ -403,7 +406,7 @@ export class TicketServiceImpl extends TicketService {
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
-    const guild = await this.guildService.getGuild(guildRef);
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(guild.guildSf);
     const member = await discordGuild.members.fetch(memberRef);
     const targetChannel = await discordGuild.channels.fetch(targetChannelRef);

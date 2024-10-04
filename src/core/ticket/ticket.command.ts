@@ -163,7 +163,10 @@ export class TicketCommand {
     try {
       await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     } catch {
-      const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
+      const guild = await this.guildService
+        .query()
+        .byGuild({ guildSf: interaction.guildId })
+        .getOneOrFail();
       channelRef = guild.config.ticketTriageCrew;
     }
 

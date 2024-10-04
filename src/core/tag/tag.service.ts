@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { GuildMember, GuildForumTag, GuildManager, Snowflake } from 'discord.js';
-import { In, InsertResult } from 'typeorm';
+import { DeleteResult, In, InsertResult } from 'typeorm';
 import { compact } from 'lodash';
 import { InternalError, ValidationError } from 'src/errors';
 import { Crew } from 'src/core/crew/crew.entity';
@@ -39,7 +39,11 @@ export abstract class TagService {
     moderated?: boolean,
   ): Promise<any>;
   abstract addTags(teamRef: SelectTeam, templates: ForumTagTemplate[]): Promise<void>;
-  abstract deleteTags(member: GuildMember, templates?: (ForumTagTemplate | string)[]): Promise<any>;
+  abstract deleteTags(tagRef: SelectTag | SelectTag[]): Promise<DeleteResult>;
+  abstract deleteTagsByTemplate(
+    guildRef: SelectGuild,
+    templates?: (ForumTagTemplate | string)[],
+  ): Promise<any>;
   abstract deleteTagTemplates(
     member: GuildMember,
     templates?: (ForumTagTemplate | string)[],
@@ -90,7 +94,7 @@ export class TagServiceImpl extends TagService {
   }
 
   async createTicketTags(guildRef: SelectGuild, memberRef: Snowflake) {
-    const guild = await this.guildService.getGuild(guildRef);
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
 
     const triage = {
       name: TicketTag.TRIAGE,
@@ -162,7 +166,7 @@ export class TagServiceImpl extends TagService {
   }
 
   async createTag(guildRef: SelectGuild, memberRef: Snowflake, name: string, moderated = false) {
-    const guild = await this.guildService.getGuild(guildRef);
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
 
     return await this.templateRepo.upsert(
       {
@@ -229,12 +233,14 @@ export class TagServiceImpl extends TagService {
     );
   }
 
-  async deleteTags(member: GuildMember, templates?: (ForumTagTemplate | string)[]) {
-    if (!member.permissions.has('Administrator')) {
-      return { success: false, message: 'Only guild administrators can perform this action' };
-    }
+  async deleteTags(tagRef: SelectTag | SelectTag[]): Promise<DeleteResult> {
+    const tags = Array.isArray(tagRef) ? tagRef.map((tag) => tag.tagSf) : tagRef;
+    return await this.tagRepo.delete(tags);
+  }
 
-    const guild = member.guild;
+  async deleteTagsByTemplate(guildRef: SelectGuild, templates?: (ForumTagTemplate | string)[]) {
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
+    const discordGuild = await this.guildManager.fetch(guild.guildSf);
 
     if (!templates || !Array.isArray(templates)) {
       templates = await this.templateRepo.find({
@@ -247,7 +253,7 @@ export class TagServiceImpl extends TagService {
     const results = await Promise.all(
       result.map(async ({ teamId, tags }) => {
         const team = await this.teamService.getTeam({ id: teamId });
-        const forum = await guild.channels.fetch(team.forumSf);
+        const forum = await discordGuild.channels.fetch(team.forumSf);
 
         if (!forum || !forum.isThreadOnly()) {
           throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');

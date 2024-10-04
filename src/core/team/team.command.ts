@@ -78,7 +78,10 @@ export class TeamCommand {
       ).asDisplayable();
     }
 
-    const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
+    const guild = await this.guildService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .getOneOrFail();
     const result = await this.teamService.registerTeam({
       forumSf: data.forum.id,
       guildId: guild.id,

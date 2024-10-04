@@ -244,7 +244,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   }
 
   async reconcileCrewLeaderRole(guildRef: SelectGuild, memberRef: Snowflake) {
-    const guild = await this.guildService.getGuild(guildRef);
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
 
     if (!guild.config?.crewLeaderRole) {
       this.logger.debug('Crew leader not set', JSON.stringify(guild));
@@ -311,7 +311,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   }
 
   async reconcileIndividualMembership(guildRef: SelectGuild, memberRef: Snowflake) {
-    const guild = await this.guildService.getGuild(guildRef);
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(guild.guildSf);
     let member: GuildMember;
 

@@ -230,7 +230,10 @@ export class CrewCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const discordGuild = await this.guildManager.fetch(interaction.guildId);
     const member = await discordGuild.members.fetch(interaction);
-    const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
+    const guild = await this.guildService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .getOneOrFail();
 
     if (
       guild.config?.crewCreatorRole &&
