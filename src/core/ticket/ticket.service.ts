@@ -117,10 +117,10 @@ export class TicketServiceImpl extends TicketService {
   async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
     const crew = await this.crewService
       .query()
-      .withDeleted()
       .byCrew(crewRef)
       .withTeam()
       .withTeamTags()
+      .withTeamTagsTemplate()
       .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const forum = await discordGuild.channels.fetch(crew.team.forumSf);
@@ -180,24 +180,6 @@ export class TicketServiceImpl extends TicketService {
       guildId: crew.guildId,
     });
 
-    if (crew.hasMovePrompt) {
-      const message = await thread.fetchStarterMessage();
-      const crews = await this.crewService
-        .query()
-        .byGuildAndShared({ id: ticket.guildId })
-        .withTeam()
-        .getMany();
-      await message.edit(
-        new TicketInfoPromptBuilder({ components: message.components })
-          .addMoveSelector(
-            { threadSf: result.identifiers[0].threadSf },
-            crew.guild.guildSf,
-            crews.filter((crew) => ![ticket.crewSf].includes(crew.crewSf)),
-          )
-          .build(),
-      );
-    }
-
     return result;
   }
 
@@ -238,15 +220,17 @@ export class TicketServiceImpl extends TicketService {
     const thread = await forum.threads.fetch(ticket.threadSf);
     const now = new Date();
 
-    await thread.send(new TicketClosedPromptBuilder().addTicketClosedMessage(guildMember).build());
-    await thread.setLocked(true);
-    await thread.setArchived(true);
-
-    return await this.ticketRepo.updateReturning(ticketRef, {
+    const result = await this.ticketRepo.updateReturning(ticketRef, {
       deletedAt: now,
       updatedBy: guildMember.id,
       updatedAt: now,
     });
+
+    // Update thread after database otherwise thread update handler will loop
+    await thread.send(new TicketClosedPromptBuilder().addTicketClosedMessage(guildMember).build());
+    await thread.edit({ locked: true, archived: true });
+
+    return result;
   }
 
   async updateTicket(data: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket> {

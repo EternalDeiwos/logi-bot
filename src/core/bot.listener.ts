@@ -75,14 +75,16 @@ export class BotEventListener {
       );
     }, false);
 
-    const deletedFlag = oldThread.appliedTags.reduce((state, snowflake) => {
-      return (
-        state ||
-        [TicketTag.DONE, TicketTag.ABANDONED, TicketTag.DECLINED, TicketTag.MOVED].includes(
-          tagMap[snowflake] as TicketTag,
-        )
-      );
-    }, false);
+    const deletedFlag =
+      Boolean(ticket.deletedAt) &&
+      oldThread.appliedTags.reduce((state, snowflake) => {
+        return (
+          state ||
+          [TicketTag.DONE, TicketTag.ABANDONED, TicketTag.DECLINED, TicketTag.MOVED].includes(
+            tagMap[snowflake] as TicketTag,
+          )
+        );
+      }, false);
 
     if (toDeleteFlag && !deletedFlag) {
       this.logger.log(`Deleting ticket ${ticket.name}`);
@@ -101,7 +103,7 @@ export class BotEventListener {
       .getOneOrFail();
 
     const message = await thread.fetchStarterMessage();
-    const prompt = new TicketInfoPromptBuilder({ components: message.components });
+    const prompt = new TicketInfoPromptBuilder();
     const triageTag = await this.tagService
       .queryTag()
       .byTeam({ id: ticket.crew.teamId })
@@ -109,14 +111,14 @@ export class BotEventListener {
       .getOneOrFail();
 
     if (thread.appliedTags.includes(triageTag.tagSf)) {
-      prompt.addTriageControls(ticket);
+      prompt.addTriageControls(ticket, { disabled: { accept: ticket.crew.hasMovePrompt } });
     }
 
     if (ticket.crew.hasMovePrompt) {
       const crews = await this.crewService
         .query()
-        .withDeleted()
         .byGuildAndShared({ guildSf: thread.guildId })
+        .withTeam()
         .getMany();
       prompt.addMoveSelector(
         { threadSf: thread.id },
@@ -125,9 +127,9 @@ export class BotEventListener {
       );
     }
 
-    this.logger.debug(JSON.stringify(prompt.build(), null, 2));
-
     await message.edit(prompt.build());
+
+    this.logger.log(`New ticket: ${ticket.name} for ${ticket.crew.name} in ${ticket.guild.name}`);
   }
 
   @On('guildMemberRemove')
