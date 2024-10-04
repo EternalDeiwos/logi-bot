@@ -1,4 +1,5 @@
 import { Snowflake } from 'discord.js';
+import { Expose, Transform } from 'class-transformer';
 import {
   Entity,
   Column,
@@ -32,15 +33,19 @@ export class ForumTagTemplate {
   id: string;
 
   @Column()
+  @Expose()
   name: string;
 
   @Column({ default: false, comment: 'Is adding or removing this tag on posts restricted?' })
+  @Expose()
   moderated: boolean;
 
   @Column({ default: false, comment: 'Is the tag applied automatically?' })
+  @Expose()
   default: boolean;
 
   @Column({ nullable: true })
+  @Expose()
   emoji: string;
 
   @Column({ type: 'uuid', name: 'guild_id' })
@@ -53,6 +58,8 @@ export class ForumTagTemplate {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_tag_template_guild_id',
   })
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   guild: Guild;
 
   /**
@@ -75,14 +82,20 @@ export class ForumTagTemplate {
     referencedColumnName: 'crewSf',
     foreignKeyConstraintName: 'fk_tag_template_crew_channel_sf',
   })
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   crew: Crew;
 
   @OneToMany(() => ForumTag, (tag) => tag.template)
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   tags: ForumTag[];
 
   @Column({ type: 'int8', name: 'created_by_sf' })
+  @Expose()
   createdBy: Snowflake;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
+  @Expose()
   createdAt: Date;
 }

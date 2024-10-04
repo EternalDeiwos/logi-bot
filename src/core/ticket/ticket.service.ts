@@ -120,6 +120,7 @@ export class TicketServiceImpl extends TicketService {
       .withDeleted()
       .byCrew(crewRef)
       .withTeam()
+      .withTeamTags()
       .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const forum = await discordGuild.channels.fetch(crew.team.forumSf);
@@ -136,9 +137,8 @@ export class TicketServiceImpl extends TicketService {
       ticket.updatedBy = ticket.createdBy;
     }
 
-    const tags = await this.tagService.getTagsByTeam({ id: crew.teamId });
-    const triageTag = tags.find((tag) => tag.name === TicketTag.TRIAGE);
-    const crewTag = tags.find((tag) => tag.name === crew.shortName);
+    const triageTag = crew.team?.tags?.find((tag) => tag.name === TicketTag.TRIAGE);
+    const crewTag = crew.team?.tags?.find((tag) => tag.name === crew.shortName);
     const appliedTags: string[] = [];
 
     if (triageTag) {
@@ -149,7 +149,7 @@ export class TicketServiceImpl extends TicketService {
       appliedTags.push(crewTag.tagSf);
     }
 
-    const defaultTags = Team.getDefaultTags(tags);
+    const defaultTags = Team.getDefaultTags(crew.team?.tags);
     appliedTags.push(...defaultTags);
 
     const prompt = new TicketInfoPromptBuilder().addTicketMessage(ticket, crew);
@@ -254,10 +254,12 @@ export class TicketServiceImpl extends TicketService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Ticket updates must provide updatedBy');
     }
 
-    const ticket = await this.ticketRepo.findOne({
-      where: { threadSf: data.threadSf },
-      withDeleted: true,
-    });
+    const ticket = await this.query()
+      .withDeleted()
+      .byThread({ threadSf: data.threadSf })
+      .withCrew()
+      .withTeam()
+      .getOneOrFail();
 
     const discordGuild = await this.guildManager.fetch(ticket.guild.guildSf);
     const member = await discordGuild.members.fetch(data.updatedBy);
@@ -274,7 +276,7 @@ export class TicketServiceImpl extends TicketService {
       { ...data, updatedAt: new Date() },
     );
 
-    const tags = await this.tagService.getTagsByTeam({ id: ticket.crew.teamId });
+    const tags = await this.tagService.queryTag().byTeam({ id: ticket.crew.teamId }).getMany();
     const tagSnowflakeMap = Team.getSnowflakeMap(tags);
     const tagsRemovedSf = tagsRemoved[tag].map((tagName) => tagSnowflakeMap[tagName]);
     const tagAdd = tagSnowflakeMap[tag];

@@ -63,7 +63,7 @@ export class BotEventListener {
       return;
     }
 
-    const tags = await this.tagService.getTagsByTeam({ id: ticket.crew.teamId });
+    const tags = await this.tagService.queryTag().byTeam({ id: ticket.crew.teamId }).getMany();
     const tagMap = await Team.getTagMap(tags);
 
     const toDeleteFlag = newThread.appliedTags.reduce((state, snowflake) => {
@@ -102,10 +102,11 @@ export class BotEventListener {
 
     const message = await thread.fetchStarterMessage();
     const prompt = new TicketInfoPromptBuilder({ components: message.components });
-    const triageTag = await this.tagService.getTagByName(
-      { id: ticket.crew.teamId },
-      TicketTag.TRIAGE,
-    );
+    const triageTag = await this.tagService
+      .queryTag()
+      .byTeam({ id: ticket.crew.teamId })
+      .search(TicketTag.TRIAGE)
+      .getOneOrFail();
 
     if (thread.appliedTags.includes(triageTag.tagSf)) {
       prompt.addTriageControls(ticket);

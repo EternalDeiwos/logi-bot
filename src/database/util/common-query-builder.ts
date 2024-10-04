@@ -26,4 +26,8 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
   getOne() {
     return this.qb.getOne();
   }
+
+  exists() {
+    return this.qb.getExists();
+  }
 }

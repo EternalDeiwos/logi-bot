@@ -122,6 +122,11 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
+  withTeamTags() {
+    this.qb.leftJoinAndSelect('team.tags', 'team_tags');
+    return this;
+  }
+
   withMembers() {
     this.qb.leftJoinAndSelect('crew.members', 'member');
     return this;

@@ -5,9 +5,10 @@ import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { TeamRepository } from './team.repository';
 import { InsertTeam, SelectTeam, Team } from './team.entity';
+import { TeamQueryBuilder } from './team.query';
 
 export abstract class TeamService {
-  abstract getTeam(team: SelectTeam): Promise<Team>;
+  abstract query(): TeamQueryBuilder;
   abstract registerTeam(team: InsertTeam): Promise<InsertResult>;
   abstract deleteTeam(team: SelectTeam): Promise<DeleteResult>;
   abstract reconcileGuildForumTags(guild: SelectGuild): Promise<void>;
@@ -28,12 +29,8 @@ export class TeamServiceImpl extends TeamService {
     super();
   }
 
-  async getTeam(team: SelectTeam) {
-    return this.teamRepo.findOneOrFail({ where: team });
-  }
-
-  async getTeamByGuild(guildRef: SelectGuild) {
-    return this.teamRepo.find({ where: { guild: guildRef } });
+  query(): TeamQueryBuilder {
+    return new TeamQueryBuilder(this.teamRepo);
   }
 
   async registerTeam(team: InsertTeam) {
@@ -41,32 +38,39 @@ export class TeamServiceImpl extends TeamService {
   }
 
   async deleteTeam(teamRef: SelectTeam) {
-    const team = await this.getTeam(teamRef);
+    const team = await this.query().byTeam(teamRef).withTags().getOneOrFail();
     await this.tagService.deleteTags(team.tags);
     return await this.teamRepo.updateReturning(teamRef, { deletedAt: new Date() });
   }
 
   async reconcileGuildForumTags(guildRef: SelectGuild) {
-    const templates = await this.tagService.getTemplateByGuild(guildRef);
-    const teams = await this.teamRepo.find({ where: { guild: guildRef } });
-
+    const templates = await this.tagService
+      .queryTemplate()
+      .byGuild(guildRef)
+      .withCrews()
+      .withCrewTeams()
+      .getMany();
+    const teams = await this.query().byGuild(guildRef).getMany();
     const result = await Promise.all(
-      teams.map((team) => this.reconcileTeamForumTags(team, templates)),
+      teams.map((team) => this._reconcileTeamForumTags(team, templates)),
     );
   }
 
   async reconcileTeamForumTags(teamRef: SelectTeam, templates: ForumTagTemplate[]) {
-    const team: Team = teamRef instanceof Team ? teamRef : await this.getTeam(teamRef);
-    const tags = await this.tagService.getTagsByTeam(team);
+    const team = await this.query().byTeam(teamRef).withTags().getOneOrFail();
+    return this._reconcileTeamForumTags(team, templates);
+  }
+
+  private async _reconcileTeamForumTags(team: Team, templates: ForumTagTemplate[]) {
     const filteredTemplates = templates.filter((template) => {
       return (
         // Crew tags only appear on their team's forum
         (!template.crewSf || template.crew?.team?.id === team.id) &&
         // Don't create tags that already exist
-        !tags.find((tag) => template.id === tag.templateId)
+        !team.tags.find((tag) => template.id === tag.templateId)
       );
     });
 
-    return this.tagService.addTags(teamRef, filteredTemplates);
+    return this.tagService.addTags(team, filteredTemplates);
   }
 }

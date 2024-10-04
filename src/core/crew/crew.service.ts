@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { Equal, IsNull, UpdateResult } from 'typeorm';
+import { UpdateResult } from 'typeorm';
 import {
   CategoryChannel,
   ChannelType,
@@ -25,10 +25,7 @@ import { SelectGuild } from 'src/core/guild/guild.entity';
 import { TeamService } from 'src/core/team/team.service';
 import { SelectTeam } from 'src/core/team/team.entity';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
-import { TagTemplateRepository } from 'src/core/tag/tag-template.repository';
-import { Ticket } from 'src/core/ticket/ticket.entity';
 import { TicketService } from 'src/core/ticket/ticket.service';
-import { TicketRepository } from 'src/core/ticket/ticket.repository';
 import { ArchiveCrew, Crew, InsertCrew, SelectCrew, UpdateCrew } from './crew.entity';
 import { CrewRepository } from './crew.repository';
 import { CrewMemberService } from './member/crew-member.service';
@@ -72,11 +69,9 @@ export class CrewServiceImpl extends CrewService {
     private readonly discordService: DiscordService,
     private readonly teamService: TeamService,
     private readonly tagService: TagService,
-    private readonly templateRepo: TagTemplateRepository,
     @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
-    private readonly ticketRepo: TicketRepository,
-    private readonly crewRepo: CrewRepository,
     private readonly memberService: CrewMemberService,
+    private readonly crewRepo: CrewRepository,
   ) {
     super();
   }
@@ -87,7 +82,7 @@ export class CrewServiceImpl extends CrewService {
 
   async registerCrew(data: InsertCrew, options: RegisterCrewOptions = {}) {
     const teamRef: SelectTeam = { id: data.teamId };
-    const team = await this.teamService.getTeam(teamRef);
+    const team = await this.teamService.query().byTeam(teamRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(team.guild.guildSf);
     const category = await discordGuild.channels.fetch(team.categorySf);
 
@@ -123,9 +118,11 @@ export class CrewServiceImpl extends CrewService {
     }
 
     if (
-      await this.templateRepo.exists({
-        where: { guild: { guildSf: discordGuild.id }, name: data.shortName },
-      })
+      await this.tagService
+        .queryTemplate()
+        .byGuild({ guildSf: discordGuild.id })
+        .search(data.shortName)
+        .exists()
     ) {
       throw new ValidationError(
         'VALIDATION_FAILED',
@@ -218,7 +215,6 @@ export class CrewServiceImpl extends CrewService {
     }
 
     // Create audit prompt
-    this.logger.debug(JSON.stringify(crew), JSON.stringify(team.guild));
     if (team.guild?.config?.crewAuditChannel) {
       try {
         const audit = await discordGuild.channels.fetch(team.guild.config.crewAuditChannel);
@@ -269,20 +265,13 @@ export class CrewServiceImpl extends CrewService {
     memberRef: Snowflake,
     options: ArchiveCrew = {},
   ) {
-    const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
+    const crew = await this.query().byCrew({ crewSf: channelRef }).withTickets().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
 
     // Close all currently open tickets
-    let tickets: Ticket[];
-    try {
-      tickets = await this.ticketRepo.find({ where: { crewSf: channelRef } });
-    } catch (err) {
-      throw new DatabaseError('QUERY_FAILED', 'Failed to fetch crew tickets', err);
-    }
-
     const errors: Error[] = [];
     await Promise.all(
-      tickets.map(async (ticket) => {
+      crew.tickets.map(async (ticket) => {
         try {
           const thread = await discordGuild.channels.fetch(ticket.threadSf);
 
@@ -290,10 +279,11 @@ export class CrewServiceImpl extends CrewService {
             throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid thread');
           }
 
-          const triageTag = await this.tagService.getTagByName(
-            { id: ticket.crew.teamId },
-            TicketTag.TRIAGE,
-          );
+          const triageTag = await this.tagService
+            .queryTag()
+            .byTeam({ id: ticket.crew.teamId })
+            .search(TicketTag.TRIAGE)
+            .getOneOrFail();
 
           if (thread.appliedTags.includes(triageTag.tagSf)) {
             return this.ticketService.updateTicket(
@@ -313,9 +303,12 @@ export class CrewServiceImpl extends CrewService {
     );
 
     try {
-      const tagTemplate = await this.templateRepo.findOneOrFail({
-        where: { crewSf: crew.crewSf },
-      });
+      const tagTemplate = await this.tagService
+        .queryTemplate()
+        .byCrew(crew)
+        .withTags()
+        .withTagTeams()
+        .getOneOrFail();
       const botMember = await discordGuild.members.fetchMe();
       await this.tagService.deleteTagsByTemplate(botMember, [tagTemplate]);
       await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
@@ -502,7 +495,7 @@ export class CrewServiceImpl extends CrewService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid crew');
     }
 
-    const discordGuild = await this.guildManager.fetch(crew.team.guild.guildSf);
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
 
     if (!channel) {
       const c = await discordGuild.channels.fetch(crew.crewSf);
@@ -515,8 +508,9 @@ export class CrewServiceImpl extends CrewService {
     }
 
     const members = await this.memberService.getMembersForCrew(crew);
-    const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
-    const prompt = new CrewInfoPromptBuilder().addCrewPromptMessage(crew, owner).addCrewControls();
+    const prompt = new CrewInfoPromptBuilder()
+      .addCrewPromptMessage(crew, members)
+      .addCrewControls();
     const message = await channel.send(prompt.build());
     await message.pin();
   }
