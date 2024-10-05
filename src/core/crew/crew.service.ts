@@ -237,6 +237,7 @@ export class CrewServiceImpl extends CrewService {
     await this.crewRepo.insert(crew);
     // await this.crewRepo.upsert(crew, ['guildId', 'crewSf', 'deletedAt']);
     crew.team = team;
+    crew.guild = team.guild;
 
     await this.tagService.createTagForCrew(crew);
 

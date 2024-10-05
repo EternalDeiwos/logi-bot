@@ -50,7 +50,7 @@ export class TeamServiceImpl extends TeamService {
       .withCrews()
       .withCrewTeams()
       .getMany();
-    const teams = await this.query().byGuild(guildRef).getMany();
+    const teams = await this.query().byGuild(guildRef).withTags().getMany();
     const result = await Promise.all(
       teams.map((team) => this._reconcileTeamForumTags(team, templates)),
     );
