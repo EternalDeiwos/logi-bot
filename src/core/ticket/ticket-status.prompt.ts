@@ -57,39 +57,27 @@ export class TicketStatusPromptBuilder extends BasePromptBuilder {
   }
 
   addGlobalCrewStatus(discordGuild: DiscordGuild, crews: Crew[]) {
-    const fields: { name: string; value: string }[] = [];
+    const crewSummary: string[] = [];
+
     for (const crew of crews) {
       const owner = crew.members.find((member) => member.access === CrewMemberAccess.OWNER);
-      const description = `${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'} and has ${crew.members.length} ${crew.members.length > 1 || !crew.members.length ? 'members' : 'member'}.`;
+      crewSummary.push(
+        `- ${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'} and has ${crew.members.length} ${crew.members.length > 1 || !crew.members.length ? 'members' : 'member'}.`,
+      );
 
-      if (crew.logs.length) {
-        const { content, crewSf: channel, messageSf: message } = crew.logs.pop();
-        const redirectText = `See the full status here: ${messageLink(channel, message)}`;
-        const value =
-          content?.length > 400
-            ? `${description}\n\n${content.substring(0, 400)}...\n\n${redirectText}`
-            : `${description}\n\n${content}`;
-
-        if (value) {
-          fields.push({
-            name: crew.name,
-            value,
-          });
-        }
+      for (const ticket of crew.tickets) {
+        crewSummary.push(`  - ${channelMention(ticket.threadSf)}`);
       }
     }
+
+    const description = crewSummary.join('\n');
 
     const embed = new EmbedBuilder()
       .setTitle('Crew Status')
       .setColor(Colors.DarkGreen)
       .setThumbnail(discordGuild.iconURL())
+      .setDescription(description || 'None')
       .setTimestamp();
-
-    if (fields.length) {
-      embed.addFields(...fields);
-    } else {
-      embed.setDescription('No data');
-    }
 
     return this.add({ embeds: [embed] });
   }

@@ -59,7 +59,7 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
 
   addGlobalCrewStatus(discordGuild: DiscordGuild, crews: Crew[]) {
     const embed = new EmbedBuilder()
-      .setTitle('Ticket Status')
+      .setTitle('Crew Status')
       .setColor(Colors.DarkGreen)
       .setThumbnail(discordGuild.iconURL())
       .setTimestamp();

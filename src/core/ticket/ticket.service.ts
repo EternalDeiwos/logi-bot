@@ -404,7 +404,6 @@ export class TicketServiceImpl extends TicketService {
     const targetChannelSecure = await this.discordService.isChannelPrivate(targetChannel);
     const srcCrews = await this.crewService
       .query()
-      .withDeleted()
       .byGuild(guild)
       .withTeam()
       .withMembers()
