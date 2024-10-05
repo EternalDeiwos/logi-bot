@@ -1,6 +1,12 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { DeleteResult, Equal, InsertResult, IsNull, UpdateResult } from 'typeorm';
-import { GuildManager, GuildMember, PermissionsBitField, Snowflake } from 'discord.js';
+import {
+  GuildBasedChannel,
+  GuildManager,
+  GuildMember,
+  PermissionsBitField,
+  Snowflake,
+} from 'discord.js';
 import { ExternalError, InternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { SelectGuild } from 'src/core/guild/guild.entity';
@@ -10,8 +16,11 @@ import { CrewService } from 'src/core/crew/crew.service';
 import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewMemberRepository } from './crew-member.repository';
 import { CrewMember, SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
+import { CrewMemberQueryBuilder } from './crew-member.query';
 
 export abstract class CrewMemberService {
+  abstract query(): CrewMemberQueryBuilder;
+
   abstract getMembersForCrew(crewRef: SelectCrew): Promise<CrewMember[]>;
 
   abstract resolveGuildMember(member: CrewMember): Promise<GuildMember>;
@@ -71,10 +80,13 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     private readonly guildManager: GuildManager,
     private readonly guildService: GuildService,
     @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
-    private readonly crewRepo: CrewRepository,
     private readonly memberRepo: CrewMemberRepository,
   ) {
     super();
+  }
+
+  query(): CrewMemberQueryBuilder {
+    return new CrewMemberQueryBuilder(this.memberRepo);
   }
 
   async getMembersForCrew(crewRef: SelectCrew): Promise<CrewMember[]> {
@@ -96,10 +108,11 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid member reference');
     }
 
-    const crew = await this.crewRepo.findOneOrFail({
-      where: { crewSf: channelRef },
-      withDeleted: true,
-    });
+    const crew = await this.crewService
+      .query()
+      .withDeleted()
+      .byCrew({ crewSf: channelRef })
+      .getOneOrFail();
 
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     return await discordGuild.members.fetch(memberRef);
@@ -110,7 +123,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     memberRef: Snowflake,
     access?: CrewMemberAccess,
   ): Promise<InsertResult> {
-    const crew = await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
+    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     const member = await this.resolveGuildMember(memberRef, crew.crewSf);
 
     try {
@@ -179,7 +192,11 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     const crew =
       channelRef instanceof Crew
         ? channelRef
-        : await this.crewRepo.findOneOrFail({ where: { crewSf: channelRef } });
+        : await this.crewService
+            .query()
+            .withDeleted()
+            .byCrew({ crewSf: channelRef })
+            .getOneOrFail();
 
     let member: GuildMember;
     try {
@@ -229,11 +246,10 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const member = await discordGuild.members.fetch(memberRef);
 
-    const crewMember = await this.memberRepo.findOneBy({
-      crewSf: Equal(channelRef),
-      memberSf: Equal(memberRef),
-      deletedAt: IsNull(),
-    });
+    const crewMember = await this.query()
+      .byCrew({ crewSf: channelRef })
+      .byMember(memberRef)
+      .getOne();
 
     return (
       (checkAdmin &&
@@ -327,12 +343,14 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       );
     }
 
-    const guildWhere = guildRef.id ? { id: guildRef.id } : { guild: { guildSf: guildRef.guildSf } };
-    const members = await this.memberRepo.find({
-      where: { ...guildWhere, memberSf: memberRef },
-    });
+    const members = await this.query().byGuild(guildRef).byMember(memberRef).getMany();
     for (const crewMember of members) {
-      const channel = await discordGuild.channels.fetch(crewMember.crewSf);
+      let channel: GuildBasedChannel | null;
+      try {
+        channel = await discordGuild.channels.fetch(crewMember.crewSf);
+      } catch (err) {
+        this.logger.warn(err.message);
+      }
 
       if (!channel) {
         await this.removeCrewMember(crewMember.crewSf, member);
@@ -347,15 +365,15 @@ export class CrewMemberServiceImpl extends CrewMemberService {
         continue;
       }
 
-      if (!member.roles.cache.has(crewMember.crew.roleSf)) {
+      if (crewMember.crew?.roleSf && !member.roles.cache.has(crewMember.crew.roleSf)) {
         await this.removeCrewMember(crewMember.crew, member);
         continue;
       }
 
       if (
-        crewMember.crew.guild?.config?.crewViewerRole &&
-        crewMember.crew.isSecureOnly &&
-        !member.roles.cache.has(crewMember.crew.guild?.config?.crewViewerRole) &&
+        crewMember.crew?.guild?.config?.crewViewerRole &&
+        crewMember.crew?.isSecureOnly &&
+        !member.roles.cache.has(crewMember.crew?.guild?.config?.crewViewerRole) &&
         crewMember.access >= CrewMemberAccess.MEMBER
       ) {
         await this.removeCrewMember(crewMember.crew, member);

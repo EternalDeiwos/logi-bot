@@ -14,6 +14,9 @@ import {
   SlashCommandContext,
   StringOption,
   Subcommand,
+  TargetUser,
+  UserCommand,
+  UserCommandContext,
 } from 'necord';
 import {
   ChannelType,
@@ -22,6 +25,7 @@ import {
   GuildMember,
   PermissionsBitField,
   Snowflake,
+  User,
 } from 'discord.js';
 import { Equal, Not } from 'typeorm';
 import { compact } from 'lodash';
@@ -30,7 +34,6 @@ import { CrewMemberAccess } from 'src/types';
 import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { BotService } from 'src/bot/bot.service';
-import { DiscordService } from 'src/bot/discord.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
 import { TeamService } from 'src/core/team/team.service';
@@ -203,7 +206,6 @@ export class CrewCommand {
 
   constructor(
     private readonly botService: BotService,
-    private readonly discordService: DiscordService,
     private readonly guildManager: GuildManager,
     private readonly guildService: GuildService,
     private readonly teamService: TeamService,
@@ -926,6 +928,26 @@ export class CrewCommand {
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew cleaning scheduled')],
+    });
+  }
+
+  @UserCommand({
+    name: 'Reconcile Crew Roles',
+  })
+  async onMemberReconcile(@Context() [interaction]: UserCommandContext, @TargetUser() user: User) {
+    await this.memberService.reconcileIndividualMembership(
+      { guildSf: interaction.guildId },
+      user.id,
+    );
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [
+        new SuccessEmbed('SUCCESS_GENERIC')
+          .setTitle('Roles reconciled')
+          .setDescription(
+            'Incorrectly applied or missing roles should now be resolved. If any roles are missing then ask a guild administrator.',
+          ),
+      ],
     });
   }
 }

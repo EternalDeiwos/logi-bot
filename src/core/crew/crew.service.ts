@@ -311,7 +311,7 @@ export class CrewServiceImpl extends CrewService {
         .withTagTeams()
         .getOneOrFail();
       const botMember = await discordGuild.members.fetchMe();
-      await this.tagService.deleteTagsByTemplate(botMember, [tagTemplate]);
+      await this.tagService.deleteTagsByTemplate({ id: crew.guild.id }, [tagTemplate]);
       await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
     } catch (err) {
       this.logger.error(`Failed to update ticket tags: ${err.message}`, err.stack);
@@ -394,7 +394,9 @@ export class CrewServiceImpl extends CrewService {
       }
     } else {
       try {
-        await Promise.all([discussion.delete(), role.delete(), crew.voiceSf && voice.delete()]);
+        await Promise.all([role.delete(), new Promise((resolve) => setTimeout(resolve, 1000))]);
+        crew.voiceSf && voice.delete();
+        await discussion.delete();
       } catch (err) {
         throw new ExternalError('DISCORD_API_ERROR', 'Failed to delete channels and role');
       }
