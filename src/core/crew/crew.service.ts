@@ -122,7 +122,7 @@ export class CrewServiceImpl extends CrewService {
         .queryTemplate()
         .byGuild({ guildSf: discordGuild.id })
         .search(data.shortName)
-        .exists()
+        .getExists()
     ) {
       throw new ValidationError(
         'VALIDATION_FAILED',
@@ -394,9 +394,7 @@ export class CrewServiceImpl extends CrewService {
       }
     } else {
       try {
-        await Promise.all([role.delete(), new Promise((resolve) => setTimeout(resolve, 1000))]);
-        crew.voiceSf && voice.delete();
-        await discussion.delete();
+        await Promise.all([role.delete(), crew.voiceSf && voice.delete(), discussion.delete()]);
       } catch (err) {
         throw new ExternalError('DISCORD_API_ERROR', 'Failed to delete channels and role');
       }
@@ -510,7 +508,7 @@ export class CrewServiceImpl extends CrewService {
       channel = c;
     }
 
-    const members = await this.memberService.getMembersForCrew(crew);
+    const members = await this.memberService.query().byCrew(crew).getMany();
     const prompt = new CrewInfoPromptBuilder()
       .addCrewPromptMessage(crew, members)
       .addCrewControls();

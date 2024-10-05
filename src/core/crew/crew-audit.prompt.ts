@@ -10,7 +10,7 @@ import { BasePromptBuilder } from 'src/bot/prompt';
 import { Crew, SelectCrew } from './crew.entity';
 
 export const crewAuditPrompt = (crew: Crew) =>
-  `A new crew called **${crew.name}** was created under ${crew.team.name} by ${userMention(crew.createdBy)}. This prompt can be used to remove the team if there is something wrong.`;
+  `A new crew called **${crew.name}** was created by ${userMention(crew.createdBy)}. This prompt can be used to remove the team if there is something wrong.`;
 
 export class CrewAuditPromptBuilder extends BasePromptBuilder {
   public addAuditMessage(crew: Crew) {

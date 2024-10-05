@@ -13,15 +13,12 @@ import { SelectGuild } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
-import { CrewRepository } from 'src/core/crew/crew.repository';
 import { CrewMemberRepository } from './crew-member.repository';
 import { CrewMember, SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
 import { CrewMemberQueryBuilder } from './crew-member.query';
 
 export abstract class CrewMemberService {
   abstract query(): CrewMemberQueryBuilder;
-
-  abstract getMembersForCrew(crewRef: SelectCrew): Promise<CrewMember[]>;
 
   abstract resolveGuildMember(member: CrewMember): Promise<GuildMember>;
   abstract resolveGuildMember(memberRef: Snowflake, channelRef: Snowflake): Promise<GuildMember>;
@@ -87,10 +84,6 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
   query(): CrewMemberQueryBuilder {
     return new CrewMemberQueryBuilder(this.memberRepo);
-  }
-
-  async getMembersForCrew(crewRef: SelectCrew): Promise<CrewMember[]> {
-    return this.memberRepo.findMembersForCrew(crewRef).getMany();
   }
 
   async resolveGuildMember(member: CrewMember): Promise<GuildMember>;
@@ -270,12 +263,13 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     const discordGuild = await this.guildManager.fetch(guild.guildSf);
     const member = await discordGuild.members.fetch(memberRef);
 
-    const [membership, count] = await this.memberRepo.findByAccess(
-      guildRef,
-      memberRef,
-      CrewMemberAccess.OWNER,
-    );
+    const count = await this.query()
+      .byGuild(guildRef)
+      .byMember(memberRef)
+      .byAccess(CrewMemberAccess.OWNER)
+      .getCount();
 
+    this.logger.debug(`Leadership for ${member.displayName}: ${count}`);
     if (count && !member.roles.cache.has(guild.config.crewLeaderRole)) {
       await member.roles.add(guild.config.crewLeaderRole);
       this.logger.log(`${member.displayName} added to crew leaders in ${guild.name}`);

@@ -4,6 +4,7 @@ import { CommonQueryBuilder } from 'src/database/util';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { SelectCrew } from 'src/core/crew/crew.entity';
 import { CrewMember, SelectCrewMember } from './crew-member.entity';
+import { CrewMemberAccess } from 'src/types';
 
 export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
   constructor(repo: Repository<CrewMember>) {
@@ -20,6 +21,11 @@ export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
         qb.where('member.member_sf=:memberSf AND member.crew_channel_sf=:crewSf', memberRef),
       ),
     );
+    return this;
+  }
+
+  byAccess(access: CrewMemberAccess) {
+    this.qb.andWhere('member.access=:access', { access });
     return this;
   }
 

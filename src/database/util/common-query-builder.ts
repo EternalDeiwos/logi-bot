@@ -19,6 +19,10 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
     return this.qb.getMany();
   }
 
+  getManyAndCount() {
+    return this.qb.getManyAndCount();
+  }
+
   getOneOrFail() {
     return this.qb.getOneOrFail();
   }
@@ -27,7 +31,11 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
     return this.qb.getOne();
   }
 
-  exists() {
+  getExists() {
     return this.qb.getExists();
+  }
+
+  getCount() {
+    return this.qb.getCount();
   }
 }

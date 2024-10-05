@@ -466,9 +466,10 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    const targetMember = await this.memberRepo.findOne({
-      where: { crewSf: channelRef, memberSf: data.member.id },
-    });
+    const targetMember = await this.memberService
+      .query()
+      .byCrewMember({ crewSf: channelRef, memberSf: data.member.id })
+      .getOne();
 
     if (!targetMember) {
       throw new ValidationError(
@@ -484,13 +485,17 @@ export class CrewCommand {
       },
     );
 
-    const oldOwners = await this.memberRepo.findBy({
-      crewSf: Equal(channelRef),
-      memberSf: Not(Equal(targetMember.memberSf)),
-      access: Equal(CrewMemberAccess.OWNER),
-    });
+    const oldOwners = await this.memberService
+      .query()
+      .byCrew({ crewSf: channelRef })
+      .byAccess(CrewMemberAccess.OWNER)
+      .getMany();
 
     for (const owner of oldOwners) {
+      if (owner.memberSf === targetMember.memberSf) {
+        continue;
+      }
+
       await this.memberService.updateCrewMember(
         { crewSf: owner.crewSf, memberSf: owner.memberSf },
         {
@@ -523,9 +528,10 @@ export class CrewCommand {
       throw new AuthError('FORBIDDEN', 'You are not a member of this team').asDisplayable();
     }
 
-    const targetMember = await this.memberRepo.findOne({
-      where: { crewSf: channelRef, memberSf: data.member.id },
-    });
+    const targetMember = await this.memberService
+      .query()
+      .byCrewMember({ crewSf: channelRef, memberSf: data.member.id })
+      .getOne();
 
     if (!targetMember) {
       throw new ValidationError(
