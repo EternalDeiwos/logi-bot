@@ -11,12 +11,11 @@ export class GuildQueryBuilder extends CommonQueryBuilder<Guild> {
 
   byGuild(guildRef: SelectGuild) {
     if (guildRef.id) {
-      this.qb.andWhere('guild.id=:id');
+      this.qb.andWhere('guild.id=:id', { id: guildRef.id });
     } else {
-      this.qb.andWhere('guild.guild_sf=:guildSf');
+      this.qb.andWhere('guild.guild_sf=:guildSf', { guildSf: guildRef.guildSf });
     }
 
-    this.qb.setParameters(guildRef);
     return this;
   }
 

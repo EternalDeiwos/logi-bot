@@ -22,7 +22,7 @@ export class TemplateQueryBuilder extends CommonQueryBuilder<ForumTagTemplate> {
   }
 
   byCrew(crewRef: SelectCrew) {
-    this.qb.andWhere('template.crew_sf=:crewSf', crewRef);
+    this.qb.andWhere('template.crew_channel_sf=:crewSf', crewRef);
     return this;
   }
 
