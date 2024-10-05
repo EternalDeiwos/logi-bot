@@ -146,7 +146,7 @@ export class BotEventListener {
   @On('guildMemberRoleRemove')
   async onRoleRemoved(@Context() [member, role]: ContextOf<'guildMemberRoleRemove'>) {
     try {
-      const roleCrew = await this.crewService.query().byRole(role.id).getOneOrFail();
+      const roleCrew = await this.crewService.query().withDeleted().byRole(role.id).getOneOrFail();
       await this.memberService.removeCrewMember(roleCrew, member);
     } catch {
       this.logger.debug(
