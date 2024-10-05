@@ -9,18 +9,6 @@ export class GuildRepository extends CommonRepository<Guild> {
     super(Guild, dataSource.createEntityManager());
   }
 
-  public searchByName(query: string, exclude?: string) {
-    const qb = this.createQueryBuilder('guild').where('guild.name ILIKE :query', {
-      query: `%${query}%`,
-    });
-
-    if (exclude) {
-      qb.andWhere('guild.guild_sf != :exclude', { exclude });
-    }
-
-    return qb.getMany();
-  }
-
   public setConfig<T extends keyof GuildConfig>(guild: SelectGuild, key: T, value: GuildConfig[T]) {
     return this.createQueryBuilder('guild')
       .update()

@@ -9,6 +9,7 @@ import {
 import { BasePromptBuilder } from 'src/bot/prompt';
 import { CrewMember } from './member/crew-member.entity';
 import { Crew } from './crew.entity';
+import { CrewMemberAccess } from 'src/types';
 
 export const newCrewMessage = (member: string) =>
   `Welcome to your new crew. This crew is led by ${member}. You can join by clicking the button below. You can leave again at any time by running the \`/echo crew leave\` command in this channel or optionally selecting the team in the command.
@@ -20,7 +21,8 @@ To run a successful crew you should do the following:
 - Continue to provide updates (or logs) as goals are complete or new goals are created.`;
 
 export class CrewInfoPromptBuilder extends BasePromptBuilder {
-  public addCrewPromptMessage(crew: Crew, owner: CrewMember) {
+  public addCrewPromptMessage(crew: Crew, members: CrewMember[]) {
+    const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
     const embed = new EmbedBuilder()
       .setTitle(`Join ${crew.name}`)
       .setDescription(newCrewMessage(owner ? userMention(owner.memberSf) : 'nobody'))

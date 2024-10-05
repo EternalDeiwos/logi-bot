@@ -10,6 +10,7 @@ import {
   Unique,
   DeepPartial,
 } from 'typeorm';
+import { Expose, Transform } from 'class-transformer';
 import { Snowflake } from 'discord.js';
 import { Team } from 'src/core/team/team.entity';
 import { Guild } from 'src/core/guild/guild.entity';
@@ -22,9 +23,11 @@ export type SelectTag = DeepPartial<Pick<ForumTag, 'tagSf'>>;
 @Unique('uk_template_id_team_id', ['templateId', 'teamId'])
 export class ForumTag {
   @PrimaryColumn({ type: 'int8', name: 'tag_sf', primaryKeyConstraintName: 'pk_tag_sf' })
+  @Expose()
   tagSf: Snowflake;
 
   @Column()
+  @Expose()
   name: string;
 
   @Column({ type: 'uuid', name: 'guild_id' })
@@ -37,6 +40,8 @@ export class ForumTag {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_tag_guild_id',
   })
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   guild: Guild;
 
   @Column({ type: 'uuid', name: 'team_id' })
@@ -50,6 +55,8 @@ export class ForumTag {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_tag_team_id',
   })
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   team: Team;
 
   @Column({ type: 'uuid', name: 'tag_template_id' })
@@ -63,6 +70,8 @@ export class ForumTag {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_tag_tag_template_id',
   })
+  @Expose()
+  @Transform(({ value }) => (value ? value : null))
   template: ForumTagTemplate;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

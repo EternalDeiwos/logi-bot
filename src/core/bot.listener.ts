@@ -63,7 +63,7 @@ export class BotEventListener {
       return;
     }
 
-    const tags = await this.tagService.getTagsByTeam({ id: ticket.crew.teamId });
+    const tags = await this.tagService.queryTag().byTeam({ id: ticket.crew.teamId }).getMany();
     const tagMap = await Team.getTagMap(tags);
 
     const toDeleteFlag = newThread.appliedTags.reduce((state, snowflake) => {
@@ -75,14 +75,16 @@ export class BotEventListener {
       );
     }, false);
 
-    const deletedFlag = oldThread.appliedTags.reduce((state, snowflake) => {
-      return (
-        state ||
-        [TicketTag.DONE, TicketTag.ABANDONED, TicketTag.DECLINED, TicketTag.MOVED].includes(
-          tagMap[snowflake] as TicketTag,
-        )
-      );
-    }, false);
+    const deletedFlag =
+      Boolean(ticket.deletedAt) &&
+      oldThread.appliedTags.reduce((state, snowflake) => {
+        return (
+          state ||
+          [TicketTag.DONE, TicketTag.ABANDONED, TicketTag.DECLINED, TicketTag.MOVED].includes(
+            tagMap[snowflake] as TicketTag,
+          )
+        );
+      }, false);
 
     if (toDeleteFlag && !deletedFlag) {
       this.logger.log(`Deleting ticket ${ticket.name}`);
@@ -101,21 +103,22 @@ export class BotEventListener {
       .getOneOrFail();
 
     const message = await thread.fetchStarterMessage();
-    const prompt = new TicketInfoPromptBuilder({ components: message.components });
-    const triageTag = await this.tagService.getTagByName(
-      { id: ticket.crew.teamId },
-      TicketTag.TRIAGE,
-    );
+    const prompt = new TicketInfoPromptBuilder();
+    const triageTag = await this.tagService
+      .queryTag()
+      .byTeam({ id: ticket.crew.teamId })
+      .search(TicketTag.TRIAGE)
+      .getOneOrFail();
 
     if (thread.appliedTags.includes(triageTag.tagSf)) {
-      prompt.addTriageControls(ticket);
+      prompt.addTriageControls(ticket, { disabled: { accept: ticket.crew.hasMovePrompt } });
     }
 
     if (ticket.crew.hasMovePrompt) {
       const crews = await this.crewService
         .query()
-        .withDeleted()
         .byGuildAndShared({ guildSf: thread.guildId })
+        .withTeam()
         .getMany();
       prompt.addMoveSelector(
         { threadSf: thread.id },
@@ -124,9 +127,9 @@ export class BotEventListener {
       );
     }
 
-    this.logger.debug(JSON.stringify(prompt.build(), null, 2));
-
     await message.edit(prompt.build());
+
+    this.logger.log(`New ticket: ${ticket.name} for ${ticket.crew.name} in ${ticket.guild.name}`);
   }
 
   @On('guildMemberRemove')
@@ -143,7 +146,7 @@ export class BotEventListener {
   @On('guildMemberRoleRemove')
   async onRoleRemoved(@Context() [member, role]: ContextOf<'guildMemberRoleRemove'>) {
     try {
-      const roleCrew = await this.crewService.query().byRole(role.id).getOneOrFail();
+      const roleCrew = await this.crewService.query().withDeleted().byRole(role.id).getOneOrFail();
       await this.memberService.removeCrewMember(roleCrew, member);
     } catch {
       this.logger.debug(

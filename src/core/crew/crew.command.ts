@@ -14,6 +14,9 @@ import {
   SlashCommandContext,
   StringOption,
   Subcommand,
+  TargetUser,
+  UserCommand,
+  UserCommandContext,
 } from 'necord';
 import {
   ChannelType,
@@ -22,6 +25,7 @@ import {
   GuildMember,
   PermissionsBitField,
   Snowflake,
+  User,
 } from 'discord.js';
 import { Equal, Not } from 'typeorm';
 import { compact } from 'lodash';
@@ -30,7 +34,6 @@ import { CrewMemberAccess } from 'src/types';
 import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { BotService } from 'src/bot/bot.service';
-import { DiscordService } from 'src/bot/discord.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
 import { TeamService } from 'src/core/team/team.service';
@@ -203,7 +206,6 @@ export class CrewCommand {
 
   constructor(
     private readonly botService: BotService,
-    private readonly discordService: DiscordService,
     private readonly guildManager: GuildManager,
     private readonly guildService: GuildService,
     private readonly teamService: TeamService,
@@ -230,7 +232,10 @@ export class CrewCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const discordGuild = await this.guildManager.fetch(interaction.guildId);
     const member = await discordGuild.members.fetch(interaction);
-    const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
+    const guild = await this.guildService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .getOneOrFail();
 
     if (
       guild.config?.crewCreatorRole &&
@@ -461,9 +466,10 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    const targetMember = await this.memberRepo.findOne({
-      where: { crewSf: channelRef, memberSf: data.member.id },
-    });
+    const targetMember = await this.memberService
+      .query()
+      .byCrewMember({ crewSf: channelRef, memberSf: data.member.id })
+      .getOne();
 
     if (!targetMember) {
       throw new ValidationError(
@@ -479,13 +485,17 @@ export class CrewCommand {
       },
     );
 
-    const oldOwners = await this.memberRepo.findBy({
-      crewSf: Equal(channelRef),
-      memberSf: Not(Equal(targetMember.memberSf)),
-      access: Equal(CrewMemberAccess.OWNER),
-    });
+    const oldOwners = await this.memberService
+      .query()
+      .byCrew({ crewSf: channelRef })
+      .byAccess(CrewMemberAccess.OWNER)
+      .getMany();
 
     for (const owner of oldOwners) {
+      if (owner.memberSf === targetMember.memberSf) {
+        continue;
+      }
+
       await this.memberService.updateCrewMember(
         { crewSf: owner.crewSf, memberSf: owner.memberSf },
         {
@@ -518,9 +528,10 @@ export class CrewCommand {
       throw new AuthError('FORBIDDEN', 'You are not a member of this team').asDisplayable();
     }
 
-    const targetMember = await this.memberRepo.findOne({
-      where: { crewSf: channelRef, memberSf: data.member.id },
-    });
+    const targetMember = await this.memberService
+      .query()
+      .byCrewMember({ crewSf: channelRef, memberSf: data.member.id })
+      .getOne();
 
     if (!targetMember) {
       throw new ValidationError(
@@ -923,6 +934,26 @@ export class CrewCommand {
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew cleaning scheduled')],
+    });
+  }
+
+  @UserCommand({
+    name: 'Reconcile Crew Roles',
+  })
+  async onMemberReconcile(@Context() [interaction]: UserCommandContext, @TargetUser() user: User) {
+    await this.memberService.reconcileIndividualMembership(
+      { guildSf: interaction.guildId },
+      user.id,
+    );
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [
+        new SuccessEmbed('SUCCESS_GENERIC')
+          .setTitle('Roles reconciled')
+          .setDescription(
+            'Incorrectly applied or missing roles should now be resolved. If any roles are missing then ask a guild administrator.',
+          ),
+      ],
     });
   }
 }

@@ -27,8 +27,6 @@ import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { CrewService } from 'src/core/crew/crew.service';
-import { CrewRepository } from 'src/core/crew/crew.repository';
-import { Crew } from 'src/core/crew/crew.entity';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
@@ -70,7 +68,6 @@ export class TicketCommand {
     private readonly botService: BotService,
     private readonly guildService: GuildService,
     private readonly crewService: CrewService,
-    private readonly crewRepo: CrewRepository,
     private readonly memberService: CrewMemberService,
     private readonly ticketService: TicketService,
   ) {}
@@ -98,13 +95,13 @@ export class TicketCommand {
       prompt.addCreateTicketMessage().addCreateButton({ crewSf: data.crew });
     } else {
       // Show crew selector
-      const crews = await this.crewRepo.find({
-        where: { guild: { guildSf: interaction.guildId } },
-      });
+      const crews = await this.crewService
+        .query()
+        .byGuild({ guildSf: interaction.guildId })
+        .getMany();
 
       prompt.addCreateTicketMessage(true).addCrewSelector(crews);
     }
-
     await interaction.channel.send(prompt.build());
 
     return interaction.reply({ content: 'Done', ephemeral: true });
@@ -132,7 +129,7 @@ export class TicketCommand {
     @ComponentParam('crew') channelRef: Snowflake,
   ) {
     const modal = new TicketCreateModalBuilder().addForm({
-      crewSf: interaction.channelId,
+      crewSf: channelRef || interaction.channelId,
     });
     return interaction.showModal(modal);
   }
@@ -163,7 +160,10 @@ export class TicketCommand {
     try {
       await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     } catch {
-      const guild = await this.guildService.getGuild({ guildSf: interaction.guildId });
+      const guild = await this.guildService
+        .query()
+        .byGuild({ guildSf: interaction.guildId })
+        .getOneOrFail();
       channelRef = guild.config.ticketTriageCrew;
     }
 

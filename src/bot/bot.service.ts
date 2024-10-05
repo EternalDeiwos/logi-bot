@@ -90,7 +90,6 @@ export class BotServiceImpl extends BotService {
       await this.replyOrFollowUp(interaction, { embeds: [embed] });
     } catch (err) {
       this.logger.error(err, err.stack);
-      throw new BaseError('EXTERNAL_ERROR', 'Discord interaction failed', err);
     }
   }
 

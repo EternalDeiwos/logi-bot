@@ -154,7 +154,10 @@ export class TagCommand {
     }
 
     const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.tagService.deleteTags(member, data.tag && [data.tag]);
+    const result = await this.tagService.deleteTagsByTemplate(
+      { guildSf: interaction.guildId },
+      data.tag && [data.tag],
+    );
 
     await this.tagService.deleteTagTemplates(member, data.tag && [data.tag]);
 
@@ -173,7 +176,7 @@ export class TagCommand {
     }
 
     const member = await interaction.guild.members.fetch(interaction.user);
-    const result = await this.tagService.deleteTags(member);
+    const result = await this.tagService.deleteTagsByTemplate(member);
 
     await this.tagService.deleteTagTemplates(member);
 

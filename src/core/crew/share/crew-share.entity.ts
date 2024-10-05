@@ -40,7 +40,7 @@ export class CrewShare {
     referencedColumnName: 'crewSf',
     foreignKeyConstraintName: 'fk_crew_share_crew_channel_sf',
   })
-  crew: Promise<Crew>;
+  crew: Crew;
 
   @PrimaryColumn({
     type: 'uuid',

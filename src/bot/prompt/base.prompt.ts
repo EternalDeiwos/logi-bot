@@ -26,7 +26,6 @@ export class BasePromptBuilder {
   }
 
   public build() {
-    const [first, ...rest] = this.options;
-    return mergeWith(first, ...rest, BasePromptBuilder.customizer) as BaseMessageOptions;
+    return mergeWith({}, ...this.options, BasePromptBuilder.customizer) as BaseMessageOptions;
   }
 }

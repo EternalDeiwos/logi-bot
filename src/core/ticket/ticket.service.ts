@@ -117,9 +117,10 @@ export class TicketServiceImpl extends TicketService {
   async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
     const crew = await this.crewService
       .query()
-      .withDeleted()
       .byCrew(crewRef)
       .withTeam()
+      .withTeamTags()
+      .withTeamTagsTemplate()
       .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const forum = await discordGuild.channels.fetch(crew.team.forumSf);
@@ -136,9 +137,8 @@ export class TicketServiceImpl extends TicketService {
       ticket.updatedBy = ticket.createdBy;
     }
 
-    const tags = await this.tagService.getTagsByTeam({ id: crew.teamId });
-    const triageTag = tags.find((tag) => tag.name === TicketTag.TRIAGE);
-    const crewTag = tags.find((tag) => tag.name === crew.shortName);
+    const triageTag = crew.team?.tags?.find((tag) => tag.name === TicketTag.TRIAGE);
+    const crewTag = crew.team?.tags?.find((tag) => tag.name === crew.shortName);
     const appliedTags: string[] = [];
 
     if (triageTag) {
@@ -149,7 +149,7 @@ export class TicketServiceImpl extends TicketService {
       appliedTags.push(crewTag.tagSf);
     }
 
-    const defaultTags = Team.getDefaultTags(tags);
+    const defaultTags = Team.getDefaultTags(crew.team?.tags);
     appliedTags.push(...defaultTags);
 
     const prompt = new TicketInfoPromptBuilder().addTicketMessage(ticket, crew);
@@ -160,7 +160,10 @@ export class TicketServiceImpl extends TicketService {
       });
 
       if (originalGuildRef.id !== crew.guildId) {
-        const originalGuild = await this.guildService.getGuild(originalGuildRef);
+        const originalGuild = await this.guildService
+          .query()
+          .byGuild(originalGuildRef)
+          .getOneOrFail();
         prompt.addCrossGuildEmbed(originalGuild);
       }
     }
@@ -176,24 +179,6 @@ export class TicketServiceImpl extends TicketService {
       threadSf: thread.id,
       guildId: crew.guildId,
     });
-
-    if (crew.hasMovePrompt) {
-      const message = await thread.fetchStarterMessage();
-      const crews = await this.crewService
-        .query()
-        .byGuildAndShared({ id: ticket.guildId })
-        .withTeam()
-        .getMany();
-      await message.edit(
-        new TicketInfoPromptBuilder({ components: message.components })
-          .addMoveSelector(
-            { threadSf: result.identifiers[0].threadSf },
-            crew.guild.guildSf,
-            crews.filter((crew) => ![ticket.crewSf].includes(crew.crewSf)),
-          )
-          .build(),
-      );
-    }
 
     return result;
   }
@@ -235,15 +220,17 @@ export class TicketServiceImpl extends TicketService {
     const thread = await forum.threads.fetch(ticket.threadSf);
     const now = new Date();
 
-    await thread.send(new TicketClosedPromptBuilder().addTicketClosedMessage(guildMember).build());
-    await thread.setLocked(true);
-    await thread.setArchived(true);
-
-    return await this.ticketRepo.updateReturning(ticketRef, {
+    const result = await this.ticketRepo.updateReturning(ticketRef, {
       deletedAt: now,
       updatedBy: guildMember.id,
       updatedAt: now,
     });
+
+    // Update thread after database otherwise thread update handler will loop
+    await thread.send(new TicketClosedPromptBuilder().addTicketClosedMessage(guildMember).build());
+    await thread.edit({ locked: true, archived: true });
+
+    return result;
   }
 
   async updateTicket(data: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket> {
@@ -251,10 +238,12 @@ export class TicketServiceImpl extends TicketService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Ticket updates must provide updatedBy');
     }
 
-    const ticket = await this.ticketRepo.findOne({
-      where: { threadSf: data.threadSf },
-      withDeleted: true,
-    });
+    const ticket = await this.query()
+      .withDeleted()
+      .byThread({ threadSf: data.threadSf })
+      .withCrew()
+      .withTeam()
+      .getOneOrFail();
 
     const discordGuild = await this.guildManager.fetch(ticket.guild.guildSf);
     const member = await discordGuild.members.fetch(data.updatedBy);
@@ -271,7 +260,7 @@ export class TicketServiceImpl extends TicketService {
       { ...data, updatedAt: new Date() },
     );
 
-    const tags = await this.tagService.getTagsByTeam({ id: ticket.crew.teamId });
+    const tags = await this.tagService.queryTag().byTeam({ id: ticket.crew.teamId }).getMany();
     const tagSnowflakeMap = Team.getSnowflakeMap(tags);
     const tagsRemovedSf = tagsRemoved[tag].map((tagName) => tagSnowflakeMap[tagName]);
     const tagAdd = tagSnowflakeMap[tag];
@@ -403,7 +392,7 @@ export class TicketServiceImpl extends TicketService {
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
-    const guild = await this.guildService.getGuild(guildRef);
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(guild.guildSf);
     const member = await discordGuild.members.fetch(memberRef);
     const targetChannel = await discordGuild.channels.fetch(targetChannelRef);
@@ -415,7 +404,6 @@ export class TicketServiceImpl extends TicketService {
     const targetChannelSecure = await this.discordService.isChannelPrivate(targetChannel);
     const srcCrews = await this.crewService
       .query()
-      .withDeleted()
       .byGuild(guild)
       .withTeam()
       .withMembers()

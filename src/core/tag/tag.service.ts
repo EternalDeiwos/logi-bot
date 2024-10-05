@@ -1,10 +1,10 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { GuildMember, GuildForumTag, GuildManager, Snowflake } from 'discord.js';
-import { In, InsertResult } from 'typeorm';
+import { DeleteResult, In, InsertResult } from 'typeorm';
 import { compact } from 'lodash';
 import { InternalError, ValidationError } from 'src/errors';
 import { Crew } from 'src/core/crew/crew.entity';
-import { SelectTeam, Team } from 'src/core/team/team.entity';
+import { SelectTeam } from 'src/core/team/team.entity';
 import { TeamService } from 'src/core/team/team.service';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
@@ -12,6 +12,8 @@ import { ForumTagTemplate } from './tag-template.entity';
 import { TagTemplateRepository } from './tag-template.repository';
 import { TagRepository } from './tag.repository';
 import { ForumTag, SelectTag } from './tag.entity';
+import { TagQueryBuilder } from './tag.query';
+import { TemplateQueryBuilder } from './tag-template.query';
 
 export enum TicketTag {
   TRIAGE = 'Triage',
@@ -25,11 +27,8 @@ export enum TicketTag {
 }
 
 export abstract class TagService {
-  abstract getTag(tagRef: SelectTag): Promise<ForumTag>;
-  abstract getTagsByTeam(teamRef: SelectTeam): Promise<ForumTag[]>;
-  abstract getTagByName(teamRef: SelectTeam, name: string): Promise<ForumTag>;
-  abstract getTagByGuild(guildRef: SelectGuild): Promise<ForumTag[]>;
-  abstract getTemplateByGuild(guildRef: SelectGuild): Promise<ForumTagTemplate[]>;
+  abstract queryTag(): TagQueryBuilder;
+  abstract queryTemplate(): TemplateQueryBuilder;
   abstract createTicketTags(guildRef: SelectGuild, memberRef: Snowflake): Promise<InsertResult[]>;
   abstract createTagForCrew(crew: Crew): Promise<any>;
   abstract createTag(
@@ -39,7 +38,11 @@ export abstract class TagService {
     moderated?: boolean,
   ): Promise<any>;
   abstract addTags(teamRef: SelectTeam, templates: ForumTagTemplate[]): Promise<void>;
-  abstract deleteTags(member: GuildMember, templates?: (ForumTagTemplate | string)[]): Promise<any>;
+  abstract deleteTags(tagRef: SelectTag | SelectTag[]): Promise<DeleteResult>;
+  abstract deleteTagsByTemplate(
+    guildRef: SelectGuild,
+    templates?: (ForumTagTemplate | string)[],
+  ): Promise<any>;
   abstract deleteTagTemplates(
     member: GuildMember,
     templates?: (ForumTagTemplate | string)[],
@@ -60,37 +63,16 @@ export class TagServiceImpl extends TagService {
     super();
   }
 
-  async getTag(tagRef: SelectTag) {
-    const { tagSf } = tagRef;
-    return this.tagRepo.findOneOrFail({ where: { tagSf } });
+  queryTag(): TagQueryBuilder {
+    return new TagQueryBuilder(this.tagRepo);
   }
 
-  async getTagsByTeam(teamRef: SelectTeam) {
-    return this.tagRepo
-      .createQueryBuilder('tag')
-      .leftJoinAndSelect('tag.template', 'template')
-      .where('tag.team_id=:id', teamRef)
-      .getMany();
-  }
-
-  async getTagByName(teamRef: SelectTeam, name: string) {
-    return this.tagRepo
-      .createQueryBuilder('tag')
-      .leftJoinAndSelect('tag.template', 'template')
-      .where('tag.team_id=:id AND tag.name=:name', { ...teamRef, name })
-      .getOneOrFail();
-  }
-
-  async getTagByGuild(guildRef: SelectGuild): Promise<ForumTag[]> {
-    return this.tagRepo.find({ where: { guild: guildRef } });
-  }
-
-  async getTemplateByGuild(guildRef: SelectGuild): Promise<ForumTagTemplate[]> {
-    return this.templateRepo.find({ where: { guild: guildRef } });
+  queryTemplate(): TemplateQueryBuilder {
+    return new TemplateQueryBuilder(this.templateRepo);
   }
 
   async createTicketTags(guildRef: SelectGuild, memberRef: Snowflake) {
-    const guild = await this.guildService.getGuild(guildRef);
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
 
     const triage = {
       name: TicketTag.TRIAGE,
@@ -162,7 +144,7 @@ export class TagServiceImpl extends TagService {
   }
 
   async createTag(guildRef: SelectGuild, memberRef: Snowflake, name: string, moderated = false) {
-    const guild = await this.guildService.getGuild(guildRef);
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
 
     return await this.templateRepo.upsert(
       {
@@ -176,7 +158,7 @@ export class TagServiceImpl extends TagService {
   }
 
   async addTags(teamRef: SelectTeam, templates: ForumTagTemplate[]) {
-    const team: Team = teamRef instanceof Team ? teamRef : await this.teamService.getTeam(teamRef);
+    const team = await this.teamService.query().byTeam(teamRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(team.guild.guildSf);
     const forum = await discordGuild.channels.fetch(team.forumSf);
 
@@ -229,12 +211,14 @@ export class TagServiceImpl extends TagService {
     );
   }
 
-  async deleteTags(member: GuildMember, templates?: (ForumTagTemplate | string)[]) {
-    if (!member.permissions.has('Administrator')) {
-      return { success: false, message: 'Only guild administrators can perform this action' };
-    }
+  async deleteTags(tagRef: SelectTag | SelectTag[]): Promise<DeleteResult> {
+    const tags = Array.isArray(tagRef) ? tagRef.map((tag) => tag.tagSf) : tagRef;
+    return await this.tagRepo.delete(tags);
+  }
 
-    const guild = member.guild;
+  async deleteTagsByTemplate(guildRef: SelectGuild, templates?: (ForumTagTemplate | string)[]) {
+    const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
+    const discordGuild = await this.guildManager.fetch(guild.guildSf);
 
     if (!templates || !Array.isArray(templates)) {
       templates = await this.templateRepo.find({
@@ -246,8 +230,8 @@ export class TagServiceImpl extends TagService {
 
     const results = await Promise.all(
       result.map(async ({ teamId, tags }) => {
-        const team = await this.teamService.getTeam({ id: teamId });
-        const forum = await guild.channels.fetch(team.forumSf);
+        const team = await this.teamService.query().byTeam({ id: teamId }).getOneOrFail();
+        const forum = await discordGuild.channels.fetch(team.forumSf);
 
         if (!forum || !forum.isThreadOnly()) {
           throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');

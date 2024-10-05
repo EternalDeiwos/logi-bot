@@ -70,7 +70,7 @@ export class TicketCreatePromptBuilder extends BasePromptBuilder {
 
   addCreateButton(crewRef: SelectCrew) {
     const create = new ButtonBuilder()
-      .setCustomId(`ticket/start/${crewRef}`)
+      .setCustomId(`ticket/start/${crewRef.crewSf}`)
       .setLabel('Create Ticket')
       .setStyle(ButtonStyle.Primary);
 
