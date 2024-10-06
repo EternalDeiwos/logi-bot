@@ -22,8 +22,13 @@ export class CrewLogPromptBuilder extends BasePromptBuilder {
       .setTimestamp(createdAt);
 
     return this.add({
-      content: roleMention(crew.roleSf),
       embeds: [embed],
+    });
+  }
+
+  addCrewMention(crew: Crew) {
+    return this.add({
+      content: roleMention(crew.roleSf),
       allowedMentions: { roles: [crew.roleSf] },
     });
   }

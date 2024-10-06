@@ -28,4 +28,9 @@ export class BasePromptBuilder {
   public build() {
     return mergeWith({}, ...this.options, BasePromptBuilder.customizer) as BaseMessageOptions;
   }
+
+  public clone<T extends BasePromptBuilder>() {
+    const Class = this.constructor as typeof BasePromptBuilder;
+    return new Class(this.build()) as T;
+  }
 }

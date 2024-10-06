@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GuildManager, Snowflake } from 'discord.js';
+import { GuildBasedChannel, GuildManager, Snowflake } from 'discord.js';
 import { InsertResult } from 'typeorm';
 import { InternalError } from 'src/errors';
 import { CrewService } from 'src/core/crew/crew.service';
@@ -56,16 +56,20 @@ export class CrewLogServiceImpl extends CrewLogService {
       createdAt,
     );
 
-    const message = await channel.send(prompt.build());
+    const message = await channel.send(
+      prompt.clone<CrewLogPromptBuilder>().addCrewMention(crew).build(),
+    );
 
     if (crew.guild?.config?.globalLogChannel) {
-      const logChannel = await discordGuild.channels.fetch(crew.guild.config.globalLogChannel);
-
-      if (!logChannel || !logChannel.isTextBased()) {
-        throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
+      let logChannel: GuildBasedChannel;
+      try {
+        logChannel = await discordGuild.channels.fetch(crew.guild.config.globalLogChannel);
+        if (logChannel && logChannel.isTextBased()) {
+          await logChannel.send(prompt.build());
+        }
+      } catch (err) {
+        this.logger.warn(`Configured global log channel for ${crew.guild.name} is missing`);
       }
-
-      await logChannel.send(prompt.build());
     }
 
     await message.pin();
