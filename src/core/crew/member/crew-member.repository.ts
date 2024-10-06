@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { Snowflake } from 'discord.js';
-import { CrewMemberAccess } from 'src/types';
 import { CommonRepository } from 'src/database/util';
-import { CrewMember } from './crew-member.entity';
-import { SelectGuild } from 'src/core/guild/guild.entity';
-import { SelectCrew } from '../crew.entity';
+import { CrewMember, InsertCrewMember } from './crew-member.entity';
 
 @Injectable()
 export class CrewMemberRepository extends CommonRepository<CrewMember> {
@@ -13,28 +9,40 @@ export class CrewMemberRepository extends CommonRepository<CrewMember> {
     super(CrewMember, dataSource.createEntityManager());
   }
 
-  findMembers() {
-    return this.createQueryBuilder('member').withDeleted();
-  }
+  safeUpsert(payload: InsertCrewMember) {
+    const [selectQuery] = this.createQueryBuilder('member')
+      .select('member.access', 'access')
+      .leftJoinAndSelect('member.guild', 'guild')
+      .leftJoinAndSelect('member.crew', 'crew')
+      .where('member.crew_channel_sf=:crewSf AND member.member_sf=:memberSf', payload)
+      .getQueryAndParameters();
 
-  findMembersForCrew(crewRef: SelectCrew) {
-    return this.findMembers().where('member.crewSf=:crewSf', crewRef);
-  }
-
-  findByAccess(guildRef: SelectGuild, memberRef: Snowflake, access: CrewMemberAccess) {
-    const qb = this.createQueryBuilder('member');
-
-    if (guildRef.id) {
-      qb.where('member.guild_id = :id');
-    } else {
-      qb.leftJoin('member.guild', 'guild').where('guild.guild_sf = :guildSf');
-    }
-
-    qb.innerJoin('member.crew', 'crew').andWhere(
-      `member.member_sf = :memberRef AND member.access <= :access`,
-      { ...guildRef, memberRef, access },
+    const conflictColumns = ['crewSf', 'memberSf', 'deletedAt'].map(
+      (prop) => this.metadata.findColumnWithPropertyName(prop).databaseName,
     );
+    const [insertQuery, params] = this.createQueryBuilder()
+      .insert()
+      .into(CrewMember)
+      .values(payload)
+      .getQueryAndParameters();
 
-    return qb.getManyAndCount();
+    return this.query(
+      `
+      WITH existing AS (${selectQuery})
+      ${insertQuery}
+      ON CONFLICT (${conflictColumns.join(', ')}) 
+      DO UPDATE SET 
+        "name" = EXCLUDED."name", 
+        "access" = (
+          SELECT CASE 
+            WHEN EXCLUDED."access"::text::integer > existing.access::text::integer 
+            THEN existing."access" ELSE EXCLUDED."access" 
+          END
+          FROM existing
+        )
+      RETURNING *
+    `,
+      params,
+    );
   }
 }

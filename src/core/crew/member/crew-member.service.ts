@@ -127,16 +127,13 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       }
     }
 
-    const result = await this.memberRepo.upsert(
-      {
-        memberSf: memberRef,
-        guildId: crew.guildId,
-        name: member.displayName,
-        access,
-        crewSf: crew.crewSf,
-      },
-      ['crewSf', 'memberSf', 'deletedAt'],
-    );
+    const result = await this.memberRepo.safeUpsert({
+      memberSf: memberRef,
+      guildId: crew.guildId,
+      name: member.displayName,
+      access,
+      crewSf: crew.crewSf,
+    });
 
     if (
       access === CrewMemberAccess.OWNER &&

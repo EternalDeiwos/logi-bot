@@ -17,7 +17,9 @@ import { CrewMemberAccess, SkipAccessControlOptions } from 'src/types';
 import { Crew } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 
-export type InsertCrewMember = DeepPartial<Omit<CrewMember, 'crew' | 'createdAt' | 'deletedAt'>>;
+export type InsertCrewMember = DeepPartial<
+  Omit<CrewMember, 'crew' | 'guild' | 'createdAt' | 'deletedAt' | 'requireAccess'>
+>;
 export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'memberSf' | 'crewSf'>>;
 export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'access'>>;
 
