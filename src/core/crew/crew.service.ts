@@ -152,6 +152,10 @@ export class CrewServiceImpl extends CrewService {
         id: discordGuild.roles.everyone.id,
         deny: [PermissionsBitField.Flags.ViewChannel],
       },
+      {
+        id: role.id,
+        allow: [PermissionsBitField.Flags.ManageMessages, PermissionsBitField.Flags.ManageThreads],
+      },
     ];
 
     const botMember = await discordGuild.members.fetchMe();
