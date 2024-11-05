@@ -369,7 +369,7 @@ export class TicketCommand {
 
     if (
       // Ticket owner can close their own tickets
-      (tag === TicketTag.ABANDONED && ticket.createdBy !== memberRef) ||
+      !(tag === TicketTag.ABANDONED && ticket.createdBy === memberRef) &&
       !(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))
     ) {
       throw new AuthError(
