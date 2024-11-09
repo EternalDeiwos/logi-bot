@@ -11,6 +11,7 @@ import {
   ModalContext,
   ModalParam,
   Options,
+  SlashCommand,
   SlashCommandContext,
   StringOption,
   Subcommand,
@@ -27,7 +28,6 @@ import {
   Snowflake,
   User,
 } from 'discord.js';
-import { Equal, Not } from 'typeorm';
 import { compact } from 'lodash';
 import { AuthError, DatabaseError, ValidationError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
@@ -350,13 +350,7 @@ export class CrewCommand {
     });
   }
 
-  @UseInterceptors(CrewSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'join',
-    description: 'Join a crew',
-    dmPermission: false,
-  })
-  async onJoinCrew(
+  private async joinCrew(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
@@ -373,6 +367,32 @@ export class CrewCommand {
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Joined crew')],
     });
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'join',
+    description: 'Join a crew',
+    dmPermission: false,
+  })
+  async onJoinCrew(
+    @Context() context: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    return this.joinCrew(context, data);
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @SlashCommand({
+    name: 'joincrew',
+    description: 'Join a crew',
+    dmPermission: false,
+  })
+  async onGlobalJoinCrew(
+    @Context() context: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    return this.joinCrew(context, data);
   }
 
   @Button('crew/join')
