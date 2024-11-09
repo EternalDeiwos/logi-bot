@@ -434,13 +434,7 @@ export class CrewCommand {
     });
   }
 
-  @UseInterceptors(CrewSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'leave',
-    description: 'Leave a team',
-    dmPermission: false,
-  })
-  async onLeaveCrew(
+  async leaveCrew(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
@@ -462,6 +456,32 @@ export class CrewCommand {
         embeds: [new ErrorEmbed('ERROR_GENERIC').setTitle('No change')],
       });
     }
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'leave',
+    description: 'Leave a crew',
+    dmPermission: false,
+  })
+  async onLeaveCrew(
+    @Context() context: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    return this.leaveCrew(context, data);
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @SlashCommand({
+    name: 'leavecrew',
+    description: 'Leave a crew',
+    dmPermission: false,
+  })
+  async onLeaveCrewAlias(
+    @Context() context: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    return this.leaveCrew(context, data);
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
