@@ -1,4 +1,4 @@
-import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
+import { Injectable, Logger, UseFilters } from '@nestjs/common';
 import {
   ChannelOption,
   Context,
@@ -14,8 +14,6 @@ import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
-import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
-import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { GuildService } from './guild.service';
 import { GuildConfig } from './guild.entity';
 

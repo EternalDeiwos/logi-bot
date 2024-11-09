@@ -43,7 +43,6 @@ import { CrewRepository } from './crew.repository';
 import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
 import { CrewShareAutocompleteInterceptor } from './share/crew-share.interceptor';
 import { CrewMemberService } from './member/crew-member.service';
-import { CrewMemberRepository } from './member/crew-member.repository';
 import { CrewShareService } from './share/crew-share.service';
 import { CrewLogService } from './log/crew-log.service';
 import { Crew } from './crew.entity';
@@ -211,7 +210,6 @@ export class CrewCommand {
     private readonly teamService: TeamService,
     private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
-    private readonly memberRepo: CrewMemberRepository,
     private readonly memberService: CrewMemberService,
     private readonly shareService: CrewShareService,
     private readonly logService: CrewLogService,
