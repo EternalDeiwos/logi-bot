@@ -9,10 +9,19 @@ import {
   ViewEntity,
   ViewColumn,
   DeleteDateColumn,
-  Point,
+  DeepPartial,
 } from 'typeorm';
+import { Snowflake } from 'discord.js';
 import { War } from 'src/game/war/war.entity';
 import { Region } from 'src/game/region/region.entity';
+
+export enum PoiMarkerType {
+  DEPOT = 33,
+  SEAPORT = 52,
+}
+
+export type SelectPoi = DeepPartial<Pick<Poi, 'id'>>;
+export type ArchivePoi = SelectPoi & { archiveSf?: Snowflake; tag?: string };
 
 @Entity()
 export class Poi {
@@ -47,7 +56,7 @@ export class Poi {
 
   @Column({ name: 'marker_type', type: 'int4' })
   @Index('marker_type_idx_poi')
-  markerType: number;
+  markerType: PoiMarkerType;
 
   @Column({ type: 'float8' })
   x: number;
@@ -109,10 +118,7 @@ export class CurrentPoi {
   ry: number;
 
   @ViewColumn({ name: 'marker_type' })
-  markerType: number;
-
-  @ViewColumn({ name: 'region_point' })
-  regionPoint: Point;
+  markerType: PoiMarkerType;
 
   @ViewColumn({ name: 'hex_name' })
   hexName: string;
@@ -125,4 +131,37 @@ export class CurrentPoi {
 
   @ViewColumn()
   slang: string[];
+
+  getName() {
+    let result = this.getMarkerName();
+
+    if (this.minorName) {
+      result += this.getMinorName();
+    } else if (this.majorName) {
+      result += this.getMajorName();
+    } else {
+      result += this.hexName;
+    }
+
+    return result;
+  }
+
+  private getMarkerName() {
+    switch (this.markerType) {
+      case 33:
+        return 'Depot at ';
+      case 52:
+        return 'Seaport at ';
+      default:
+        return '';
+    }
+  }
+
+  private getMinorName() {
+    return `${this.minorName} near ${this.getMajorName()}`;
+  }
+
+  private getMajorName() {
+    return `${this.majorName}, ${this.hexName}`;
+  }
 }
