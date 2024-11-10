@@ -13,6 +13,12 @@ import { Region, CurrentRegion } from 'src/game/region/region.entity';
 import { RegionLog, CurrentRegionLog } from 'src/game/region/region-log.entity';
 import { Poi, CurrentPoi } from 'src/game/poi/poi.entity';
 import { Catalog, ExpandedCatalog } from 'src/game/catalog/catalog.entity';
+import { Stockpile } from 'src/inventory/stockpile/stockpile.entity';
+import { StockpileLog } from 'src/inventory/stockpile/stockpile-log.entity';
+import {
+  CurrentStockpileEntry,
+  StockpileEntry,
+} from 'src/inventory/stockpile/stockpile-entry.entity';
 import * as migrations from 'src/database/migrations';
 
 export const AppDataSource = new DataSource({
@@ -43,6 +49,10 @@ export const AppDataSource = new DataSource({
     CurrentPoi,
     Catalog,
     ExpandedCatalog,
+    Stockpile,
+    StockpileLog,
+    StockpileEntry,
+    CurrentStockpileEntry,
   ],
   subscribers: [],
   migrations,

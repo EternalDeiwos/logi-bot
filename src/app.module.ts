@@ -3,18 +3,15 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { CoreModule } from 'src/core/core.module';
+import { GameModule } from './game/game.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { EventsModule } from 'src/events/events.module';
 import { AppController } from './app.controller';
 import { PermissionsService } from './permissions.service';
 import { validationSchema } from './app.config';
 
 @Module({
-  imports: [
-    DatabaseModule,
-    // GameModule,
-    CoreModule,
-    // InventoryModule
-  ],
+  imports: [DatabaseModule, GameModule, CoreModule, InventoryModule],
   controllers: [AppController],
   providers: [PermissionsService],
 })
