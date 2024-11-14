@@ -158,16 +158,16 @@ export class ExpandedCatalog {
   category: string;
 
   @ViewColumn({ name: 'crate_quantity' })
-  crateQuantity: string;
+  crateQuantity: number;
 
   @ViewColumn({ name: 'shippable_quantity' })
-  shippableQuantity: string;
+  shippableQuantity: number;
 
   @ViewColumn({ name: 'crate_stockpile_maximum' })
-  crateMax: string;
+  crateMax: number;
 
   @ViewColumn({ name: 'shippable_stockpile_maximum' })
-  shippableMax: string;
+  shippableMax: number;
 
   @ViewColumn()
   data: any;

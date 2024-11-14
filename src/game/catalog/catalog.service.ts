@@ -2,17 +2,34 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BaseError } from 'src/errors';
 import { CatalogRepository, ExpandedCatalogRepository } from './catalog.repository';
-import { Catalog } from './catalog.entity';
+import { Catalog, ExpandedCatalog } from './catalog.entity';
+import { CatalogQueryBuilder } from './catalog.query';
+
+export abstract class CatalogService {
+  abstract query(): CatalogQueryBuilder;
+  abstract countCurrent(): Promise<number>;
+  abstract getCurrent(): Promise<ExpandedCatalog[]>;
+  abstract updateCatalog(uri: string, gameVersion: string, catalogVersion: string): Promise<number>;
+  abstract updateDefaultCatalog(catalogVersion: string): Promise<number>;
+}
 
 @Injectable()
-export class CatalogService {
+export class CatalogServiceImpl extends CatalogService {
   private readonly logger = new Logger(CatalogService.name);
 
   constructor(
     private readonly configService: ConfigService,
     private readonly catalogRepo: CatalogRepository,
-    private readonly currentCatalogRepo: ExpandedCatalogRepository,
-  ) {}
+    private readonly expandedCatalogRepo: ExpandedCatalogRepository,
+  ) {
+    super();
+  }
+
+  query() {
+    const gameVersion = this.configService.getOrThrow<string>('APP_FOXHOLE_VERSION');
+    const catalogVersion = this.configService.getOrThrow<string>('APP_CATALOG_VERSION');
+    return new CatalogQueryBuilder(this.expandedCatalogRepo, gameVersion, catalogVersion);
+  }
 
   getDefaultCatalogUri(gameVersion: string) {
     return `https://raw.githubusercontent.com/GICodeWarrior/fir/main/foxhole/${gameVersion}/catalog.json`;
@@ -23,7 +40,7 @@ export class CatalogService {
     const catalogVersion = await this.configService.getOrThrow('APP_CATALOG_VERSION');
 
     try {
-      return await this.currentCatalogRepo.count({ where: { gameVersion, catalogVersion } });
+      return await this.expandedCatalogRepo.count({ where: { gameVersion, catalogVersion } });
     } catch (err) {
       throw new BaseError('QUERY_FAILED', 'Failed to get current catalog', err);
     }
@@ -34,7 +51,7 @@ export class CatalogService {
     const catalogVersion = await this.configService.getOrThrow('APP_CATALOG_VERSION');
 
     try {
-      return await this.currentCatalogRepo.find({ where: { gameVersion, catalogVersion } });
+      return await this.expandedCatalogRepo.find({ where: { gameVersion, catalogVersion } });
     } catch (err) {
       throw new BaseError('QUERY_FAILED', 'Failed to get current catalog', err);
     }
