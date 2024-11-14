@@ -51,7 +51,7 @@ export class PoiQueryBuilder extends CommonQueryBuilder<CurrentPoi> {
   }
 
   withStockpiles() {
-    this.qb.leftJoinAndSelect('poi.stockpiles', 'stockpile');
+    this.qb.innerJoinAndSelect('poi.stockpiles', 'stockpile');
     return this;
   }
 

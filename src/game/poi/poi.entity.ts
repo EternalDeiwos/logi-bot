@@ -10,10 +10,14 @@ import {
   ViewColumn,
   DeleteDateColumn,
   DeepPartial,
+  OneToMany,
 } from 'typeorm';
+import { Expose, Transform, Type } from 'class-transformer';
 import { Snowflake } from 'discord.js';
 import { War } from 'src/game/war/war.entity';
 import { Region } from 'src/game/region/region.entity';
+import { Stockpile } from 'src/inventory/stockpile/stockpile.entity';
+import { StockpileLog } from 'src/inventory/stockpile/stockpile-log.entity';
 
 export enum PoiMarkerType {
   DEPOT = 33,
@@ -53,6 +57,18 @@ export class Poi {
     foreignKeyConstraintName: 'fk_poi_war_number',
   })
   war: War;
+
+  @Expose()
+  @Type(() => Stockpile)
+  @Transform(({ value }) => (value ? value : null))
+  @OneToMany(() => Stockpile, (stockpile) => stockpile.location)
+  stockpiles: Stockpile[];
+
+  @Expose()
+  @Type(() => StockpileLog)
+  @Transform(({ value }) => (value ? value : null))
+  @OneToMany(() => StockpileLog, (log) => log.location)
+  logs: StockpileLog[];
 
   @Column({ name: 'marker_type', type: 'int4' })
   @Index('marker_type_idx_poi')
@@ -131,6 +147,12 @@ export class CurrentPoi {
 
   @ViewColumn()
   slang: string[];
+
+  @OneToMany(() => Stockpile, (stockpile) => stockpile.location)
+  stockpiles: Stockpile[];
+
+  @OneToMany(() => StockpileLog, (log) => log.location)
+  logs: StockpileLog[];
 
   getName() {
     let result = this.getMarkerName();
