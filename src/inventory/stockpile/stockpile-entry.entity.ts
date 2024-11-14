@@ -11,12 +11,31 @@ import {
   ViewColumn,
   PrimaryColumn,
   CreateDateColumn,
+  DeepPartial,
 } from 'typeorm';
 import { War } from 'src/game/war/war.entity';
-import { Catalog } from 'src/game/catalog/catalog.entity';
+import { Catalog, ExpandedCatalog } from 'src/game/catalog/catalog.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { StockpileLog } from './stockpile-log.entity';
 import { Stockpile } from './stockpile.entity';
+
+export type StockpileReportRecord = {
+  ['Stockpile Title']: string;
+  ['Stockpile Name']: string;
+  ['Structure Type']: string;
+  ['Quantity']: string;
+  ['Name']: string;
+  ['Crated?']: string;
+  ['Per Crate']: string;
+  ['Total']: string;
+  ['Description']: string;
+  ['CodeName']: string;
+};
+
+export type SelectStockpileEntry = DeepPartial<Pick<StockpileEntry, 'id'>>;
+export type InsertStockpileEntry = DeepPartial<
+  Omit<StockpileEntry, 'id' | 'log' | 'stockpile' | 'catalog' | 'war' | 'guild' | 'createdAt'>
+>;
 
 @Entity('stockpile_entry')
 export class StockpileEntry {
@@ -53,7 +72,7 @@ export class StockpileEntry {
   })
   stockpile: Stockpile;
 
-  @Column({ name: 'catalog_id', type: 'int8' })
+  @Column({ name: 'catalog_id', type: 'uuid' })
   @RelationId((entry: StockpileEntry) => entry.catalog)
   @Index('catalog_id_idx_stockpile_entry')
   catalogId: string;
@@ -64,7 +83,7 @@ export class StockpileEntry {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_stockpile_entry_catalog_id',
   })
-  catalog: Catalog;
+  catalog: ExpandedCatalog;
 
   @Column({ name: 'war_number', type: 'int8' })
   @RelationId((entry: StockpileEntry) => entry.war)
@@ -94,6 +113,15 @@ export class StockpileEntry {
   })
   guild: Guild;
 
+  @Column({ type: 'int4', name: 'quantity_uncrated', default: 0 })
+  quantity: number;
+
+  @Column({ type: 'int4', name: 'quantity_crated', default: 0 })
+  quantityCrated: number;
+
+  @Column({ type: 'int4', name: 'quantity_shippable', default: 0 })
+  quantityShippable: number;
+
   @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;
@@ -107,12 +135,15 @@ export class StockpileEntry {
   name: 'stockpile_entry_current',
   expression: (ds) =>
     ds
-      .createQueryBuilder()
-      .distinctOn(['stockpile_id', 'catalog_id'])
-      .from(StockpileEntry, 'entry')
-      .orderBy('stockpile_id')
-      .addOrderBy('catalog_id')
-      .addOrderBy('created_at', 'DESC'),
+      .createQueryBuilder(StockpileEntry, 'entry')
+      .distinctOn(['entry.stockpile_id', 'entry.catalog_id'])
+      .withDeleted()
+      .leftJoinAndSelect('entry.log', 'log')
+      .leftJoinAndSelect('entry.catalog', 'catalog')
+      .andWhere('log.deleted_at IS NULL')
+      .orderBy('entry.stockpile_id')
+      .addOrderBy('entry.catalog_id')
+      .addOrderBy('entry.created_at', 'DESC'),
 })
 export class CurrentStockpileEntry {
   @ViewColumn()
@@ -141,6 +172,15 @@ export class CurrentStockpileEntry {
 
   @ManyToOne(() => War)
   war: War;
+
+  @ViewColumn({ name: 'quantity_uncrated' })
+  quantity: number;
+
+  @ViewColumn({ name: 'quantity_crated' })
+  quantityCrated: number;
+
+  @ViewColumn({ name: 'quantity_shippable' })
+  quantityShippable: number;
 
   @Expose()
   @ViewColumn({ name: 'created_by_sf' })

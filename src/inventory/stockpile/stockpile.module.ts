@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WarModule } from 'src/game/war/war.module';
+import { BotModule } from 'src/bot/bot.module';
+import { GuildModule } from 'src/core/guild/guild.module';
+import { CoreModule } from 'src/core/core.module';
+import { PoiModule } from 'src/game/poi/poi.module';
+import { CatalogModule } from 'src/game/catalog/catalog.module';
 import { Stockpile } from './stockpile.entity';
 import { StockpileRepository } from './stockpile.repository';
 import { StockpileLog } from './stockpile-log.entity';
@@ -12,17 +17,17 @@ import {
   CurrentStockpileEntryRepository,
   StockpileEntryRepository,
 } from './stockpile-entry.repository';
-import { BotModule } from 'src/bot/bot.module';
-import { PoiModule } from 'src/game/poi/poi.module';
-import { GuildModule } from 'src/core/guild/guild.module';
+import { StockpileUpdateConsumer } from './stockpile-update.consumer';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Stockpile, StockpileLog, StockpileEntry, CurrentStockpileEntry]),
     BotModule,
     GuildModule,
+    CoreModule,
     WarModule,
     PoiModule,
+    CatalogModule,
   ],
   providers: [
     StockpileRepository,
@@ -30,6 +35,7 @@ import { GuildModule } from 'src/core/guild/guild.module';
     StockpileEntryRepository,
     CurrentStockpileEntryRepository,
     { provide: StockpileService, useClass: StockpileServiceImpl },
+    StockpileUpdateConsumer,
     StockpileCommand,
   ],
   exports: [StockpileService],

@@ -7,13 +7,33 @@ import {
   JoinColumn,
   PrimaryColumn,
   CreateDateColumn,
+  DeleteDateColumn,
+  DeepPartial,
+  OneToMany,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Expose, Transform } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import { War } from 'src/game/war/war.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Poi } from 'src/game/poi/poi.entity';
-import { Stockpile } from './stockpile.entity';
+import { Crew } from 'src/core/crew/crew.entity';
+import { StockpileEntry } from './stockpile-entry.entity';
+
+export type SelectStockpileLog = DeepPartial<Pick<StockpileLog, 'id'>>;
+export type InsertStockpileLog = DeepPartial<
+  Omit<
+    StockpileLog,
+    | 'id'
+    | 'war'
+    | 'location'
+    | 'guild'
+    | 'crew'
+    | 'processedAt'
+    | 'deletedAt'
+    | 'deletedBy'
+    | 'createdAt'
+  >
+>;
 
 @Entity()
 export class StockpileLog {
@@ -24,8 +44,21 @@ export class StockpileLog {
   })
   id: string;
 
+  @Column({ name: 'crew_channel_sf', type: 'int8', nullable: true })
+  @RelationId((log: StockpileLog) => log.crew)
+  @Index('crew_channel_sf_idx_stockpile_log')
+  crewSf: string;
+
+  @ManyToOne(() => Crew, { onDelete: 'NO ACTION' })
+  @JoinColumn({
+    name: 'crew_channel_sf',
+    referencedColumnName: 'crewSf',
+    foreignKeyConstraintName: 'fk_stockpile_log_crew_channel_sf',
+  })
+  crew: Crew;
+
   @Column({ name: 'location_id', type: 'int8' })
-  @RelationId((stockpile: Stockpile) => stockpile.location)
+  @RelationId((log: StockpileLog) => log.location)
   @Index('location_id_idx_stockpile_log')
   locationId: string;
 
@@ -66,10 +99,19 @@ export class StockpileLog {
   guild: Guild;
 
   @Column()
-  description: string;
+  message: string;
 
   @Column('text')
   raw: string;
+
+  @Expose()
+  @Type(() => StockpileEntry)
+  @Transform(({ value }) => (value ? value : null))
+  @OneToMany(() => StockpileEntry, (entry) => entry.log)
+  entries: StockpileEntry[];
+
+  @Column({ type: 'timestamptz', name: 'processed_at', nullable: true })
+  processedAt: Date;
 
   @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })
@@ -78,4 +120,12 @@ export class StockpileLog {
   @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
+
+  @Expose()
+  @Column({ type: 'int8', name: 'deleted_by_sf', nullable: true })
+  deletedBy: Snowflake;
+
+  @Expose()
+  @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
+  deletedAt: Date;
 }

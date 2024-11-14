@@ -16,6 +16,8 @@ import { GuildService } from 'src/core/guild/guild.service';
 import { StockpileService } from './stockpile.service';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
+import { StockpileUpdateAutocompleteInterceptor } from './stockpile-update.interceptor';
+import { SelectStockpileLog } from './stockpile-log.entity';
 
 export class CreateStockpileCommandParams {
   @StringOption({
@@ -93,7 +95,7 @@ export class StockpileLogCommandParams {
     autocomplete: true,
     required: false,
   })
-  crewId: string;
+  crew: string;
 }
 
 @Injectable()
@@ -125,18 +127,12 @@ export class StockpileCommand {
     await interaction.deferReply({ ephemeral: true });
 
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const discordGuild = await this.guildManager.fetch(interaction.guildId);
-    const member = await discordGuild.members.fetch(interaction);
     const guild = await this.guildService
       .query()
       .byGuild({ guildSf: interaction.guildId })
       .getOneOrFail();
 
-    if (
-      guild.config?.stockpileCreatorRole &&
-      !interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator) &&
-      !member.roles.cache.has(guild.config.stockpileCreatorRole)
-    ) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
       throw new AuthError('FORBIDDEN', 'Not allowed to create stockpiles').asDisplayable();
     }
 
@@ -150,6 +146,52 @@ export class StockpileCommand {
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Stockpile registered')],
+    });
+  }
+
+  @UseInterceptors(StockpileUpdateAutocompleteInterceptor)
+  @Subcommand({
+    name: 'log',
+    description: 'Update stockpile contents',
+    dmPermission: false,
+  })
+  async onLogStockpile(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() { reportAttachment, crew, locationId, message }: StockpileLogCommandParams,
+  ) {
+    const channelRef = crew || interaction.channelId;
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const guild = await this.guildService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .getOneOrFail();
+
+    const report = await fetch(reportAttachment.url);
+    const raw = await report.text();
+
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError('FORBIDDEN', 'Not allowed to updated stockpiles').asDisplayable();
+    }
+
+    const result = await this.stockpileService.registerLog({
+      crewSf: channelRef,
+      createdBy: memberRef,
+      guildId: guild.id,
+      locationId,
+      message,
+      raw,
+    });
+
+    if (result.identifiers.length) {
+      const [{ id }] = result.identifiers as SelectStockpileLog[];
+
+      await this.botService.publish(interaction, 'stockpile', 'log.process', {
+        id,
+      });
+    }
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Stockpile update scheduled')],
     });
   }
 }

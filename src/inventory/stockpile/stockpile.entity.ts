@@ -88,6 +88,7 @@ export class Stockpile {
 
   @Expose()
   @Type(() => StockpileEntry)
+  @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => StockpileEntry, (entry) => entry.stockpile)
   items: StockpileEntry[];
 

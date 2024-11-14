@@ -1,14 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InsertResult } from 'typeorm';
 import { ValidationError } from 'src/errors';
-import { InsertStockpile } from './stockpile.entity';
-import { StockpileRepository } from './stockpile.repository';
-import { StockpileQueryBuilder } from './stockpile.query';
 import { GuildService } from 'src/core/guild/guild.service';
 import { WarService } from 'src/game/war/war.service';
+import { InsertStockpile } from './stockpile.entity';
+import { StockpileRepository } from './stockpile.repository';
+import { StockpileLogRepository } from './stockpile-log.repository';
+import { StockpileEntryRepository } from './stockpile-entry.repository';
+import { StockpileQueryBuilder } from './stockpile.query';
+import { InsertStockpileLog } from './stockpile-log.entity';
+import { StockpileLogQueryBuilder } from './stockpile-log.query';
+import { InsertStockpileEntry } from './stockpile-entry.entity';
 
 export abstract class StockpileService {
   abstract query(): StockpileQueryBuilder;
-  abstract registerStockpile(data: InsertStockpile): Promise<any>;
+  abstract queryLog(): StockpileLogQueryBuilder;
+  abstract registerStockpile(data: InsertStockpile): Promise<void>;
+  abstract registerLog(data: InsertStockpileLog): Promise<InsertResult>;
+  abstract updateStockpile(data: InsertStockpileEntry[]): Promise<InsertResult>;
 }
 
 @Injectable()
@@ -19,6 +28,8 @@ export class StockpileServiceImpl extends StockpileService {
     private readonly guildService: GuildService,
     private readonly warService: WarService,
     private readonly stockpileRepo: StockpileRepository,
+    private readonly logRepo: StockpileLogRepository,
+    private readonly entryRepo: StockpileEntryRepository,
   ) {
     super();
   }
@@ -27,8 +38,11 @@ export class StockpileServiceImpl extends StockpileService {
     return new StockpileQueryBuilder(this.stockpileRepo);
   }
 
+  queryLog() {
+    return new StockpileLogQueryBuilder(this.logRepo);
+  }
+
   async registerStockpile(data: InsertStockpile) {
-    const guild = await this.guildService.query().byGuild({ id: data.guildId }).getOneOrFail();
     const war = await this.warService.getCurrent();
 
     if (data.name.length > 10) {
@@ -47,9 +61,15 @@ export class StockpileServiceImpl extends StockpileService {
 
     const stockpile = this.stockpileRepo.create({ ...data, warNumber: war.warNumber });
     await this.stockpileRepo.insert(stockpile);
-    stockpile.guild = guild;
-    stockpile.war = war;
+  }
 
-    return stockpile;
+  async registerLog(data: InsertStockpileLog) {
+    const war = await this.warService.getCurrent();
+    const log = this.logRepo.create({ ...data, warNumber: war.warNumber });
+    return this.logRepo.insert(log);
+  }
+
+  async updateStockpile(data: InsertStockpileEntry[]) {
+    return await this.entryRepo.insert(data);
   }
 }
