@@ -2,6 +2,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Context, ContextOf, On } from 'necord';
+import { EmojiService } from 'src/bot/emoji.service';
 
 @Injectable()
 export class BotEventListener {
@@ -9,12 +10,14 @@ export class BotEventListener {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly emojiService: EmojiService,
     private readonly rmq: AmqpConnection,
   ) {}
 
   @On('ready')
   async onReady(@Context() [client]: ContextOf<'ready'>) {
     this.logger.log(`Bot logged in as ${client.user.username}`);
+    await this.emojiService.configureApplicationEmoji();
   }
 
   @On('guildCreate')
