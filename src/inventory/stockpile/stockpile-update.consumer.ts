@@ -29,7 +29,9 @@ export class StockpileUpdateConsumer {
     const log = await this.stockpileService
       .queryLog()
       .byLog(payload)
+      .withCrew()
       .withPoi()
+      .withRegion()
       .withStockpiles()
       .getOneOrFail();
 
@@ -45,6 +47,15 @@ export class StockpileUpdateConsumer {
 
     const entries: Record<string, InsertStockpileEntry> = records.reduce(
       (state, record) => {
+        const stockpile = log.location.stockpiles.find((s) => s.name === record['Stockpile Name']);
+
+        if (!stockpile) {
+          this.logger.warn(
+            `Unable to process stockpile report for ${record['Stockpile Name']} at the ${log.location.getName()}`,
+          );
+          return state;
+        }
+
         const item = catalog[record.CodeName];
         const isShippable = item.shippableMax > 0;
         const quantity = parseInt(record.Quantity);
@@ -54,8 +65,8 @@ export class StockpileUpdateConsumer {
           guildId: log.guildId,
           createdBy: log.createdBy,
           warNumber: log.warNumber,
-          catalogId: catalog[record.CodeName].id,
-          stockpileId: log.location.stockpiles.find((s) => s.name === record['Stockpile Name']).id,
+          catalogId: item.id,
+          stockpileId: stockpile.id,
         };
 
         if (record['Crated?'] === 'true') {
@@ -76,5 +87,6 @@ export class StockpileUpdateConsumer {
     );
 
     await this.stockpileService.updateStockpile(Object.values(entries));
+    this.logger.log(`Stockpile at the ${log.location.getName()} updated by ${log.crew.name}`);
   }
 }

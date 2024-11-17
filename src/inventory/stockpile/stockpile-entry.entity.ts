@@ -83,7 +83,14 @@ export class StockpileEntry {
     referencedColumnName: 'id',
     foreignKeyConstraintName: 'fk_stockpile_entry_catalog_id',
   })
-  catalog: ExpandedCatalog;
+  catalog: Catalog;
+
+  @ManyToOne(() => ExpandedCatalog, { createForeignKeyConstraints: false })
+  @JoinColumn({
+    name: 'catalog_id',
+    referencedColumnName: 'id',
+  })
+  expandedCatalog: ExpandedCatalog;
 
   @Column({ name: 'war_number', type: 'int8' })
   @RelationId((entry: StockpileEntry) => entry.war)
@@ -129,6 +136,24 @@ export class StockpileEntry {
   @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
+
+  getValue(): string {
+    const counts = [];
+
+    if (this.quantityShippable) {
+      counts.push(`${this.quantityShippable}sc`);
+    }
+
+    if (this.quantityCrated) {
+      counts.push(`${this.quantityCrated}c`);
+    }
+
+    if (this.quantity) {
+      counts.push(this.quantity);
+    }
+
+    return counts.length ? counts.join(' + ') : 'None';
+  }
 }
 
 @ViewEntity({
@@ -139,7 +164,7 @@ export class StockpileEntry {
       .distinctOn(['entry.stockpile_id', 'entry.catalog_id'])
       .withDeleted()
       .leftJoinAndSelect('entry.log', 'log')
-      .leftJoinAndSelect('entry.catalog', 'catalog')
+      .leftJoinAndSelect('entry.expandedCatalog', 'catalog')
       .andWhere('log.deleted_at IS NULL')
       .orderBy('entry.stockpile_id')
       .addOrderBy('entry.catalog_id')
@@ -164,14 +189,20 @@ export class CurrentStockpileEntry {
   @ViewColumn({ name: 'catalog_id' })
   catalogId: string;
 
-  @ManyToOne(() => Catalog)
-  catalog: Catalog;
+  @ManyToOne(() => ExpandedCatalog)
+  catalog: ExpandedCatalog;
 
   @ViewColumn({ name: 'war_number' })
   warNumber: string;
 
   @ManyToOne(() => War)
   war: War;
+
+  @ViewColumn({ name: 'guild_id' })
+  guildId: string;
+
+  @ManyToOne(() => Guild)
+  guild: Guild;
 
   @ViewColumn({ name: 'quantity_uncrated' })
   quantity: number;

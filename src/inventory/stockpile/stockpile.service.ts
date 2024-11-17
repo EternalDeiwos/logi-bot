@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InsertResult } from 'typeorm';
 import { ValidationError } from 'src/errors';
-import { GuildService } from 'src/core/guild/guild.service';
 import { WarService } from 'src/game/war/war.service';
 import { InsertStockpile } from './stockpile.entity';
 import { StockpileRepository } from './stockpile.repository';
@@ -11,10 +11,12 @@ import { StockpileQueryBuilder } from './stockpile.query';
 import { InsertStockpileLog } from './stockpile-log.entity';
 import { StockpileLogQueryBuilder } from './stockpile-log.query';
 import { InsertStockpileEntry } from './stockpile-entry.entity';
+import { StockpileEntryQueryBuilder } from './stockpile-entry.query';
 
 export abstract class StockpileService {
   abstract query(): StockpileQueryBuilder;
   abstract queryLog(): StockpileLogQueryBuilder;
+  abstract queryEntries(): StockpileEntryQueryBuilder;
   abstract registerStockpile(data: InsertStockpile): Promise<void>;
   abstract registerLog(data: InsertStockpileLog): Promise<InsertResult>;
   abstract updateStockpile(data: InsertStockpileEntry[]): Promise<InsertResult>;
@@ -25,7 +27,7 @@ export class StockpileServiceImpl extends StockpileService {
   private readonly logger = new Logger(StockpileService.name);
 
   constructor(
-    private readonly guildService: GuildService,
+    private readonly configService: ConfigService,
     private readonly warService: WarService,
     private readonly stockpileRepo: StockpileRepository,
     private readonly logRepo: StockpileLogRepository,
@@ -40,6 +42,12 @@ export class StockpileServiceImpl extends StockpileService {
 
   queryLog() {
     return new StockpileLogQueryBuilder(this.logRepo);
+  }
+
+  queryEntries() {
+    const gameVersion = this.configService.getOrThrow<string>('APP_FOXHOLE_VERSION');
+    const catalogVersion = this.configService.getOrThrow<string>('APP_CATALOG_VERSION');
+    return new StockpileEntryQueryBuilder(this.entryRepo, gameVersion, catalogVersion);
   }
 
   async registerStockpile(data: InsertStockpile) {

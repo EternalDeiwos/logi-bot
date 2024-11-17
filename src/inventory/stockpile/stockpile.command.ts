@@ -7,17 +7,20 @@ import {
   StringOption,
   Subcommand,
 } from 'necord';
-import { Attachment, GuildManager, PermissionsBitField } from 'discord.js';
+import { Attachment, Client, GuildManager, PermissionsBitField } from 'discord.js';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { DeltaCommand } from 'src/inventory/inventory.command-group';
 import { PoiSelectAutocompleteInterceptor } from 'src/game/poi/poi-select.interceptor';
 import { AuthError } from 'src/errors';
 import { GuildService } from 'src/core/guild/guild.service';
-import { StockpileService } from './stockpile.service';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
-import { StockpileUpdateAutocompleteInterceptor } from './stockpile-update.interceptor';
+import { StockpileService } from './stockpile.service';
 import { SelectStockpileLog } from './stockpile-log.entity';
+import { StockpileUpdateAutocompleteInterceptor } from './stockpile-update.interceptor';
+import { StockpileSearchAutocompleteInterceptor } from './stockpile-search.interceptor';
+import { StockpileContentPromptBuilder } from './stockpile-content.prompt';
+import { cloneDeepWith, groupBy } from 'lodash';
 
 export class CreateStockpileCommandParams {
   @StringOption({
@@ -65,6 +68,32 @@ export class UpdateStockpileCommandParams extends SelectStockpileCommandParams {
   code: string;
 }
 
+export class SearchStockpileCommandParams {
+  @StringOption({
+    name: 'stockpile',
+    description: 'Select a stockpile',
+    autocomplete: true,
+    required: false,
+  })
+  stockpileId: string;
+
+  @StringOption({
+    name: 'location',
+    description: 'Select a location',
+    autocomplete: true,
+    required: false,
+  })
+  locationId: string;
+
+  @StringOption({
+    name: 'catalog',
+    description: 'Select an item',
+    autocomplete: true,
+    required: false,
+  })
+  catalogId: string;
+}
+
 export class StockpileLogCommandParams {
   @StringOption({
     name: 'location',
@@ -108,6 +137,7 @@ export class StockpileCommand {
   private readonly logger = new Logger(StockpileCommand.name);
 
   constructor(
+    private readonly client: Client,
     private readonly guildManager: GuildManager,
     private readonly guildService: GuildService,
     private readonly botService: BotService,
@@ -193,5 +223,66 @@ export class StockpileCommand {
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Stockpile update scheduled')],
     });
+  }
+
+  @UseInterceptors(StockpileSearchAutocompleteInterceptor)
+  @Subcommand({
+    name: 'search',
+    description: 'Search stockpile contents',
+    dmPermission: false,
+  })
+  async onSearchStockpile(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() options: SearchStockpileCommandParams,
+  ) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError('FORBIDDEN', 'Not allowed to updated stockpiles').asDisplayable();
+    }
+
+    const query = await this.stockpileService
+      .queryEntries()
+      .withGuild()
+      .withCatalog()
+      .withLog()
+      .withPoi()
+      .withRegion()
+      .withStockpile()
+      .forDefaultCatalog()
+      .byGuild({ guildSf: interaction.guildId });
+
+    if (options.catalogId) {
+      query.byCatalog({ id: options.catalogId });
+    }
+
+    if (options.locationId) {
+      query.byLocation({ id: options.locationId });
+    }
+
+    if (options.stockpileId) {
+      query.byStockpile({ id: options.stockpileId });
+    }
+
+    const entries = await query.order().getMany();
+    const groups = groupBy(entries, (e) => e.expandedCatalog.category);
+
+    const prompt = new StockpileContentPromptBuilder(await this.client.application.emojis.fetch());
+
+    for (const [group, entries] of Object.entries(groups)) {
+      prompt.displayFields(entries, {
+        title: group
+          .split('::')
+          .pop()
+          .replace(/([a-z])([A-Z])/g, '$1 $2'),
+      });
+    }
+
+    const promptBuilt = prompt.build();
+    // this.logger.debug(JSON.stringify(promptBuilt, null, 2));
+    // const tmp = cloneDeepWith(promptBuilt, (v, k) => {
+    //   this.logger.debug(`${k}: ${v.length}`);
+    // });
+
+    await this.client.application.emojis.fetch();
+    return this.botService.replyOrFollowUp(interaction, promptBuilt);
   }
 }

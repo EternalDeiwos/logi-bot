@@ -4,10 +4,14 @@ import {
   Unique,
   CreateDateColumn,
   ViewEntity,
-  ViewColumn,
   PrimaryColumn,
+  DeepPartial,
 } from 'typeorm';
 import { WarFaction } from 'src/game/war/war.entity';
+
+export type SelectCatalog = DeepPartial<
+  Pick<Catalog, 'id' | 'gameVersion' | 'catalogVersion' | 'name'>
+>;
 
 @Entity()
 @Unique('uk_foxhole_catalog_name', ['gameVersion', 'catalogVersion', 'name'])
@@ -46,6 +50,7 @@ export class Catalog {
       .select([
         'id',
         'code_name',
+        'slang',
         `(data ->> 'DisplayName')::text display_name`,
         'foxhole_version',
         'catalog_version',
@@ -136,42 +141,45 @@ export class Catalog {
       .from(Catalog, 'c'),
 })
 export class ExpandedCatalog {
-  @ViewColumn()
+  @Column({ type: 'uuid' })
   id: string;
 
-  @ViewColumn({ name: 'foxhole_version' })
+  @Column({ name: 'foxhole_version' })
   gameVersion: string;
 
-  @ViewColumn({ name: 'catalog_version' })
+  @Column({ name: 'catalog_version' })
   catalogVersion: string;
 
-  @ViewColumn({ name: 'code_name' })
+  @Column({ name: 'code_name' })
   name: string;
 
-  @ViewColumn({ name: 'display_name' })
+  @Column({ type: 'text', array: true })
+  slang: string[];
+
+  @Column({ name: 'display_name' })
   displayName: string;
 
-  @ViewColumn()
+  @Column()
   faction: WarFaction;
 
-  @ViewColumn({ name: 'category' })
+  @Column({ name: 'category' })
   category: string;
 
-  @ViewColumn({ name: 'crate_quantity' })
+  @Column({ name: 'crate_quantity' })
   crateQuantity: number;
 
-  @ViewColumn({ name: 'shippable_quantity' })
+  @Column({ name: 'shippable_quantity' })
   shippableQuantity: number;
 
-  @ViewColumn({ name: 'crate_stockpile_maximum' })
+  @Column({ name: 'crate_stockpile_maximum' })
   crateMax: number;
 
-  @ViewColumn({ name: 'shippable_stockpile_maximum' })
+  @Column({ name: 'shippable_stockpile_maximum' })
   shippableMax: number;
 
-  @ViewColumn()
+  @Column({ type: 'jsonb' })
   data: any;
 
-  @ViewColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

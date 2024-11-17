@@ -83,4 +83,9 @@ export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
     this.qb.leftJoinAndSelect('log.entries', 'entry');
     return this;
   }
+
+  withCrew() {
+    this.qb.leftJoinAndSelect('log.crew', 'crew');
+    return this;
+  }
 }
