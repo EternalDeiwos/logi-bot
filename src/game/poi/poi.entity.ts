@@ -82,6 +82,43 @@ export class Poi {
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt: Date;
+
+  getName() {
+    let result = this.getMarkerName();
+
+    if (this.region.minorName) {
+      result += this.getMinorName();
+    } else if (this.region.majorName) {
+      result += this.getMajorName();
+    } else {
+      result += this.region.hexName;
+    }
+
+    return result;
+  }
+
+  getMarkerName() {
+    switch (this.markerType) {
+      case 33:
+        return 'Depot at ';
+      case 52:
+        return 'Seaport at ';
+      default:
+        return '';
+    }
+  }
+
+  getMinorName() {
+    if (this.region.minorName) {
+      return `${this.region.minorName} near ${this.getMajorName()}`;
+    }
+
+    return this.getMajorName();
+  }
+
+  getMajorName() {
+    return `${this.region.majorName}, ${this.region.hexName}`;
+  }
 }
 
 @ViewEntity({
@@ -168,7 +205,7 @@ export class CurrentPoi {
     return result;
   }
 
-  private getMarkerName() {
+  getMarkerName() {
     switch (this.markerType) {
       case 33:
         return 'Depot at ';
@@ -179,11 +216,11 @@ export class CurrentPoi {
     }
   }
 
-  private getMinorName() {
+  getMinorName() {
     return `${this.minorName} near ${this.getMajorName()}`;
   }
 
-  private getMajorName() {
+  getMajorName() {
     return `${this.majorName}, ${this.hexName}`;
   }
 }

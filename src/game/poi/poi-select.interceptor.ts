@@ -18,17 +18,16 @@ export class PoiSelectAutocompleteInterceptor extends AutocompleteInterceptor {
         .query()
         .onlyStorage()
         .search(focused.value.toString())
+        .limit(25)
         .getMany();
 
       return interaction.respond(
-        results
-          .map((result) => {
-            return {
-              name: result.getName(),
-              value: result.id,
-            };
-          })
-          .slice(0, 25),
+        results.map((result) => {
+          return {
+            name: result.getName(),
+            value: result.id,
+          };
+        }),
       );
     }
   }

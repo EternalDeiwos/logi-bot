@@ -59,4 +59,9 @@ export class PoiQueryBuilder extends CommonQueryBuilder<CurrentPoi> {
     this.qb.leftJoinAndSelect('poi.logs', 'log');
     return this;
   }
+
+  order() {
+    this.qb.addOrderBy('poi.major_name');
+    return this;
+  }
 }
