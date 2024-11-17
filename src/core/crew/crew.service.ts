@@ -94,6 +94,13 @@ export class CrewServiceImpl extends CrewService {
     data.shortName = data.shortName || data.name;
     data.slug = data.slug || toSlug(data.name);
 
+    if (/[^a-zA-Z0-9-_ ]/.test(data.shortName)) {
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        'Discord role names cannot contain special characters. The main crew `name` can contain special characters _if_ you provide a `short_name` option without non-alphanumeric characters. Allowed special characters include spaces, dash (`-`) and underscore (`_`).',
+      ).asDisplayable();
+    }
+
     if (data.shortName.length > 20) {
       throw new ValidationError(
         'VALIDATION_FAILED',
