@@ -19,10 +19,17 @@ import {
 } from './stockpile-entry.repository';
 import { StockpileUpdateConsumer } from './stockpile-update.consumer';
 import { StockpileController } from './stockpile.controller';
+import { StockpileAccess } from './stockpile-access.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Stockpile, StockpileLog, StockpileEntry, CurrentStockpileEntry]),
+    TypeOrmModule.forFeature([
+      Stockpile,
+      StockpileLog,
+      StockpileEntry,
+      CurrentStockpileEntry,
+      StockpileAccess,
+    ]),
     BotModule,
     GuildModule,
     CoreModule,

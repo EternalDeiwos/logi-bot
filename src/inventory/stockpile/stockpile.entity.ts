@@ -18,12 +18,22 @@ import { War } from 'src/game/war/war.entity';
 import { ExpandedPoi, Poi } from 'src/game/poi/poi.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { StockpileEntry } from './stockpile-entry.entity';
+import { StockpileAccess } from './stockpile-access.entity';
 
 export type SelectStockpile = DeepPartial<Pick<Stockpile, 'id'>>;
 export type InsertStockpile = DeepPartial<
   Omit<
     Stockpile,
-    'id' | 'war' | 'location' | 'guild' | 'entries' | 'deletedAt' | 'deletedBy' | 'createdAt'
+    | 'id'
+    | 'war'
+    | 'location'
+    | 'guild'
+    | 'entries'
+    | 'items'
+    | 'access'
+    | 'deletedAt'
+    | 'deletedBy'
+    | 'createdAt'
   >
 >;
 
@@ -103,6 +113,12 @@ export class Stockpile {
   @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => StockpileEntry, (entry) => entry.stockpile)
   items: StockpileEntry[];
+
+  @Expose()
+  @Type(() => StockpileAccess)
+  @Transform(({ value }) => (value ? value : null))
+  @OneToMany(() => StockpileAccess, (entry) => entry.stockpile)
+  access: StockpileAccess[];
 
   @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })
