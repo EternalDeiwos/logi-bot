@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, IsNull, Repository } from 'typeorm';
 import { CommonRepository } from 'src/database/util';
 import { RegionLog } from 'src/game/region/region-log.entity';
-import { CurrentPoi, Poi } from './poi.entity';
+import { ExpandedPoi, Poi } from './poi.entity';
 
 @Injectable()
 export class PoiRepository extends CommonRepository<Poi> {
@@ -57,8 +57,8 @@ export class PoiRepository extends CommonRepository<Poi> {
 }
 
 @Injectable()
-export class CurrentPoiRepository extends Repository<CurrentPoi> {
+export class ExpandedPoiRepository extends Repository<ExpandedPoi> {
   constructor(private readonly dataSource: DataSource) {
-    super(CurrentPoi, dataSource.createEntityManager());
+    super(ExpandedPoi, dataSource.createEntityManager());
   }
 }

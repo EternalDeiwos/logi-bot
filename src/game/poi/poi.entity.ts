@@ -7,7 +7,6 @@ import {
   ManyToOne,
   JoinColumn,
   ViewEntity,
-  ViewColumn,
   DeleteDateColumn,
   DeepPartial,
   OneToMany,
@@ -30,6 +29,7 @@ export type ArchivePoi = SelectPoi & { archiveSf?: Snowflake; tag?: string };
 @Entity()
 export class Poi {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_poi_id' })
+  @Expose()
   id: string;
 
   @Column({ type: 'uuid', name: 'region_id' })
@@ -38,6 +38,9 @@ export class Poi {
   regionId: string;
 
   @ManyToOne(() => Region, { onDelete: 'RESTRICT' })
+  @Expose()
+  @Type(() => Region)
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'region_id',
     referencedColumnName: 'id',
@@ -46,6 +49,7 @@ export class Poi {
   region: Region;
 
   @Column({ name: 'war_number', type: 'int8' })
+  @Expose()
   @RelationId((poi: Poi) => poi.war)
   @Index('war_number_idx_poi')
   warNumber: string;
@@ -71,16 +75,20 @@ export class Poi {
   logs: StockpileLog[];
 
   @Column({ name: 'marker_type', type: 'int4' })
+  @Expose()
   @Index('marker_type_idx_poi')
   markerType: PoiMarkerType;
 
   @Column({ type: 'float8' })
+  @Expose()
   x: number;
 
   @Column({ type: 'float8' })
+  @Expose()
   y: number;
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
+  @Expose()
   deletedAt: Date;
 
   getName() {
@@ -122,10 +130,10 @@ export class Poi {
 }
 
 @ViewEntity({
-  name: 'poi_current',
+  name: 'poi_expanded',
   expression: (ds) =>
     ds
-      .createQueryBuilder()
+      .createQueryBuilder(Poi, 'p')
       .select([
         'p.id id',
         'r.hex_id hex_id',
@@ -140,55 +148,80 @@ export class Poi {
         'r.major_name major_name',
         'r.minor_name minor_name',
         'r.slang slang',
+        'p.deleted_at deleted_at',
       ])
-      .from(Poi, 'p')
-      .innerJoin(Region, 'r', 'r.id=p.region_id')
-      .where('p.deleted_at IS NULL'),
+      .innerJoin('p.region', 'r'),
 })
-export class CurrentPoi {
-  @ViewColumn()
+export class ExpandedPoi {
+  @Column({ type: 'int8' })
+  @Expose()
   id: string;
 
-  @ViewColumn({ name: 'hex_id' })
+  @Column({ type: 'int8', name: 'hex_id' })
+  @Expose()
   hexId: string;
 
-  @ViewColumn({ name: 'region_id' })
+  @Column({ type: 'uuid', name: 'region_id' })
   regionId: string;
 
-  @ViewColumn({ name: 'war_number' })
+  @Column({ type: 'int8', name: 'war_number' })
+  @Expose()
   warNumber: string;
 
-  @ViewColumn()
+  @Column({ type: 'float8' })
+  @Expose()
   x: number;
 
-  @ViewColumn()
+  @Column({ type: 'float8' })
+  @Expose()
   y: number;
 
-  @ViewColumn()
+  @Column({ type: 'float8' })
+  @Expose()
   rx: number;
 
-  @ViewColumn()
+  @Column({ type: 'float8' })
+  @Expose()
   ry: number;
 
-  @ViewColumn({ name: 'marker_type' })
+  @Column({ name: 'marker_type', type: 'int4' })
+  @Expose()
   markerType: PoiMarkerType;
 
-  @ViewColumn({ name: 'hex_name' })
+  @Column({ name: 'hex_name' })
+  @Expose()
   hexName: string;
 
-  @ViewColumn({ name: 'major_name' })
+  @Column({ name: 'major_name' })
+  @Expose()
   majorName: string;
 
-  @ViewColumn({ name: 'minor_name' })
+  @Column({ name: 'minor_name' })
+  @Expose()
   minorName: string;
 
-  @ViewColumn()
+  @Column({ type: 'text', array: true })
+  @Expose()
   slang: string[];
 
-  @OneToMany(() => Stockpile, (stockpile) => stockpile.location)
+  @Column({ name: 'deleted_at' })
+  @Expose()
+  deletedAt?: Date;
+
+  @OneToMany(() => Stockpile, (stockpile) => stockpile.expandedLocation, {
+    createForeignKeyConstraints: false,
+  })
+  @Expose()
+  @Type(() => Stockpile)
+  @Transform(({ value }) => (value ? value : null))
   stockpiles: Stockpile[];
 
-  @OneToMany(() => StockpileLog, (log) => log.location)
+  @OneToMany(() => StockpileLog, (log) => log.expandedLocation, {
+    createForeignKeyConstraints: false,
+  })
+  @Expose()
+  @Type(() => StockpileLog)
+  @Transform(({ value }) => (value ? value : null))
   logs: StockpileLog[];
 
   getName() {

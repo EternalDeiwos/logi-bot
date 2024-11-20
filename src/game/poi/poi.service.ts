@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RegionService } from 'src/game/region/region.service';
 import { BaseError } from 'src/errors';
-import { CurrentPoiRepository, PoiRepository } from './poi.repository';
+import { ExpandedPoiRepository, PoiRepository } from './poi.repository';
 import { PoiQueryBuilder } from './poi.query';
 
 export abstract class PoiService {
@@ -17,13 +17,13 @@ export class PoiServiceImpl extends PoiService {
   constructor(
     private readonly regionService: RegionService,
     private readonly poiRepo: PoiRepository,
-    private readonly currentPoiRepo: CurrentPoiRepository,
+    private readonly expandedPoiRepo: ExpandedPoiRepository,
   ) {
     super();
   }
 
   query() {
-    return new PoiQueryBuilder(this.currentPoiRepo);
+    return new PoiQueryBuilder(this.expandedPoiRepo);
   }
 
   async populatePoi() {
@@ -44,7 +44,7 @@ export class PoiServiceImpl extends PoiService {
 
   async countActive() {
     try {
-      return this.currentPoiRepo.count();
+      return this.query().getCount();
     } catch (err) {
       throw new BaseError('QUERY_FAILED', 'Failed to get poi', err);
     }
