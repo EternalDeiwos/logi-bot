@@ -1,3 +1,4 @@
+import { Expose } from 'class-transformer';
 import {
   Entity,
   Column,
@@ -24,21 +25,26 @@ export class Catalog {
   id: string;
 
   @Column({ name: 'foxhole_version' })
+  @Expose()
   gameVersion: string;
 
   @Column({ name: 'catalog_version' })
+  @Expose()
   catalogVersion: string;
 
   @Column({ name: 'code_name' })
+  @Expose()
   name: string;
 
   @Column({ type: 'text', array: true, default: [] })
+  @Expose()
   slang: string[];
 
   @Column('jsonb')
   data: any;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @Expose()
   createdAt: Date;
 }
 
@@ -145,41 +151,53 @@ export class ExpandedCatalog {
   id: string;
 
   @Column({ name: 'foxhole_version' })
+  @Expose()
   gameVersion: string;
 
   @Column({ name: 'catalog_version' })
+  @Expose()
   catalogVersion: string;
 
   @Column({ name: 'code_name' })
+  @Expose()
   name: string;
 
   @Column({ type: 'text', array: true })
+  @Expose()
   slang: string[];
 
   @Column({ name: 'display_name' })
+  @Expose()
   displayName: string;
 
   @Column()
+  @Expose()
   faction: WarFaction;
 
   @Column({ name: 'category' })
+  @Expose()
   category: string;
 
   @Column({ name: 'crate_quantity' })
+  @Expose()
   crateQuantity: number;
 
   @Column({ name: 'shippable_quantity' })
+  @Expose()
   shippableQuantity: number;
 
   @Column({ name: 'crate_stockpile_maximum' })
+  @Expose()
   crateMax: number;
 
   @Column({ name: 'shippable_stockpile_maximum' })
+  @Expose()
   shippableMax: number;
 
   @Column({ type: 'jsonb' })
   data: any;
 
   @Column({ name: 'created_at', type: 'timestamptz' })
+  @Expose()
   createdAt: Date;
 }

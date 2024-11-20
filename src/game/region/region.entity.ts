@@ -1,3 +1,4 @@
+import { Expose, Type } from 'class-transformer';
 import {
   Entity,
   Column,
@@ -17,31 +18,40 @@ export class Region {
     default: () => 'uuidv7()',
     primaryKeyConstraintName: 'pk_region_id',
   })
+  @Expose()
   id: string;
 
   @Column({ name: 'hex_id', type: 'int8' })
+  @Expose()
   @Index('hex_idx_region')
   hexId: string;
 
   @Column({ name: 'map_name' })
+  @Expose()
   mapName: string;
 
   @Column({ name: 'hex_name' })
+  @Expose()
   hexName: string;
 
   @Column({ name: 'major_name', nullable: true })
+  @Expose()
   majorName?: string;
 
   @Column({ name: 'minor_name', nullable: true })
+  @Expose()
   minorName?: string;
 
   @Column({ type: 'text', array: true, default: [] })
+  @Expose()
   slang?: string[];
 
   @Column({ type: 'float8' })
+  @Expose()
   x: number;
 
   @Column({ type: 'float8' })
+  @Expose()
   y: number;
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
@@ -55,29 +65,38 @@ export class Region {
 })
 export class CurrentRegion {
   @ViewColumn()
+  @Expose()
   id: string;
 
   @ViewColumn({ name: 'hex_id' })
+  @Expose()
   hexId: string;
 
   @ViewColumn({ name: 'map_name' })
+  @Expose()
   mapName: string;
 
   @ViewColumn({ name: 'hex_name' })
+  @Expose()
   hexName: string;
 
   @ViewColumn({ name: 'major_name' })
+  @Expose()
   majorName?: string;
 
   @ViewColumn({ name: 'minor_name' })
+  @Expose()
   minorName?: string;
 
   @ViewColumn()
+  @Expose()
   slang?: string[];
 
   @ViewColumn()
+  @Expose()
   x: number;
 
   @ViewColumn()
+  @Expose()
   y: number;
 }
