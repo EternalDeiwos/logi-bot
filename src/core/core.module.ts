@@ -35,6 +35,7 @@ import { TicketService, TicketServiceImpl } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
 import { TicketRepository } from './ticket/ticket.repository';
 import { TicketController } from './ticket/ticket.controller';
+import { AccessModule } from './access/access.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { TicketController } from './ticket/ticket.controller';
     BotModule,
     GuildModule,
     ApiModule,
+    AccessModule,
     TypeOrmModule.forFeature([
       Team,
       Crew,
