@@ -89,12 +89,7 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
   }
 
   withPoi() {
-    this.qb.leftJoinAndSelect('stockpile.location', 'poi');
-    return this;
-  }
-
-  withRegion() {
-    this.qb.leftJoinAndSelect('poi.region', 'region');
+    this.qb.leftJoinAndSelect('stockpile.expandedLocation', 'poi');
     return this;
   }
 
@@ -104,12 +99,12 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
   }
 
   withCatalog() {
-    this.qb.leftJoinAndSelect('entry.catalog', 'catalog');
+    this.qb.leftJoinAndSelect('entry.expandedCatalog', 'catalog');
     return this;
   }
 
   order() {
-    this.qb.addOrderBy('region.major_name').addOrderBy('stockpile.name');
+    this.qb.addOrderBy('poi.major_name').addOrderBy('stockpile.name');
     return this;
   }
 }

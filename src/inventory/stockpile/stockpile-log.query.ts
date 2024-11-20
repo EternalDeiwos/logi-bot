@@ -65,12 +65,7 @@ export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
   }
 
   withPoi() {
-    this.qb.leftJoinAndSelect('log.location', 'poi');
-    return this;
-  }
-
-  withRegion() {
-    this.qb.leftJoinAndSelect('poi.region', 'region');
+    this.qb.leftJoinAndSelect('log.expandedLocation', 'poi');
     return this;
   }
 

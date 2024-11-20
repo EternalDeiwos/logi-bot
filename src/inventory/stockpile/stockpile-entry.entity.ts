@@ -1,4 +1,4 @@
-import { Expose, Transform } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import { Snowflake } from 'discord.js';
 import {
   Entity,
@@ -8,7 +8,6 @@ import {
   ManyToOne,
   JoinColumn,
   ViewEntity,
-  ViewColumn,
   PrimaryColumn,
   CreateDateColumn,
   DeepPartial,
@@ -59,7 +58,7 @@ export class StockpileEntry {
   })
   log: StockpileLog;
 
-  @Column({ name: 'stockpile_id', type: 'int8' })
+  @Column({ name: 'stockpile_id', type: 'uuid' })
   @RelationId((entry: StockpileEntry) => entry.stockpile)
   @Index('stockpile_id_idx_stockpile_entry')
   stockpileId: string;
@@ -86,6 +85,9 @@ export class StockpileEntry {
   catalog: Catalog;
 
   @ManyToOne(() => ExpandedCatalog, { createForeignKeyConstraints: false })
+  @Expose({ name: 'catalog' })
+  @Type(() => ExpandedCatalog)
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'catalog_id',
     referencedColumnName: 'id',
@@ -111,8 +113,6 @@ export class StockpileEntry {
   guildId: string;
 
   @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
-  @Expose()
-  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'guild_id',
     referencedColumnName: 'id',
@@ -121,20 +121,23 @@ export class StockpileEntry {
   guild: Guild;
 
   @Column({ type: 'int4', name: 'quantity_uncrated', default: 0 })
+  @Expose()
   quantity: number;
 
   @Column({ type: 'int4', name: 'quantity_crated', default: 0 })
+  @Expose()
   quantityCrated: number;
 
   @Column({ type: 'int4', name: 'quantity_shippable', default: 0 })
+  @Expose()
   quantityShippable: number;
 
-  @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })
+  @Expose()
   createdBy: Snowflake;
 
-  @Expose()
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
+  @Expose()
   createdAt: Date;
 
   getValue(): string {
@@ -160,64 +163,112 @@ export class StockpileEntry {
   name: 'stockpile_entry_current',
   expression: (ds) =>
     ds
-      .createQueryBuilder(StockpileEntry, 'entry')
+      .createQueryBuilder()
       .distinctOn(['entry.stockpile_id', 'entry.catalog_id'])
+      .select('entry.*')
+      .from(StockpileEntry, 'entry')
       .withDeleted()
-      .leftJoinAndSelect('entry.log', 'log')
-      .leftJoinAndSelect('entry.expandedCatalog', 'catalog')
-      .andWhere('log.deleted_at IS NULL')
+      .leftJoinAndSelect('entry.log', 'l')
+      .leftJoinAndSelect('entry.expandedCatalog', 'c')
+      .andWhere('l.deleted_at IS NULL')
       .orderBy('entry.stockpile_id')
       .addOrderBy('entry.catalog_id')
       .addOrderBy('entry.created_at', 'DESC'),
 })
 export class CurrentStockpileEntry {
-  @ViewColumn()
+  @Column({ type: 'uuid' })
   id: string;
 
-  @ViewColumn({ name: 'log_id' })
+  @Column({ type: 'uuid', name: 'log_id' })
+  @RelationId((entry: CurrentStockpileEntry) => entry.log)
   logId: string;
 
   @ManyToOne(() => StockpileLog)
+  @JoinColumn({
+    name: 'log_id',
+    referencedColumnName: 'id',
+  })
   log: StockpileLog;
 
-  @ViewColumn({ name: 'stockpile_id' })
+  @Column({ type: 'uuid', name: 'stockpile_id' })
+  @RelationId((entry: CurrentStockpileEntry) => entry.stockpile)
   stockpileId: string;
 
   @ManyToOne(() => Stockpile)
+  @JoinColumn({
+    name: 'stockpile_id',
+    referencedColumnName: 'id',
+  })
   stockpile: Stockpile;
 
-  @ViewColumn({ name: 'catalog_id' })
+  @Column({ type: 'uuid', name: 'catalog_id' })
   catalogId: string;
 
   @ManyToOne(() => ExpandedCatalog)
   catalog: ExpandedCatalog;
 
-  @ViewColumn({ name: 'war_number' })
+  @ManyToOne(() => ExpandedCatalog)
+  @Expose({ name: 'catalog' })
+  @Type(() => ExpandedCatalog)
+  @Transform(({ value }) => (value ? value : null))
+  @JoinColumn({
+    name: 'catalog_id',
+    referencedColumnName: 'id',
+  })
+  expandedCatalog: ExpandedCatalog;
+
+  @Column({ type: 'int8', name: 'war_number' })
   warNumber: string;
 
   @ManyToOne(() => War)
+  @JoinColumn({
+    name: 'war_number',
+    referencedColumnName: 'warNumber',
+  })
   war: War;
 
-  @ViewColumn({ name: 'guild_id' })
+  @Column({ type: 'uuid', name: 'guild_id' })
   guildId: string;
 
   @ManyToOne(() => Guild)
+  @JoinColumn({
+    name: 'guild_id',
+    referencedColumnName: 'id',
+  })
   guild: Guild;
 
-  @ViewColumn({ name: 'quantity_uncrated' })
+  @Column({ type: 'int4', name: 'quantity_uncrated' })
   quantity: number;
 
-  @ViewColumn({ name: 'quantity_crated' })
+  @Column({ type: 'int4', name: 'quantity_crated' })
   quantityCrated: number;
 
-  @ViewColumn({ name: 'quantity_shippable' })
+  @Column({ type: 'int4', name: 'quantity_shippable' })
   quantityShippable: number;
 
   @Expose()
-  @ViewColumn({ name: 'created_by_sf' })
+  @Column({ type: 'int8', name: 'created_by_sf' })
   createdBy: Snowflake;
 
   @Expose()
-  @ViewColumn({ name: 'created_at' })
+  @Column({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
+
+  getValue(): string {
+    const counts = [];
+
+    if (this.quantityShippable) {
+      counts.push(`${this.quantityShippable}sc`);
+    }
+
+    if (this.quantityCrated) {
+      counts.push(`${this.quantityCrated}c`);
+    }
+
+    if (this.quantity) {
+      counts.push(this.quantity);
+    }
+
+    return counts.length ? counts.join(' + ') : 'None';
+  }
 }

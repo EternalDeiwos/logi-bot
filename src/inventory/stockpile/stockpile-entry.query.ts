@@ -5,7 +5,7 @@ import { SelectPoi } from 'src/game/poi/poi.entity';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { SelectCatalog } from 'src/game/catalog/catalog.entity';
 import { SelectStockpile } from './stockpile.entity';
-import { StockpileEntry } from './stockpile-entry.entity';
+import { CurrentStockpileEntry } from './stockpile-entry.entity';
 
 type SelectCatalogId = Pick<SelectCatalog, 'id'>;
 
@@ -13,9 +13,9 @@ const searchWhere = (alias: string = 'catalog') => {
   return new Brackets((qb) => qb.where(`(${alias}.data->'DisplayName')::text ILIKE :query`));
 };
 
-export class StockpileEntryQueryBuilder extends CommonQueryBuilder<StockpileEntry> {
+export class StockpileEntryQueryBuilder extends CommonQueryBuilder<CurrentStockpileEntry> {
   constructor(
-    repo: Repository<StockpileEntry>,
+    repo: Repository<CurrentStockpileEntry>,
     private readonly gameVersion: string,
     private readonly catalogVersion: string,
   ) {
@@ -176,7 +176,7 @@ export class StockpileEntryQueryBuilder extends CommonQueryBuilder<StockpileEntr
   }
 
   withPoi() {
-    this.qb.leftJoinAndSelect('log.location', 'poi');
+    this.qb.leftJoinAndSelect('log.expandedLocation', 'poi');
     return this;
   }
 
@@ -185,22 +185,18 @@ export class StockpileEntryQueryBuilder extends CommonQueryBuilder<StockpileEntr
     return this;
   }
 
-  withRegion() {
-    this.qb.innerJoinAndSelect('poi.region', 'region');
-    return this;
-  }
-
   order() {
     this.qb
       .addOrderBy('catalog.category')
       .addOrderBy('catalog.display_name')
-      .addOrderBy('region.major_name')
+      .addOrderBy('catalog.id')
+      .addOrderBy('poi.major_name')
       .addOrderBy('stockpile.name');
     return this;
   }
 
   distinctOnCatalog() {
-    this.qb.distinctOn(['catalog.id']);
+    this.qb.distinctOn(['catalog.category', 'catalog.display_name', 'catalog.id']);
     return this;
   }
 }

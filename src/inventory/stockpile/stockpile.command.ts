@@ -245,7 +245,6 @@ export class StockpileCommand {
       .withCatalog()
       .withLog()
       .withPoi()
-      .withRegion()
       .withStockpile()
       .forDefaultCatalog()
       .byGuild({ guildSf: interaction.guildId });

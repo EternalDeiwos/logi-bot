@@ -29,10 +29,10 @@ export class StockpileContentPromptBuilder extends BasePromptBuilder {
 
     const [name, stockpile, quantity] = entries.reduce(
       (state, e) => {
-        const locationMarkerName = e.log.location.region.hexName
+        const locationMarkerName = e.log.expandedLocation.hexName
           .toLowerCase()
           .split(' ')
-          .concat(e.log.location.region.majorName.toLowerCase().split(' '))
+          .concat(e.log.expandedLocation.majorName.toLowerCase().split(' '))
           .join('_');
 
         const locationMarker = this.emojis.find((emoji) => emoji.name === locationMarkerName);

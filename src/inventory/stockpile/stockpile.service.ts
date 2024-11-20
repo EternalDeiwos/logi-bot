@@ -6,7 +6,10 @@ import { WarService } from 'src/game/war/war.service';
 import { InsertStockpile } from './stockpile.entity';
 import { StockpileRepository } from './stockpile.repository';
 import { StockpileLogRepository } from './stockpile-log.repository';
-import { StockpileEntryRepository } from './stockpile-entry.repository';
+import {
+  CurrentStockpileEntryRepository,
+  StockpileEntryRepository,
+} from './stockpile-entry.repository';
 import { StockpileQueryBuilder } from './stockpile.query';
 import { InsertStockpileLog } from './stockpile-log.entity';
 import { StockpileLogQueryBuilder } from './stockpile-log.query';
@@ -31,6 +34,7 @@ export class StockpileServiceImpl extends StockpileService {
     private readonly warService: WarService,
     private readonly stockpileRepo: StockpileRepository,
     private readonly logRepo: StockpileLogRepository,
+    private readonly currentEntryRepo: CurrentStockpileEntryRepository,
     private readonly entryRepo: StockpileEntryRepository,
   ) {
     super();
@@ -47,7 +51,7 @@ export class StockpileServiceImpl extends StockpileService {
   queryEntries() {
     const gameVersion = this.configService.getOrThrow<string>('APP_FOXHOLE_VERSION');
     const catalogVersion = this.configService.getOrThrow<string>('APP_CATALOG_VERSION');
-    return new StockpileEntryQueryBuilder(this.entryRepo, gameVersion, catalogVersion);
+    return new StockpileEntryQueryBuilder(this.currentEntryRepo, gameVersion, catalogVersion);
   }
 
   async registerStockpile(data: InsertStockpile) {

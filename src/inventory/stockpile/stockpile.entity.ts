@@ -15,7 +15,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { War } from 'src/game/war/war.entity';
-import { Poi } from 'src/game/poi/poi.entity';
+import { ExpandedPoi, Poi } from 'src/game/poi/poi.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { StockpileEntry } from './stockpile-entry.entity';
 
@@ -35,6 +35,7 @@ export class Stockpile {
     default: () => 'uuidv7()',
     primaryKeyConstraintName: 'pk_stockpile_id',
   })
+  @Expose()
   id: string;
 
   @Column({ name: 'location_id', type: 'int8' })
@@ -42,7 +43,7 @@ export class Stockpile {
   @Index('location_id_idx_stockpile')
   locationId: string;
 
-  @ManyToOne(() => Poi, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Poi, (poi) => poi.stockpiles, { onDelete: 'RESTRICT' })
   @JoinColumn({
     name: 'location_id',
     referencedColumnName: 'id',
@@ -50,7 +51,18 @@ export class Stockpile {
   })
   location: Poi;
 
+  @ManyToOne(() => ExpandedPoi, (poi) => poi.stockpiles, { createForeignKeyConstraints: false })
+  @Expose({ name: 'location' })
+  @Type(() => ExpandedPoi)
+  @Transform(({ value }) => (value ? value : null))
+  @JoinColumn({
+    name: 'location_id',
+    referencedColumnName: 'id',
+  })
+  expandedLocation: ExpandedPoi;
+
   @Column({ name: 'war_number', type: 'int8' })
+  @Expose()
   @RelationId((stockpile: Stockpile) => stockpile.war)
   @Index('war_number_idx_stockpile')
   warNumber: string;
@@ -70,6 +82,7 @@ export class Stockpile {
 
   @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
   @Expose()
+  @Type(() => Guild)
   @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'guild_id',
@@ -82,7 +95,6 @@ export class Stockpile {
   @Column()
   name: string;
 
-  @Expose()
   @Column({ default: '000000' })
   code: string;
 

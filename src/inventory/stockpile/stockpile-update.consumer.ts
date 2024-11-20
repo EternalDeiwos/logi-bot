@@ -31,7 +31,6 @@ export class StockpileUpdateConsumer {
       .byLog(payload)
       .withCrew()
       .withPoi()
-      .withRegion()
       .withStockpiles()
       .getOneOrFail();
 
@@ -60,14 +59,16 @@ export class StockpileUpdateConsumer {
         const isShippable = item.shippableMax > 0;
         const quantity = parseInt(record.Quantity);
 
-        const entry = state[record.CodeName] || {
-          logId: log.id,
-          guildId: log.guildId,
-          createdBy: log.createdBy,
-          warNumber: log.warNumber,
-          catalogId: item.id,
-          stockpileId: stockpile.id,
-        };
+        const entry =
+          state[record.CodeName] ||
+          ({
+            logId: log.id,
+            guildId: log.guildId,
+            createdBy: log.createdBy,
+            warNumber: log.warNumber,
+            catalogId: item.id,
+            stockpileId: stockpile.id,
+          } as InsertStockpileEntry);
 
         if (record['Crated?'] === 'true') {
           if (isShippable) {

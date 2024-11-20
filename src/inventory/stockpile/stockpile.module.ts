@@ -18,6 +18,7 @@ import {
   StockpileEntryRepository,
 } from './stockpile-entry.repository';
 import { StockpileUpdateConsumer } from './stockpile-update.consumer';
+import { StockpileController } from './stockpile.controller';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { StockpileUpdateConsumer } from './stockpile-update.consumer';
     StockpileUpdateConsumer,
     StockpileCommand,
   ],
+  controllers: [StockpileController],
   exports: [StockpileService],
 })
 export class StockpileModule {}

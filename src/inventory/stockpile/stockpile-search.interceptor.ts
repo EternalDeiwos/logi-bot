@@ -10,9 +10,6 @@ export class StockpileSearchAutocompleteInterceptor extends AutocompleteIntercep
   private readonly logger = new Logger(StockpileSearchAutocompleteInterceptor.name);
 
   @Inject()
-  private readonly crewService: CrewService;
-
-  @Inject()
   private readonly poiService: PoiService;
 
   @Inject()
@@ -41,7 +38,12 @@ export class StockpileSearchAutocompleteInterceptor extends AutocompleteIntercep
     }
 
     if (focused.name === 'catalog') {
-      const query = await this.stockpileService.queryEntries().withLog().withCatalog();
+      const query = await this.stockpileService
+        .queryEntries()
+        .withLog()
+        .withCatalog()
+        .withPoi()
+        .withStockpile();
       const locationId = interaction.options.getString('location', false);
       const stockpileId = interaction.options.getString('stockpile', false);
 
@@ -59,7 +61,7 @@ export class StockpileSearchAutocompleteInterceptor extends AutocompleteIntercep
       return interaction.respond(
         results.map((result) => {
           return {
-            name: result.catalog.data.DisplayName,
+            name: result.expandedCatalog.displayName,
             value: result.catalogId,
           };
         }),
@@ -70,7 +72,6 @@ export class StockpileSearchAutocompleteInterceptor extends AutocompleteIntercep
       const query = await this.stockpileService
         .query()
         .withPoi()
-        .withRegion()
         .withGuild()
         .byGuild({ guildSf: interaction.guildId });
       const locationId = interaction.options.getString('location', false);

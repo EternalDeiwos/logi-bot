@@ -15,7 +15,7 @@ import { Snowflake } from 'discord.js';
 import { Expose, Transform, Type } from 'class-transformer';
 import { War } from 'src/game/war/war.entity';
 import { Guild } from 'src/core/guild/guild.entity';
-import { Poi } from 'src/game/poi/poi.entity';
+import { ExpandedPoi, Poi } from 'src/game/poi/poi.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 import { StockpileEntry } from './stockpile-entry.entity';
 
@@ -50,6 +50,9 @@ export class StockpileLog {
   crewSf: string;
 
   @ManyToOne(() => Crew, { onDelete: 'NO ACTION' })
+  @Expose()
+  @Type(() => Crew)
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'crew_channel_sf',
     referencedColumnName: 'crewSf',
@@ -62,7 +65,10 @@ export class StockpileLog {
   @Index('location_id_idx_stockpile_log')
   locationId: string;
 
-  @ManyToOne(() => Poi, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Poi, (poi) => poi.logs, { onDelete: 'RESTRICT' })
+  @Expose()
+  @Type(() => Poi)
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'location_id',
     referencedColumnName: 'id',
@@ -70,7 +76,18 @@ export class StockpileLog {
   })
   location: Poi;
 
+  @ManyToOne(() => ExpandedPoi, (poi) => poi.logs, { createForeignKeyConstraints: false })
+  @Expose({ name: 'location' })
+  @Type(() => ExpandedPoi)
+  @Transform(({ value }) => (value ? value : null))
+  @JoinColumn({
+    name: 'location_id',
+    referencedColumnName: 'id',
+  })
+  expandedLocation: ExpandedPoi;
+
   @Column({ name: 'war_number', type: 'int8' })
+  @Expose()
   @RelationId((log: StockpileLog) => log.war)
   @Index('war_number_idx_stockpile_log')
   warNumber: string;
@@ -90,6 +107,7 @@ export class StockpileLog {
 
   @ManyToOne(() => Guild, { onDelete: 'CASCADE', eager: true })
   @Expose()
+  @Type(() => Guild)
   @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'guild_id',
