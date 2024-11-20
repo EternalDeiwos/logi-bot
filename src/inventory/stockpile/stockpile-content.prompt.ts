@@ -1,11 +1,4 @@
-import {
-  EmbedBuilder,
-  Colors,
-  Collection,
-  ApplicationEmoji,
-  BaseMessageOptions,
-  EmbedData,
-} from 'discord.js';
+import { EmbedBuilder, Colors, Collection, ApplicationEmoji, EmbedData } from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
 import { StockpileEntry } from './stockpile-entry.entity';
 import { InternalError } from 'src/errors';
@@ -29,18 +22,19 @@ export class StockpileContentPromptBuilder extends BasePromptBuilder {
 
     const [name, stockpile, quantity] = entries.reduce(
       (state, e) => {
-        const locationMarkerName = e.log.expandedLocation.hexName
-          .toLowerCase()
-          .split(' ')
-          .concat(e.log.expandedLocation.majorName.toLowerCase().split(' '))
-          .join('_');
+        // const locationMarkerName = e.log.expandedLocation.hexName
+        //   .toLowerCase()
+        //   .split(' ')
+        //   .concat(e.log.expandedLocation.majorName.toLowerCase().split(' '))
+        //   .join('_');
 
-        const locationMarker = this.emojis.find((emoji) => emoji.name === locationMarkerName);
+        // const locationMarker = this.emojis.find((emoji) => emoji.name === locationMarkerName);
 
         const [name, stockpile, quantity] = state;
         name.push(e.expandedCatalog.data.DisplayName);
         stockpile.push(
-          `${locationMarker ? locationMarker.toString() : locationMarkerName} ${e.stockpile.name}`,
+          // `${locationMarker ? locationMarker.toString() : locationMarkerName} ${e.stockpile.name}`,
+          `${e.stockpile.name} @ ${e.log.expandedLocation.getMajorName()}`,
         );
         quantity.push(e.getValue());
         return state;
