@@ -78,6 +78,43 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
     return this;
   }
 
+  unsafe_excludeStockpileEntriesByCodeName(
+    codeName: string | string[],
+    stockpileRef?: SelectStockpile,
+  ) {
+    if (!Array.isArray(codeName)) {
+      codeName = [codeName];
+    }
+
+    this.qb.andWhere(
+      new Brackets((qb) => {
+        let discriminator = '_excludeCodeName';
+
+        if (stockpileRef) {
+          discriminator = stockpileRef.id.replaceAll('-', '') + discriminator;
+          qb.andWhere(`stockpile.id='${stockpileRef.id}'`);
+        }
+
+        qb.andWhere(`catalog.code_name NOT IN (:...${discriminator})`, {
+          [discriminator]: codeName,
+        });
+      }),
+    );
+    return this;
+  }
+
+  withoutNilEntries() {
+    this.qb.andWhere(
+      new Brackets((qb) =>
+        qb
+          .where('entry.quantity_uncrated > 0')
+          .orWhere('entry.quantity_crated > 0')
+          .orWhere('entry.quantity_shippable > 0'),
+      ),
+    );
+    return this;
+  }
+
   search(query: string) {
     this.qb.andWhere(searchWhere(), { query: `%${query}%` });
     return this;
@@ -89,12 +126,22 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
   }
 
   withPoi() {
-    this.qb.leftJoinAndSelect('stockpile.expandedLocation', 'poi');
+    this.qb.innerJoinAndSelect('stockpile.expandedLocation', 'poi', 'poi.deleted_at IS NULL');
     return this;
   }
 
   withEntries() {
     this.qb.leftJoinAndSelect('stockpile.items', 'entry');
+    return this;
+  }
+
+  withCurrentEntries() {
+    this.qb.leftJoinAndSelect('stockpile.currentItems', 'entry');
+    return this;
+  }
+
+  withLogs() {
+    this.qb.leftJoinAndSelect('entry.log', 'log');
     return this;
   }
 

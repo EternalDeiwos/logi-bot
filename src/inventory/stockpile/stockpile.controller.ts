@@ -51,6 +51,7 @@ export class StockpileController {
       .withGuild()
       .withPoi()
       .withEntries()
+      .withoutNilEntries()
       .withCatalog()
       .byGuild({ guildSf: auth.aud })
       .byStockpile({ id })

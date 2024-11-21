@@ -145,6 +145,18 @@ export class StockpileEntryQueryBuilder extends CommonQueryBuilder<CurrentStockp
     return this;
   }
 
+  withoutNilEntries() {
+    this.qb.andWhere(
+      new Brackets((qb) =>
+        qb
+          .where('entry.quantity_uncrated > 0')
+          .orWhere('entry.quantity_crated > 0')
+          .orWhere('entry.quantity_shippable > 0'),
+      ),
+    );
+    return this;
+  }
+
   searchByCatalog(query: string) {
     this.qb.andWhere(searchWhere(), { query: `%${query}%` });
     return this;

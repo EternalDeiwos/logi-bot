@@ -89,7 +89,7 @@ export class StockpileSearchAutocompleteInterceptor extends AutocompleteIntercep
       return interaction.respond(
         results.map((result) => {
           return {
-            name: `${result.location.getName()}: ${result.name}`,
+            name: `${result.expandedLocation.getName()}: ${result.name}`,
             value: result.id,
           };
         }),

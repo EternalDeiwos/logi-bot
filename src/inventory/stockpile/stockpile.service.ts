@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InsertResult } from 'typeorm';
+import { InsertResult, UpdateResult } from 'typeorm';
 import { ValidationError } from 'src/errors';
 import { WarService } from 'src/game/war/war.service';
 import { InsertStockpile } from './stockpile.entity';
@@ -11,7 +11,7 @@ import {
   StockpileEntryRepository,
 } from './stockpile-entry.repository';
 import { StockpileQueryBuilder } from './stockpile.query';
-import { InsertStockpileLog } from './stockpile-log.entity';
+import { InsertStockpileLog, SelectStockpileLog } from './stockpile-log.entity';
 import { StockpileLogQueryBuilder } from './stockpile-log.query';
 import { InsertStockpileEntry } from './stockpile-entry.entity';
 import { StockpileEntryQueryBuilder } from './stockpile-entry.query';
@@ -23,6 +23,7 @@ export abstract class StockpileService {
   abstract registerStockpile(data: InsertStockpile): Promise<void>;
   abstract registerLog(data: InsertStockpileLog): Promise<InsertResult>;
   abstract updateStockpile(data: InsertStockpileEntry[]): Promise<InsertResult>;
+  abstract completeLogProcessing(logRef: SelectStockpileLog): Promise<UpdateResult>;
 }
 
 @Injectable()
@@ -83,5 +84,10 @@ export class StockpileServiceImpl extends StockpileService {
 
   async updateStockpile(data: InsertStockpileEntry[]) {
     return await this.entryRepo.insert(data);
+  }
+
+  async completeLogProcessing(logRef: SelectStockpileLog) {
+    this.logger.debug('CLP', JSON.stringify(logRef));
+    return await this.logRepo.update(logRef, { processedAt: new Date() });
   }
 }

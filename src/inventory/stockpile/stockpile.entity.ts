@@ -17,7 +17,7 @@ import {
 import { War } from 'src/game/war/war.entity';
 import { ExpandedPoi, Poi } from 'src/game/poi/poi.entity';
 import { Guild } from 'src/core/guild/guild.entity';
-import { StockpileEntry } from './stockpile-entry.entity';
+import { CurrentStockpileEntry, StockpileEntry } from './stockpile-entry.entity';
 import { StockpileAccess } from './stockpile-access.entity';
 
 export type SelectStockpile = DeepPartial<Pick<Stockpile, 'id'>>;
@@ -113,6 +113,12 @@ export class Stockpile {
   @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => StockpileEntry, (entry) => entry.stockpile)
   items: StockpileEntry[];
+
+  @Expose()
+  @Type(() => CurrentStockpileEntry)
+  @Transform(({ value }) => (value ? value : null))
+  @OneToMany(() => CurrentStockpileEntry, (entry) => entry.stockpile)
+  currentItems: CurrentStockpileEntry[];
 
   @Expose()
   @Type(() => StockpileAccess)

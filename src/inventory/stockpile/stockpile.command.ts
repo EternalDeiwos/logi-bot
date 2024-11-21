@@ -246,6 +246,7 @@ export class StockpileCommand {
       .withLog()
       .withPoi()
       .withStockpile()
+      .withoutNilEntries()
       .forDefaultCatalog()
       .byGuild({ guildSf: interaction.guildId });
 
@@ -275,13 +276,7 @@ export class StockpileCommand {
       });
     }
 
-    const promptBuilt = prompt.build();
-    // this.logger.debug(JSON.stringify(promptBuilt, null, 2));
-    // const tmp = cloneDeepWith(promptBuilt, (v, k) => {
-    //   this.logger.debug(`${k}: ${v.length}`);
-    // });
-
     await this.client.application.emojis.fetch();
-    return this.botService.replyOrFollowUp(interaction, promptBuilt);
+    return this.botService.replyOrFollowUp(interaction, prompt.build());
   }
 }

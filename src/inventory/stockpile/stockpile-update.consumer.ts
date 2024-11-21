@@ -2,11 +2,12 @@ import { RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { parse } from 'csv-parse/sync';
 import { ConsumeMessage } from 'amqplib';
-import { mapKeys, uniq } from 'lodash';
+import { flattenDepth, mapKeys, uniq } from 'lodash';
 import { CatalogService } from 'src/game/catalog/catalog.service';
 import { StockpileService } from './stockpile.service';
-import { SelectStockpileLog } from './stockpile-log.entity';
+import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
 import { InsertStockpileEntry, StockpileReportRecord } from './stockpile-entry.entity';
+import { Stockpile } from './stockpile.entity';
 
 @Injectable()
 export class StockpileUpdateConsumer {
@@ -41,16 +42,78 @@ export class StockpileUpdateConsumer {
     }) as StockpileReportRecord[];
 
     const codeName = uniq(records.map((r) => r.CodeName));
-    const catalogList = await this.catalogService.query().byCodeName(codeName).getMany();
-    const catalog = mapKeys(catalogList, (r) => r.name);
+    // groups[stockpile][itemCode]
+    const groups = await this.mergeRecords(records, log, codeName);
+    const updateStockpileRefs = Object.keys(groups);
+    const ghostsQuery = await this.stockpileService
+      .query()
+      .byStockpile(updateStockpileRefs.map((id) => ({ id })))
+      .withCurrentEntries()
+      .withoutNilEntries()
+      .withLogs()
+      .withCatalog();
 
-    const entries: Record<string, InsertStockpileEntry> = records.reduce(
+    for (const [stockpileId, group] of Object.entries(groups)) {
+      ghostsQuery.unsafe_excludeStockpileEntriesByCodeName(Object.keys(group), { id: stockpileId });
+    }
+
+    const ghosts = await ghostsQuery.getMany();
+    const entries = [
+      // flatten groups into 1d array
+      ...flattenDepth(
+        Object.values(groups).map((group) => Object.values(group)),
+        2,
+      ),
+      ...this.reconcileGhosts(ghosts, log),
+    ];
+
+    await this.stockpileService.updateStockpile(entries);
+    await this.stockpileService.completeLogProcessing({ id: payload.id });
+
+    this.logger.log(
+      `Stockpile at the ${log.expandedLocation.getName()} updated by ${log.crew.name}`,
+    );
+  }
+
+  private reconcileGhosts(ghosts: Stockpile[], log: StockpileLog): InsertStockpileEntry[] {
+    const result: InsertStockpileEntry[] = [];
+
+    for (const stockpile of ghosts) {
+      for (const item of stockpile.currentItems) {
+        this.logger.log(
+          `${stockpile.name} at ${log.expandedLocation.getMajorName()}: Reduced to nil: ${item.expandedCatalog.displayName}`,
+        );
+        result.push({
+          logId: log.id,
+          guildId: log.guildId,
+          createdBy: log.createdBy,
+          warNumber: log.warNumber,
+          catalogId: item.expandedCatalog.id,
+          stockpileId: stockpile.id,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  private async mergeRecords(
+    records: StockpileReportRecord[],
+    log: StockpileLog,
+    codeName: string[],
+  ): Promise<Record<string, Record<string, InsertStockpileEntry>>> {
+    const items = await this.catalogService.query().byCodeName(codeName).getMany();
+    const catalog = mapKeys(items, (r) => r.name);
+
+    return records.reduce(
       (state, record) => {
-        const stockpile = log.location.stockpiles.find((s) => s.name === record['Stockpile Name']);
+        const stockpile = log.expandedLocation.stockpiles.find(
+          (s) => s.name === record['Stockpile Name'],
+        );
 
         if (!stockpile) {
           this.logger.warn(
-            `Unable to process stockpile report for ${record['Stockpile Name']} at the ${log.location.getName()}`,
+            `Unable to process stockpile report for ${record['Stockpile Name']} at the ${log.expandedLocation.getName()}`,
           );
           return state;
         }
@@ -59,8 +122,9 @@ export class StockpileUpdateConsumer {
         const isShippable = item.shippableMax > 0;
         const quantity = parseInt(record.Quantity);
 
+        state[stockpile.id] = state[stockpile.id] || {};
         const entry =
-          state[record.CodeName] ||
+          state[stockpile.id][record.CodeName] ||
           ({
             logId: log.id,
             guildId: log.guildId,
@@ -80,14 +144,11 @@ export class StockpileUpdateConsumer {
           entry.quantity = quantity;
         }
 
-        state[record.CodeName] = entry;
+        state[stockpile.id][record.CodeName] = entry;
 
         return state;
       },
-      {} as Record<string, InsertStockpileEntry>,
+      {} as Record<string, Record<string, InsertStockpileEntry>>,
     );
-
-    await this.stockpileService.updateStockpile(Object.values(entries));
-    this.logger.log(`Stockpile at the ${log.location.getName()} updated by ${log.crew.name}`);
   }
 }
