@@ -13,20 +13,19 @@ import {
 import { Snowflake } from 'discord.js';
 import { Expose, Transform, Type } from 'class-transformer';
 import { Guild } from 'src/core/guild/guild.entity';
-import { SelectCrew } from 'src/core/crew/crew.entity';
+import { AccessRule } from './access-rule';
 
-export type AccessRule = {
-  crew: SelectCrew;
-  role: Snowflake;
-  member: Snowflake;
-};
+export enum AccessRuleType {
+  PERMIT = 'permit',
+  DENY = 'deny',
+}
 
-export type InsertAccessRule = DeepPartial<
+export type InsertAccessEntry = DeepPartial<
   Omit<AccessEntry, 'guild' | 'updatedAt' | 'deletedAt' | 'deletedBy'>
 >;
-export type SelectAccessRule = DeepPartial<Pick<AccessEntry, 'id'>>;
-export type UpdateAccessRule = DeepPartial<Pick<AccessEntry, 'rule' | 'updatedBy'>>;
-export type DeleteAccessRule = SelectAccessRule & { deletedBySf?: Snowflake };
+export type SelectAccessEntry = DeepPartial<Pick<AccessEntry, 'id'>>;
+export type UpdateAccessEntry = DeepPartial<Pick<AccessEntry, 'rule' | 'updatedBy'>>;
+export type DeleteAccessEntry = SelectAccessEntry & { deletedBySf?: Snowflake };
 
 @Entity({ name: 'access_rule' })
 export class AccessEntry {
@@ -58,8 +57,13 @@ export class AccessEntry {
   @Expose()
   description: string;
 
+  @Column({ type: 'enum', enum: AccessRuleType, default: AccessRuleType.PERMIT })
+  @Expose()
+  type: AccessRuleType;
+
   @Column({ type: 'jsonb' })
   @Expose()
+  @Type(() => AccessRule)
   rule: AccessRule;
 
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })

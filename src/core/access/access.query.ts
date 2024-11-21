@@ -1,7 +1,7 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectGuild } from 'src/core/guild/guild.entity';
-import { AccessEntry } from './access.entity';
+import { AccessEntry, SelectAccessEntry } from './access.entity';
 
 const searchWhere = (alias: string = 'entry') => {
   return new Brackets((qb) => qb.where(`${alias}.description ILIKE :query`));
@@ -11,6 +11,16 @@ export class AccessEntryQueryBuilder extends CommonQueryBuilder<AccessEntry> {
   constructor(repo: Repository<AccessEntry>) {
     super(repo, 'entry');
     this.qb.leftJoinAndSelect('entry.guild', 'guild');
+  }
+
+  byEntry(entryRef: SelectAccessEntry | SelectAccessEntry[]) {
+    if (!Array.isArray(entryRef)) {
+      entryRef = [entryRef];
+    }
+
+    this.qb.andWhere('entry.id IN (:...entries)', { entries: entryRef.map((e) => e.id) });
+
+    return this;
   }
 
   byGuild(guildRef: SelectGuild | SelectGuild[]) {

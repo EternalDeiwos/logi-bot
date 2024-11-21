@@ -1,3 +1,4 @@
+import { PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -13,7 +14,7 @@ import {
   DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
-import { Exclude, Expose, Transform, Type } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import { CrewMemberAccess } from 'src/types';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
@@ -192,3 +193,5 @@ export class Crew {
     return members.find((member) => member.access === CrewMemberAccess.OWNER);
   }
 }
+
+export class SelectCrewDto extends PickType(Crew, ['crewSf'] as const) {}
