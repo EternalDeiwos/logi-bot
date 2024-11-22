@@ -7,6 +7,7 @@ import { RMQModule } from 'src/rmq/rmq.module';
 import { DiscordExceptionFilter } from './bot-exception.filter';
 import { BotService, BotServiceImpl } from './bot.service';
 import { DiscordService, DiscordServiceImpl } from './discord.service';
+import { EmojiService, EmojiServiceImpl } from './emoji.service';
 
 @Module({
   imports: [
@@ -36,7 +37,8 @@ import { DiscordService, DiscordServiceImpl } from './discord.service';
     DiscordExceptionFilter,
     { provide: BotService, useClass: BotServiceImpl },
     { provide: DiscordService, useClass: DiscordServiceImpl },
+    { provide: EmojiService, useClass: EmojiServiceImpl },
   ],
-  exports: [DiscordExceptionFilter, BotService, DiscordService],
+  exports: [DiscordExceptionFilter, BotService, DiscordService, EmojiService],
 })
 export class BotModule {}

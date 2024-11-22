@@ -1,13 +1,18 @@
+import { Expose } from 'class-transformer';
 import {
   Entity,
   Column,
   Unique,
   CreateDateColumn,
   ViewEntity,
-  ViewColumn,
   PrimaryColumn,
+  DeepPartial,
 } from 'typeorm';
 import { WarFaction } from 'src/game/war/war.entity';
+
+export type SelectCatalog = DeepPartial<
+  Pick<Catalog, 'id' | 'gameVersion' | 'catalogVersion' | 'name'>
+>;
 
 @Entity()
 @Unique('uk_foxhole_catalog_name', ['gameVersion', 'catalogVersion', 'name'])
@@ -20,21 +25,26 @@ export class Catalog {
   id: string;
 
   @Column({ name: 'foxhole_version' })
+  @Expose()
   gameVersion: string;
 
   @Column({ name: 'catalog_version' })
+  @Expose()
   catalogVersion: string;
 
   @Column({ name: 'code_name' })
+  @Expose()
   name: string;
 
   @Column({ type: 'text', array: true, default: [] })
+  @Expose()
   slang: string[];
 
   @Column('jsonb')
   data: any;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @Expose()
   createdAt: Date;
 }
 
@@ -46,6 +56,7 @@ export class Catalog {
       .select([
         'id',
         'code_name',
+        'slang',
         `(data ->> 'DisplayName')::text display_name`,
         'foxhole_version',
         'catalog_version',
@@ -136,42 +147,57 @@ export class Catalog {
       .from(Catalog, 'c'),
 })
 export class ExpandedCatalog {
-  @ViewColumn()
+  @Column({ type: 'uuid' })
   id: string;
 
-  @ViewColumn({ name: 'foxhole_version' })
+  @Column({ name: 'foxhole_version' })
+  @Expose()
   gameVersion: string;
 
-  @ViewColumn({ name: 'catalog_version' })
+  @Column({ name: 'catalog_version' })
+  @Expose()
   catalogVersion: string;
 
-  @ViewColumn({ name: 'code_name' })
+  @Column({ name: 'code_name' })
+  @Expose()
   name: string;
 
-  @ViewColumn({ name: 'display_name' })
+  @Column({ type: 'text', array: true })
+  @Expose()
+  slang: string[];
+
+  @Column({ name: 'display_name' })
+  @Expose()
   displayName: string;
 
-  @ViewColumn()
+  @Column()
+  @Expose()
   faction: WarFaction;
 
-  @ViewColumn({ name: 'category' })
+  @Column({ name: 'category' })
+  @Expose()
   category: string;
 
-  @ViewColumn({ name: 'crate_quantity' })
-  crateQuantity: string;
+  @Column({ name: 'crate_quantity' })
+  @Expose()
+  crateQuantity: number;
 
-  @ViewColumn({ name: 'shippable_quantity' })
-  shippableQuantity: string;
+  @Column({ name: 'shippable_quantity' })
+  @Expose()
+  shippableQuantity: number;
 
-  @ViewColumn({ name: 'crate_stockpile_maximum' })
-  crateMax: string;
+  @Column({ name: 'crate_stockpile_maximum' })
+  @Expose()
+  crateMax: number;
 
-  @ViewColumn({ name: 'shippable_stockpile_maximum' })
-  shippableMax: string;
+  @Column({ name: 'shippable_stockpile_maximum' })
+  @Expose()
+  shippableMax: number;
 
-  @ViewColumn()
+  @Column({ type: 'jsonb' })
   data: any;
 
-  @ViewColumn({ name: 'created_at' })
+  @Column({ name: 'created_at', type: 'timestamptz' })
+  @Expose()
   createdAt: Date;
 }

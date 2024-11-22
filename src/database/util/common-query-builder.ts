@@ -15,6 +15,11 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
     return this;
   }
 
+  limit(limit: number) {
+    this.qb.limit(limit);
+    return this;
+  }
+
   getMany() {
     return this.qb.getMany();
   }

@@ -9,6 +9,10 @@ import { ConfigKey } from './app.config';
 
 import * as pkg from '../package.json';
 
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 async function bootstrap() {
   const app = await NestFactory.create(ServerModule, {
     cors: false,

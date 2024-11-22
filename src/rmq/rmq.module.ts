@@ -26,6 +26,9 @@ import { ErrorTraceConsumer } from './error.consumer';
               name: 'discord',
             },
             {
+              name: 'stockpile',
+            },
+            {
               name: 'retry',
             },
             {

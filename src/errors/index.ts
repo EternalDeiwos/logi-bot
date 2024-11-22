@@ -25,6 +25,7 @@ type QueueErrorConfig = {
 
 type ValidationErrorConfig = {
   VALIDATION_FAILED: Error[];
+  NOT_FOUND: Error[];
 };
 
 type AuthErrorConfig = {

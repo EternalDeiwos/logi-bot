@@ -11,8 +11,16 @@ import { CrewShare } from 'src/core/crew/share/crew-share.entity';
 import { War } from 'src/game/war/war.entity';
 import { Region, CurrentRegion } from 'src/game/region/region.entity';
 import { RegionLog, CurrentRegionLog } from 'src/game/region/region-log.entity';
-import { Poi, CurrentPoi } from 'src/game/poi/poi.entity';
+import { Poi, ExpandedPoi } from 'src/game/poi/poi.entity';
 import { Catalog, ExpandedCatalog } from 'src/game/catalog/catalog.entity';
+import { Stockpile } from 'src/inventory/stockpile/stockpile.entity';
+import { StockpileLog } from 'src/inventory/stockpile/stockpile-log.entity';
+import { StockpileAccess } from 'src/inventory/stockpile/stockpile-access.entity';
+import { AccessEntry } from 'src/core/access/access.entity';
+import {
+  CurrentStockpileEntry,
+  StockpileEntry,
+} from 'src/inventory/stockpile/stockpile-entry.entity';
 import * as migrations from 'src/database/migrations';
 
 export const AppDataSource = new DataSource({
@@ -40,9 +48,15 @@ export const AppDataSource = new DataSource({
     RegionLog,
     CurrentRegionLog,
     Poi,
-    CurrentPoi,
+    ExpandedPoi,
     Catalog,
     ExpandedCatalog,
+    Stockpile,
+    StockpileLog,
+    StockpileEntry,
+    StockpileAccess,
+    AccessEntry,
+    CurrentStockpileEntry,
   ],
   subscribers: [],
   migrations,

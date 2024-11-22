@@ -7,16 +7,29 @@ import {
   ManyToOne,
   JoinColumn,
   ViewEntity,
-  ViewColumn,
   DeleteDateColumn,
-  Point,
+  DeepPartial,
+  OneToMany,
 } from 'typeorm';
+import { Expose, Transform, Type } from 'class-transformer';
+import { Snowflake } from 'discord.js';
 import { War } from 'src/game/war/war.entity';
 import { Region } from 'src/game/region/region.entity';
+import { Stockpile } from 'src/inventory/stockpile/stockpile.entity';
+import { StockpileLog } from 'src/inventory/stockpile/stockpile-log.entity';
+
+export enum PoiMarkerType {
+  DEPOT = 33,
+  SEAPORT = 52,
+}
+
+export type SelectPoi = DeepPartial<Pick<Poi, 'id'>>;
+export type ArchivePoi = SelectPoi & { archiveSf?: Snowflake; tag?: string };
 
 @Entity()
 export class Poi {
   @PrimaryGeneratedColumn({ type: 'int8', primaryKeyConstraintName: 'pk_poi_id' })
+  @Expose()
   id: string;
 
   @Column({ type: 'uuid', name: 'region_id' })
@@ -25,6 +38,9 @@ export class Poi {
   regionId: string;
 
   @ManyToOne(() => Region, { onDelete: 'RESTRICT' })
+  @Expose()
+  @Type(() => Region)
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'region_id',
     referencedColumnName: 'id',
@@ -33,6 +49,7 @@ export class Poi {
   region: Region;
 
   @Column({ name: 'war_number', type: 'int8' })
+  @Expose()
   @RelationId((poi: Poi) => poi.war)
   @Index('war_number_idx_poi')
   warNumber: string;
@@ -45,25 +62,78 @@ export class Poi {
   })
   war: War;
 
+  @Expose()
+  @Type(() => Stockpile)
+  @Transform(({ value }) => (value ? value : null))
+  @OneToMany(() => Stockpile, (stockpile) => stockpile.location)
+  stockpiles: Stockpile[];
+
+  @Expose()
+  @Type(() => StockpileLog)
+  @Transform(({ value }) => (value ? value : null))
+  @OneToMany(() => StockpileLog, (log) => log.location)
+  logs: StockpileLog[];
+
   @Column({ name: 'marker_type', type: 'int4' })
+  @Expose()
   @Index('marker_type_idx_poi')
-  markerType: number;
+  markerType: PoiMarkerType;
 
   @Column({ type: 'float8' })
+  @Expose()
   x: number;
 
   @Column({ type: 'float8' })
+  @Expose()
   y: number;
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
+  @Expose()
   deletedAt: Date;
+
+  getName() {
+    let result = this.getMarkerName();
+
+    if (this.region.minorName) {
+      result += this.getMinorName();
+    } else if (this.region.majorName) {
+      result += this.getMajorName();
+    } else {
+      result += this.region.hexName;
+    }
+
+    return result;
+  }
+
+  getMarkerName() {
+    switch (this.markerType) {
+      case 33:
+        return 'Depot at ';
+      case 52:
+        return 'Seaport at ';
+      default:
+        return '';
+    }
+  }
+
+  getMinorName() {
+    if (this.region.minorName) {
+      return `${this.region.minorName} near ${this.getMajorName()}`;
+    }
+
+    return this.getMajorName();
+  }
+
+  getMajorName() {
+    return `${this.region.majorName}, ${this.region.hexName}`;
+  }
 }
 
 @ViewEntity({
-  name: 'poi_current',
+  name: 'poi_expanded',
   expression: (ds) =>
     ds
-      .createQueryBuilder()
+      .createQueryBuilder(Poi, 'p')
       .select([
         'p.id id',
         'r.hex_id hex_id',
@@ -78,51 +148,112 @@ export class Poi {
         'r.major_name major_name',
         'r.minor_name minor_name',
         'r.slang slang',
+        'p.deleted_at deleted_at',
       ])
-      .from(Poi, 'p')
-      .innerJoin(Region, 'r', 'r.id=p.region_id')
-      .where('p.deleted_at IS NULL'),
+      .innerJoin('p.region', 'r'),
 })
-export class CurrentPoi {
-  @ViewColumn()
+export class ExpandedPoi {
+  @Column({ type: 'int8' })
+  @Expose()
   id: string;
 
-  @ViewColumn({ name: 'hex_id' })
+  @Column({ type: 'int8', name: 'hex_id' })
+  @Expose()
   hexId: string;
 
-  @ViewColumn({ name: 'region_id' })
+  @Column({ type: 'uuid', name: 'region_id' })
   regionId: string;
 
-  @ViewColumn({ name: 'war_number' })
+  @Column({ type: 'int8', name: 'war_number' })
+  @Expose()
   warNumber: string;
 
-  @ViewColumn()
+  @Column({ type: 'float8' })
+  @Expose()
   x: number;
 
-  @ViewColumn()
+  @Column({ type: 'float8' })
+  @Expose()
   y: number;
 
-  @ViewColumn()
+  @Column({ type: 'float8' })
+  @Expose()
   rx: number;
 
-  @ViewColumn()
+  @Column({ type: 'float8' })
+  @Expose()
   ry: number;
 
-  @ViewColumn({ name: 'marker_type' })
-  markerType: number;
+  @Column({ name: 'marker_type', type: 'int4' })
+  @Expose()
+  markerType: PoiMarkerType;
 
-  @ViewColumn({ name: 'region_point' })
-  regionPoint: Point;
-
-  @ViewColumn({ name: 'hex_name' })
+  @Column({ name: 'hex_name' })
+  @Expose()
   hexName: string;
 
-  @ViewColumn({ name: 'major_name' })
+  @Column({ name: 'major_name' })
+  @Expose()
   majorName: string;
 
-  @ViewColumn({ name: 'minor_name' })
+  @Column({ name: 'minor_name' })
+  @Expose()
   minorName: string;
 
-  @ViewColumn()
+  @Column({ type: 'text', array: true })
+  @Expose()
   slang: string[];
+
+  @Column({ name: 'deleted_at' })
+  @Expose()
+  deletedAt?: Date;
+
+  @OneToMany(() => Stockpile, (stockpile) => stockpile.expandedLocation, {
+    createForeignKeyConstraints: false,
+  })
+  @Expose()
+  @Type(() => Stockpile)
+  @Transform(({ value }) => (value ? value : null))
+  stockpiles: Stockpile[];
+
+  @OneToMany(() => StockpileLog, (log) => log.expandedLocation, {
+    createForeignKeyConstraints: false,
+  })
+  @Expose()
+  @Type(() => StockpileLog)
+  @Transform(({ value }) => (value ? value : null))
+  logs: StockpileLog[];
+
+  getName() {
+    let result = this.getMarkerName();
+
+    if (this.minorName) {
+      result += this.getMinorName();
+    } else if (this.majorName) {
+      result += this.getMajorName();
+    } else {
+      result += this.hexName;
+    }
+
+    return result;
+  }
+
+  getMarkerName() {
+    switch (this.markerType) {
+      case 33:
+        return 'Depot at ';
+      case 52:
+        return 'Seaport at ';
+      default:
+        return '';
+    }
+  }
+
+  getMinorName() {
+    return `${this.minorName} near ${this.getMajorName()}`;
+  }
+
+  getMajorName() {
+    return `${this.majorName}, ${this.hexName}`;
+  }
 }

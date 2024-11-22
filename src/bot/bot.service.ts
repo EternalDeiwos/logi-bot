@@ -1,18 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
+import { flatten } from 'lodash';
 import { AutocompleteInteraction, Interaction, InteractionReplyOptions } from 'discord.js';
 import { ArrayOrElement, ConsumerResponsePayload, DiscordAPIInteraction } from 'src/types';
 import { ConsumerResponseError, BaseError } from 'src/errors';
 import { ErrorEmbed } from './embed';
 
 export type CommandInteraction = Exclude<Interaction, AutocompleteInteraction>;
+export type Reply =
+  | Awaited<ReturnType<CommandInteraction['reply']>>
+  | Awaited<ReturnType<CommandInteraction['followUp']>>;
 
 export abstract class BotService {
   abstract replyOrFollowUp(
     interaction: ArrayOrElement<CommandInteraction>,
     options: InteractionReplyOptions,
-  ): Promise<any>;
+  ): Promise<Reply[]>;
 
   abstract reportCommandError(
     interaction: ArrayOrElement<Interaction>,
@@ -48,15 +52,30 @@ export class BotServiceImpl extends BotService {
   async replyOrFollowUp(
     interaction: ArrayOrElement<CommandInteraction>,
     options: InteractionReplyOptions,
-  ) {
+  ): Promise<Reply[]> {
     if (Array.isArray(interaction)) {
       interaction = interaction.pop();
     }
 
+    if (options.embeds && options.embeds.length > 10) {
+      const { embeds, ...rest } = options;
+      const result = [];
+      for (let count = 0; count < embeds.length; count += 10) {
+        result.push(
+          await this.replyOrFollowUp(interaction, {
+            ...rest,
+            embeds: embeds.slice(count, count + 10),
+          }),
+        );
+      }
+
+      return flatten(result);
+    }
+
     if (interaction.replied || interaction.deferred) {
-      return interaction.followUp(options);
+      return [await interaction.followUp({ ephemeral: true, ...options })];
     } else {
-      return interaction.reply({ ephemeral: true, ...options });
+      return [await interaction.reply({ ephemeral: true, ...options })];
     }
   }
 
