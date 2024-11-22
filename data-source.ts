@@ -15,6 +15,8 @@ import { Poi, ExpandedPoi } from 'src/game/poi/poi.entity';
 import { Catalog, ExpandedCatalog } from 'src/game/catalog/catalog.entity';
 import { Stockpile } from 'src/inventory/stockpile/stockpile.entity';
 import { StockpileLog } from 'src/inventory/stockpile/stockpile-log.entity';
+import { StockpileAccess } from 'src/inventory/stockpile/stockpile-access.entity';
+import { AccessEntry } from 'src/core/access/access.entity';
 import {
   CurrentStockpileEntry,
   StockpileEntry,
@@ -52,6 +54,8 @@ export const AppDataSource = new DataSource({
     Stockpile,
     StockpileLog,
     StockpileEntry,
+    StockpileAccess,
+    AccessEntry,
     CurrentStockpileEntry,
   ],
   subscribers: [],
