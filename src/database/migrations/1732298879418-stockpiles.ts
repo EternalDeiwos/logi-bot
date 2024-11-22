@@ -4,6 +4,7 @@ export class Stockpiles1732298879418 implements MigrationInterface {
   name = 'Stockpiles1732298879418';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query('SET session_replication_role = replica');
     await queryRunner.query(
       `DELETE FROM "app"."typeorm_metadata" WHERE "type" = $1 AND "name" = $2 AND "schema" = $3`,
       ['VIEW', 'catalog_expanded', 'app'],
@@ -227,6 +228,7 @@ export class Stockpiles1732298879418 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query('SET session_replication_role = replica');
     await queryRunner.query(
       `DELETE FROM "app"."typeorm_metadata" WHERE "type" = $1 AND "name" = $2 AND "schema" = $3`,
       ['VIEW', 'poi_expanded', 'app'],
