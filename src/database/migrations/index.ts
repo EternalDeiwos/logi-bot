@@ -5,4 +5,6 @@ export * from './1718398690480-crew-archive-logs';
 export * from './1718539084270-crew-logs-table';
 export * from './1718794822049-crew-sharing';
 export * from './1726260822577-refactor';
-export * from './1732289230184-game-stockpiles';
+export * from './1726307788459-game-tables';
+export * from './1726315986907-game-views';
+export * from './1732298879418-stockpiles';
