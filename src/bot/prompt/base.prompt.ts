@@ -1,5 +1,5 @@
 import { BaseMessageOptions } from 'discord.js';
-import { mergeWith } from 'lodash';
+import { countBy, mergeWith } from 'lodash';
 
 export class BasePromptBuilder {
   public static base: BaseMessageOptions = {};
@@ -13,6 +13,13 @@ export class BasePromptBuilder {
     if (Array.isArray(objValue)) {
       return objValue.concat(srcValue);
     }
+  }
+
+  public get length() {
+    return this.options.reduce(
+      (state, current) => (current.embeds || current.content ? state + 1 : state),
+      0,
+    );
   }
 
   public add(options: BaseMessageOptions | BasePromptBuilder) {

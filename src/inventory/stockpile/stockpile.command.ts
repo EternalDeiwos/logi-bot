@@ -7,20 +7,24 @@ import {
   StringOption,
   Subcommand,
 } from 'necord';
-import { Attachment, Client, GuildManager, PermissionsBitField } from 'discord.js';
+import { QueryFailedError } from 'typeorm';
+import { groupBy } from 'lodash';
+import { Attachment, Client, PermissionsBitField } from 'discord.js';
+import { AuthError, ValidationError } from 'src/errors';
+import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { DeltaCommand } from 'src/inventory/inventory.command-group';
 import { PoiSelectAutocompleteInterceptor } from 'src/game/poi/poi-select.interceptor';
-import { AuthError } from 'src/errors';
 import { GuildService } from 'src/core/guild/guild.service';
-import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
+import { AccessDecision } from 'src/core/access/access-decision';
+import { AccessService } from 'src/core/access/access.service';
 import { StockpileService } from './stockpile.service';
 import { SelectStockpileLog } from './stockpile-log.entity';
 import { StockpileUpdateAutocompleteInterceptor } from './stockpile-update.interceptor';
 import { StockpileSearchAutocompleteInterceptor } from './stockpile-search.interceptor';
 import { StockpileContentPromptBuilder } from './stockpile-content.prompt';
-import { cloneDeepWith, groupBy } from 'lodash';
+import { StockpileGrantAccessAutocompleteInterceptor } from './stockpile-grant-access.interceptor';
 
 export class CreateStockpileCommandParams {
   @StringOption({
@@ -127,6 +131,24 @@ export class StockpileLogCommandParams {
   crew: string;
 }
 
+export class GrantStockpileAccessCommandParams {
+  @StringOption({
+    name: 'stockpile',
+    description: 'Select a stockpile',
+    autocomplete: true,
+    required: true,
+  })
+  stockpileId: string;
+
+  @StringOption({
+    name: 'rule',
+    description: 'Select a rule',
+    autocomplete: true,
+    required: true,
+  })
+  ruleId: string;
+}
+
 @Injectable()
 @DeltaCommand({
   name: 'stockpile',
@@ -138,10 +160,10 @@ export class StockpileCommand {
 
   constructor(
     private readonly client: Client,
-    private readonly guildManager: GuildManager,
     private readonly guildService: GuildService,
     private readonly botService: BotService,
     private readonly stockpileService: StockpileService,
+    private readonly accessService: AccessService,
   ) {}
 
   @UseInterceptors(PoiSelectAutocompleteInterceptor)
@@ -200,7 +222,7 @@ export class StockpileCommand {
     const raw = await report.text();
 
     if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
-      throw new AuthError('FORBIDDEN', 'Not allowed to updated stockpiles').asDisplayable();
+      throw new AuthError('FORBIDDEN', 'Not allowed to update stockpiles').asDisplayable();
     }
 
     const result = await this.stockpileService.registerLog({
@@ -235,12 +257,28 @@ export class StockpileCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() options: SearchStockpileCommandParams,
   ) {
-    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
-      throw new AuthError('FORBIDDEN', 'Not allowed to updated stockpiles').asDisplayable();
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const stockpiles = await this.stockpileService
+      .query()
+      .withGuild()
+      .byGuild({ guildSf: interaction.guildId })
+      .withAccessRules()
+      .getMany();
+    const accessibleStockpiles = stockpiles.filter((stockpile) =>
+      stockpile.access.some((access) =>
+        AccessDecision.fromEntry(access.rule).permit(...accessArgs),
+      ),
+    );
+
+    if (!accessibleStockpiles.length) {
+      return this.botService.replyOrFollowUp(interaction, {
+        embeds: [new ErrorEmbed('ERROR_GENERIC').setTitle('None')],
+      });
     }
 
     const query = await this.stockpileService
       .queryEntries()
+      .byStockpile(accessibleStockpiles)
       .withGuild()
       .withCatalog()
       .withLog()
@@ -276,7 +314,68 @@ export class StockpileCommand {
       });
     }
 
-    await this.client.application.emojis.fetch();
+    if (!prompt.length) {
+      return this.botService.replyOrFollowUp(interaction, {
+        embeds: [new ErrorEmbed('ERROR_GENERIC').setTitle('None')],
+      });
+    }
+
     return this.botService.replyOrFollowUp(interaction, prompt.build());
+  }
+
+  @UseInterceptors(StockpileGrantAccessAutocompleteInterceptor)
+  @Subcommand({
+    name: 'grant',
+    description: 'Grant access to stockpile. Guild admin only',
+    dmPermission: false,
+  })
+  async onGrantStockpileAccess(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() options: GrantStockpileAccessCommandParams,
+  ) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+      throw new AuthError('FORBIDDEN', 'Only guild admins can use this command').asDisplayable();
+    }
+
+    const stockpile = await this.stockpileService
+      .query()
+      .withGuild()
+      .byGuild({ guildSf: interaction.guildId })
+      .byStockpile({ id: options.stockpileId })
+      .getOneOrFail();
+
+    if (!stockpile) {
+      throw new ValidationError('VALIDATION_FAILED', `Unable to access stockpile`).asDisplayable();
+    }
+
+    const rule = await this.accessService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .byEntry({ id: options.ruleId })
+      .getOneOrFail();
+
+    if (!rule) {
+      throw new ValidationError('NOT_FOUND', 'Rule does not exist').asDisplayable();
+    }
+
+    try {
+      await this.stockpileService.grantAccess({
+        stockpileId: options.stockpileId,
+        ruleId: options.ruleId,
+        createdBy: interaction.user.id,
+      });
+    } catch (err) {
+      if (err instanceof QueryFailedError && err.driverError.code === '23505') {
+        throw new ValidationError(
+          'VALIDATION_FAILED',
+          `Rule '${rule.description}' already exists for ${stockpile.name}`,
+          [err],
+        ).asDisplayable();
+      }
+    }
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Access granted')],
+    });
   }
 }

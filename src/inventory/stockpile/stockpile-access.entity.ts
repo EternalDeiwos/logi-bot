@@ -11,16 +11,18 @@ import {
   CreateDateColumn,
   DeepPartial,
   DeleteDateColumn,
+  Unique,
 } from 'typeorm';
 import { AccessEntry } from 'src/core/access/access.entity';
 import { Stockpile } from './stockpile.entity';
 
 export type SelectStockpileAccess = DeepPartial<Pick<StockpileAccess, 'id'>>;
 export type InsertStockpileAccess = DeepPartial<
-  Omit<StockpileAccess, 'id' | 'stockpile' | 'rule' | 'guild' | 'updatedAt'>
+  Omit<StockpileAccess, 'id' | 'stockpile' | 'rule' | 'guild' | 'updatedAt' | 'createdAt'>
 >;
 
 @Entity('stockpile_access')
+@Unique('uk_rule_stockpile_deleted_at', ['ruleId', 'stockpileId', 'deletedAt'])
 export class StockpileAccess {
   @PrimaryColumn({
     type: 'uuid',

@@ -10,11 +10,13 @@ import {
   CurrentStockpileEntryRepository,
   StockpileEntryRepository,
 } from './stockpile-entry.repository';
+import { StockpileAccessRepository } from './stockpile-access.repository';
 import { StockpileQueryBuilder } from './stockpile.query';
 import { InsertStockpileLog, SelectStockpileLog } from './stockpile-log.entity';
 import { StockpileLogQueryBuilder } from './stockpile-log.query';
 import { InsertStockpileEntry } from './stockpile-entry.entity';
 import { StockpileEntryQueryBuilder } from './stockpile-entry.query';
+import { InsertStockpileAccess, SelectStockpileAccess } from './stockpile-access.entity';
 
 export abstract class StockpileService {
   abstract query(): StockpileQueryBuilder;
@@ -24,6 +26,10 @@ export abstract class StockpileService {
   abstract registerLog(data: InsertStockpileLog): Promise<InsertResult>;
   abstract updateStockpile(data: InsertStockpileEntry[]): Promise<InsertResult>;
   abstract completeLogProcessing(logRef: SelectStockpileLog): Promise<UpdateResult>;
+  abstract grantAccess(data: InsertStockpileAccess): Promise<InsertResult>;
+  abstract revokeAccess(
+    accessRef: SelectStockpileAccess | SelectStockpileAccess[],
+  ): Promise<UpdateResult>;
 }
 
 @Injectable()
@@ -37,6 +43,7 @@ export class StockpileServiceImpl extends StockpileService {
     private readonly logRepo: StockpileLogRepository,
     private readonly currentEntryRepo: CurrentStockpileEntryRepository,
     private readonly entryRepo: StockpileEntryRepository,
+    private readonly accessRepo: StockpileAccessRepository,
   ) {
     super();
   }
@@ -87,7 +94,23 @@ export class StockpileServiceImpl extends StockpileService {
   }
 
   async completeLogProcessing(logRef: SelectStockpileLog) {
-    this.logger.debug('CLP', JSON.stringify(logRef));
     return await this.logRepo.update(logRef, { processedAt: new Date() });
+  }
+
+  async grantAccess(data: InsertStockpileAccess) {
+    return await this.accessRepo.insert(data);
+  }
+
+  async revokeAccess(accessRef: SelectStockpileAccess | SelectStockpileAccess[]) {
+    if (!Array.isArray(accessRef)) {
+      accessRef = [accessRef];
+    }
+
+    return await this.accessRepo
+      .createQueryBuilder('access')
+      .update()
+      .set({ deletedAt: new Date() })
+      .where('access.id IN (:...access)', { access: accessRef.map((a) => a.id) })
+      .execute();
   }
 }

@@ -1,19 +1,25 @@
 import { RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { GuildManager } from 'discord.js';
 import { parse } from 'csv-parse/sync';
 import { ConsumeMessage } from 'amqplib';
 import { flattenDepth, mapKeys, uniq } from 'lodash';
+import { DiscordAPIInteraction } from 'src/types';
 import { CatalogService } from 'src/game/catalog/catalog.service';
-import { StockpileService } from './stockpile.service';
+import { AccessService } from 'src/core/access/access.service';
 import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
 import { InsertStockpileEntry, StockpileReportRecord } from './stockpile-entry.entity';
+import { StockpileService } from './stockpile.service';
 import { Stockpile } from './stockpile.entity';
+import { AccessDecision } from 'src/core/access/access-decision';
 
 @Injectable()
 export class StockpileUpdateConsumer {
   private readonly logger = new Logger(StockpileUpdateConsumer.name);
 
   constructor(
+    private readonly guildManager: GuildManager,
+    private readonly accessService: AccessService,
     private readonly stockpileService: StockpileService,
     private readonly catalogService: CatalogService,
   ) {}
@@ -26,13 +32,18 @@ export class StockpileUpdateConsumer {
       deadLetterExchange: 'errors',
     },
   })
-  public async processStockpileUpdate(payload: SelectStockpileLog, msg: ConsumeMessage) {
+  public async processStockpileUpdate(
+    payload: SelectStockpileLog & { interaction: DiscordAPIInteraction },
+    msg: ConsumeMessage,
+  ) {
+    const { interaction } = payload;
     const log = await this.stockpileService
       .queryLog()
       .byLog(payload)
       .withCrew()
       .withPoi()
       .withStockpiles()
+      .withAccessRules()
       .getOneOrFail();
 
     const records = parse(log.raw, {
@@ -43,7 +54,7 @@ export class StockpileUpdateConsumer {
 
     const codeName = uniq(records.map((r) => r.CodeName));
     // groups[stockpile][itemCode]
-    const groups = await this.mergeRecords(records, log, codeName);
+    const groups = await this.mergeRecords(records, log, codeName, interaction);
     const updateStockpileRefs = Object.keys(groups);
     const ghostsQuery = await this.stockpileService
       .query()
@@ -57,7 +68,7 @@ export class StockpileUpdateConsumer {
       ghostsQuery.unsafe_excludeStockpileEntriesByCodeName(Object.keys(group), { id: stockpileId });
     }
 
-    const ghosts = await ghostsQuery.getMany();
+    const ghosts = updateStockpileRefs.length ? await ghostsQuery.getMany() : [];
     const entries = [
       // flatten groups into 1d array
       ...flattenDepth(
@@ -101,7 +112,15 @@ export class StockpileUpdateConsumer {
     records: StockpileReportRecord[],
     log: StockpileLog,
     codeName: string[],
+    interaction: DiscordAPIInteraction,
   ): Promise<Record<string, Record<string, InsertStockpileEntry>>> {
+    const guild = await this.guildManager.fetch(interaction.guildId);
+    const member = await guild.members.fetch(interaction.member);
+    const accessArgs = await this.accessService.getTestArgs({
+      guildId: interaction.guildId,
+      user: { id: interaction.member },
+      member: { roles: Array.from(member.roles.valueOf().keys()) },
+    });
     const items = await this.catalogService.query().byCodeName(codeName).getMany();
     const catalog = mapKeys(items, (r) => r.name);
 
@@ -113,7 +132,18 @@ export class StockpileUpdateConsumer {
 
         if (!stockpile) {
           this.logger.warn(
-            `Unable to process stockpile report for ${record['Stockpile Name']} at the ${log.expandedLocation.getName()}`,
+            `Unable to process ${record.CodeName} for ${record['Stockpile Name']} at the ${log.expandedLocation.getName()}`,
+          );
+          return state;
+        }
+
+        if (
+          !stockpile.access.some((access) =>
+            AccessDecision.fromEntry(access.rule).permit(...accessArgs),
+          )
+        ) {
+          this.logger.warn(
+            `Access control failed in processing ${record.CodeName} for ${record['Stockpile Name']} at the ${log.expandedLocation.getName()}`,
           );
           return state;
         }

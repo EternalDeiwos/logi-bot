@@ -1,5 +1,5 @@
-import { Controller, Get, Logger, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiExtraModels, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Logger, Param, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from 'src/core/api/auth.guard';
 import { Auth } from 'src/core/api/auth.decorator';
 import { APITokenPayload } from 'src/core/api/api.service';
@@ -9,7 +9,6 @@ import { Stockpile } from './stockpile.entity';
 @ApiTags('stockpile')
 @ApiBearerAuth()
 @Controller('stockpile')
-// @ApiExtraModels(Crew, Guild)
 @UseGuards(AuthGuard)
 export class StockpileController {
   private readonly logger = new Logger(StockpileController.name);
@@ -17,12 +16,6 @@ export class StockpileController {
   constructor(private readonly stockpileService: StockpileService) {}
 
   @Get()
-  // @ApiQuery({ name: 'q', description: 'query', required: false })
-  // @ApiQuery({
-  //   name: 'shared',
-  //   description: 'Include crews shared from other guilds?',
-  //   required: false,
-  // })
   @ApiResponse({ status: 200, description: 'Get a list of stockpiles', type: [Stockpile] })
   @ApiResponse({ status: 401, description: 'Authentication Failed' })
   async getStockpiles(@Auth() auth: APITokenPayload) {
@@ -30,17 +23,13 @@ export class StockpileController {
       .query()
       .withGuild()
       .withPoi()
+      .withAccessRules()
       .byGuild({ guildSf: auth.aud })
       .getMany();
   }
 
   @Get(':stockpile')
-  // @ApiQuery({ name: 'q', description: 'query', required: false })
-  // @ApiQuery({
-  //   name: 'shared',
-  //   description: 'Include crews shared from other guilds?',
-  //   required: false,
-  // })
+  @ApiParam({ name: 'stockpile', description: 'Stockpile id', required: true })
   @ApiResponse({ status: 200, description: 'Get a specific stockpile', type: Stockpile })
   @ApiResponse({ status: 401, description: 'Authentication Failed' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -51,6 +40,7 @@ export class StockpileController {
       .withGuild()
       .withPoi()
       .withEntries()
+      .withAccessRules()
       .withoutNilEntries()
       .withCatalog()
       .byGuild({ guildSf: auth.aud })

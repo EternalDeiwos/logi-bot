@@ -150,6 +150,13 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
     return this;
   }
 
+  withAccessRules() {
+    this.qb
+      .leftJoinAndSelect('stockpile.access', 'access')
+      .leftJoinAndSelect('access.rule', 'rule');
+    return this;
+  }
+
   order() {
     this.qb.addOrderBy('poi.major_name').addOrderBy('stockpile.name');
     return this;
