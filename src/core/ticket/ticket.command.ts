@@ -20,7 +20,7 @@ import {
 } from 'necord';
 import { Message, Snowflake } from 'discord.js';
 import { AuthError, InternalError } from 'src/errors';
-import { BotService } from 'src/bot/bot.service';
+import { BotService, CommandInteraction } from 'src/bot/bot.service';
 import { SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
@@ -356,39 +356,21 @@ export class TicketCommand {
     @ComponentParam('action') action: string,
     @ComponentParam('thread') threadRef: Snowflake,
   ) {
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const ticket = await this.ticketService
-      .query()
-      .byThread({ threadSf: threadRef })
-      .getOneOrFail();
+    // const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    // const ticket = await this.ticketService
+    //   .query()
+    //   .byThread({ threadSf: threadRef })
+    //   .getOneOrFail();
     const tag = TicketActionToTag[action];
 
     if (!tag) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid action').asDisplayable();
     }
 
-    if (
-      // Ticket owner can close their own tickets
-      !(tag === TicketTag.ABANDONED && ticket.createdBy === memberRef) &&
-      !(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))
-    ) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only a crew members can perform this action',
-      ).asDisplayable();
-    }
-
-    const result = await this.ticketService.updateTicket(
-      { threadSf: threadRef, updatedBy: memberRef },
-      tag,
-    );
-
-    await this.botService.replyOrFollowUp(interaction, {
-      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket updated')],
-    });
+    return this.lifecycleCommand([interaction], tag);
   }
 
-  async lifecycleCommand([interaction]: SlashCommandContext, tag: TicketTag, reason?: string) {
+  async lifecycleCommand([interaction]: [CommandInteraction], tag: TicketTag, reason?: string) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
@@ -397,8 +379,8 @@ export class TicketCommand {
 
     if (
       // Ticket owner can close their own tickets
-      (tag === TicketTag.ABANDONED && ticket.createdBy !== memberRef) ||
-      !(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))
+      !(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef, false)) &&
+      !(tag === TicketTag.ABANDONED && ticket.createdBy === memberRef)
     ) {
       throw new AuthError(
         'FORBIDDEN',
