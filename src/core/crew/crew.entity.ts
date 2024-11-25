@@ -1,4 +1,3 @@
-import { PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -193,5 +192,3 @@ export class Crew {
     return members.find((member) => member.access === CrewMemberAccess.OWNER);
   }
 }
-
-export class SelectCrewDto extends PickType(Crew, ['crewSf'] as const) {}
