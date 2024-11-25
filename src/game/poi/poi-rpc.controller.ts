@@ -9,8 +9,8 @@ import { PoiService } from './poi.service';
 @ApiBearerAuth()
 @Controller('rpc')
 @UseGuards(AuthGuard)
-export class PoiController {
-  private readonly logger = new Logger(PoiController.name);
+export class PoiRpcController {
+  private readonly logger = new Logger(PoiRpcController.name);
 
   constructor(private readonly poiService: PoiService) {}
 

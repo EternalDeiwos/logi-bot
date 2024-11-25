@@ -5,7 +5,7 @@ import { RegionModule } from 'src/game/region/region.module';
 import { ExpandedPoi, Poi } from './poi.entity';
 import { ExpandedPoiRepository, PoiRepository } from './poi.repository';
 import { PoiService, PoiServiceImpl } from './poi.service';
-import { PoiController } from './poi.controller';
+import { PoiRpcController } from './poi-rpc.controller';
 import { ApiModule } from 'src/core/api/api.module';
 
 @Module({
@@ -15,7 +15,7 @@ import { ApiModule } from 'src/core/api/api.module';
     ExpandedPoiRepository,
     { provide: PoiService, useClass: PoiServiceImpl },
   ],
-  controllers: [PoiController],
+  controllers: [PoiRpcController],
   exports: [PoiService],
 })
 export class PoiModule {}
