@@ -6,10 +6,13 @@ import { CurrentRegionRepository, RegionRepository } from './region.repository';
 import { CurrentRegionLog, RegionLog } from './region-log.entity';
 import { CurrentRegionLogRepository, RegionLogRepository } from './region-log.repository';
 import { RegionService } from './region.service';
+import { RegionRpcController } from './region-rpc.controller';
+import { ApiModule } from 'src/core/api/api.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Region, CurrentRegion, RegionLog, CurrentRegionLog]),
+    ApiModule,
     WarModule,
   ],
   providers: [
@@ -19,6 +22,7 @@ import { RegionService } from './region.service';
     CurrentRegionLogRepository,
     RegionService,
   ],
+  controllers: [RegionRpcController],
   exports: [RegionService],
 })
 export class RegionModule {}
