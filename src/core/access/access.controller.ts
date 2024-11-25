@@ -18,7 +18,6 @@ import {
   ApiQuery,
   ApiResponse,
   ApiTags,
-  OmitType,
 } from '@nestjs/swagger';
 import { GuildManager } from 'discord.js';
 import { AuthGuard } from 'src/core/api/auth.guard';
@@ -31,16 +30,7 @@ import { AccessEntry } from './access.entity';
 import { AccessRule } from './access-rule';
 import { AccessRuleInner } from './access-rule-inner';
 import { AccessDecision } from './access-decision';
-
-export class InsertAccessEntryDto extends OmitType(AccessEntry, [
-  'id',
-  'guild',
-  'guildId',
-  'updatedAt',
-  'updatedBy',
-  'deletedAt',
-  'deletedBy',
-] as const) {}
+import { InsertAccessEntryDto } from './dto/insert-access.dto';
 
 @ApiTags('rule')
 @ApiBearerAuth()

@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { Snowflake } from 'discord.js';
-import { SelectCrew, SelectCrewDto } from 'src/core/crew/crew.entity';
+import { SelectCrew } from 'src/core/crew/crew.entity';
+import { SelectCrewDto } from 'src/core/crew/dto/select-crew.dto';
 import { AccessRule } from './access-rule';
 
 export class AccessRuleInner {

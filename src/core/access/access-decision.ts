@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { Interaction, Snowflake } from 'discord.js';
+import { Snowflake } from 'discord.js';
 import { SelectCrewMember } from 'src/core/crew/member/crew-member.entity';
 import { SelectCrew } from 'src/core/crew/crew.entity';
 import { AccessEntry, AccessRuleType } from './access.entity';
