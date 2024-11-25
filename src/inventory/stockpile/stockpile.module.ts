@@ -23,6 +23,7 @@ import { StockpileController } from './stockpile.controller';
 import { StockpileRpcController } from './stockpile-rpc.controller';
 import { StockpileAccess } from './stockpile-access.entity';
 import { StockpileAccessRepository } from './stockpile-access.repository';
+import { RMQModule } from 'src/rmq/rmq.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { StockpileAccessRepository } from './stockpile-access.repository';
       CurrentStockpileEntry,
       StockpileAccess,
     ]),
+    RMQModule,
     AccessModule,
     BotModule,
     GuildModule,

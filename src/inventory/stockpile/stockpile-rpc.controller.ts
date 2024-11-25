@@ -14,12 +14,7 @@ import { AuthGuard } from 'src/core/api/auth.guard';
 import { Auth } from 'src/core/api/auth.decorator';
 import { APITokenPayload } from 'src/core/api/api.service';
 import { StockpileService } from './stockpile.service';
-import { StockpileAccess } from './stockpile-access.entity';
-
-class InsertStockpileAccessDto extends PickType(StockpileAccess, [
-  'ruleId',
-  'stockpileId',
-] as const) {}
+import { InsertStockpileAccessDto } from './dto/insert-stockpile-access.dto';
 
 @ApiTags('stockpile')
 @ApiBearerAuth()
