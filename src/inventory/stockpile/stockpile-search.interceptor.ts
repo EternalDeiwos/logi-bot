@@ -90,7 +90,7 @@ export class StockpileSearchAutocompleteInterceptor extends AutocompleteIntercep
       }
 
       if (catalogId) {
-        query.byContents({ id: catalogId });
+        query.withEntries().byContents({ id: catalogId });
       }
 
       const results = await query.search(focused.value.toString()).order().limit(25).getMany();
