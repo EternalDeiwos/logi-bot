@@ -56,19 +56,22 @@ export class StockpileUpdateConsumer {
     // groups[stockpile][itemCode]
     const groups = await this.mergeRecords(records, log, codeName, interaction);
     const updateStockpileRefs = Object.keys(groups);
-    const ghostsQuery = await this.stockpileService
-      .query()
-      .byStockpile(updateStockpileRefs.map((id) => ({ id })))
-      .withCurrentEntries()
-      .withoutNilEntries()
-      .withLogs()
-      .withCatalog();
+    const excludeCatalogByStockpile = Object.fromEntries(
+      Object.entries(groups).map(([stockpileId, group]) => [stockpileId, Object.keys(group)]),
+    );
 
-    for (const [stockpileId, group] of Object.entries(groups)) {
-      ghostsQuery.unsafe_excludeStockpileEntriesByCodeName(Object.keys(group), { id: stockpileId });
-    }
+    const ghosts = updateStockpileRefs.length
+      ? await this.stockpileService
+          .query()
+          .byStockpile(updateStockpileRefs.map((id) => ({ id })))
+          .withCurrentEntries()
+          .withoutNilEntries()
+          .withLogs()
+          .withCatalog()
+          .unsafe_excludeStockpileEntries(excludeCatalogByStockpile)
+          .getMany()
+      : [];
 
-    const ghosts = updateStockpileRefs.length ? await ghostsQuery.getMany() : [];
     const entries = [
       // flatten groups into 1d array
       ...flattenDepth(
