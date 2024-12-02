@@ -166,12 +166,12 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   }
 
   async removeGuildMemberCrews(guildRef: SelectGuild, memberRef: Snowflake) {
-    const guildWhere = guildRef.id
-      ? { id: Equal(guildRef.id) }
-      : { guild: { guildSf: Equal(guildRef.guildSf) } };
+    guildRef = guildRef.id
+      ? guildRef
+      : await this.guildService.query().byGuild(guildRef).getOneOrFail();
     return this.memberRepo.updateReturning(
       {
-        ...guildWhere,
+        guildId: guildRef.id,
         memberSf: memberRef,
       },
       { deletedAt: new Date() },
