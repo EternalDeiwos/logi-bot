@@ -24,6 +24,7 @@ import { StockpileRpcController } from './stockpile-rpc.controller';
 import { StockpileAccess } from './stockpile-access.entity';
 import { StockpileAccessRepository } from './stockpile-access.repository';
 import { RMQModule } from 'src/rmq/rmq.module';
+import { StockpileLogHistory } from './stockpile-history.entity';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { RMQModule } from 'src/rmq/rmq.module';
       Stockpile,
       StockpileLog,
       StockpileEntry,
+      StockpileLogHistory,
       CurrentStockpileEntry,
       StockpileAccess,
     ]),
