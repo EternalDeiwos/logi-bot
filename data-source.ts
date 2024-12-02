@@ -22,6 +22,7 @@ import {
   StockpileEntry,
 } from 'src/inventory/stockpile/stockpile-entry.entity';
 import { StockpileLogHistory } from 'src/inventory/stockpile/stockpile-history.entity';
+import { StockpileDiff } from 'src/inventory/stockpile/stockpile-diff.entity';
 import * as migrations from 'src/database/migrations';
 
 export const AppDataSource = new DataSource({
@@ -56,6 +57,7 @@ export const AppDataSource = new DataSource({
     StockpileLog,
     StockpileEntry,
     StockpileLogHistory,
+    StockpileDiff,
     StockpileAccess,
     AccessEntry,
     CurrentStockpileEntry,
