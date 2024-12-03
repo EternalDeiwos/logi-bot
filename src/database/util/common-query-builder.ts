@@ -1,4 +1,5 @@
-import { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
+import { SelectGuild } from 'src/core/guild/guild.entity';
+import { Brackets, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 
 export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
   protected readonly qb: SelectQueryBuilder<Entity>;
@@ -8,6 +9,36 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
     protected readonly alias: string,
   ) {
     this.qb = repo.createQueryBuilder(alias);
+  }
+
+  byGuild(guildRef: SelectGuild | SelectGuild[]) {
+    if (!Array.isArray(guildRef)) {
+      guildRef = [guildRef];
+    }
+
+    const params = guildRef.reduce(
+      (acc, g) => {
+        if (g.id) acc.guilds.push(g.id);
+        if (g.guildSf) acc.discordGuilds.push(g.guildSf);
+        return acc;
+      },
+      { guilds: [], discordGuilds: [] },
+    );
+
+    this.qb.andWhere(
+      new Brackets((qb) => {
+        if (params.guilds.length) {
+          qb.where(`${this.alias}.guild_id IN (:...guilds)`);
+        }
+
+        if (params.discordGuilds.length) {
+          qb.orWhere('guild.guild_sf IN (:...discordGuilds)');
+        }
+      }),
+      params,
+    );
+
+    return this;
   }
 
   withDeleted() {
