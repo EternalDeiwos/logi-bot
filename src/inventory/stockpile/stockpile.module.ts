@@ -26,6 +26,7 @@ import { StockpileAccessRepository } from './stockpile-access.repository';
 import { RMQModule } from 'src/rmq/rmq.module';
 import { StockpileLogHistory } from './stockpile-history.entity';
 import { StockpileDiff } from './stockpile-diff.entity';
+import { StockpileDiffRepository } from './stockpile-diff.repository';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { StockpileDiff } from './stockpile-diff.entity';
     StockpileEntryRepository,
     CurrentStockpileEntryRepository,
     StockpileAccessRepository,
+    StockpileDiffRepository,
     { provide: StockpileService, useClass: StockpileServiceImpl },
     StockpileUpdateConsumer,
     StockpileCommand,

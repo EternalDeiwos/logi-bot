@@ -46,16 +46,12 @@ import { IPostgresInterval } from 'postgres-interval';
         ) h2
       ) history
     LEFT JOIN app.stockpile_entry entry1 
-      ON entry1.log_id=history.current_log_id
+      ON entry1.log_id=history.current_log_id 
+      AND entry1.stockpile_id=history.stockpile_id
     LEFT JOIN app.stockpile_entry entry2 
       ON entry2.log_id=history.previous_log_id 
       AND entry1.catalog_id=entry2.catalog_id 
       AND entry1.stockpile_id=entry2.stockpile_id
-    WHERE (
-      COALESCE(entry1.quantity_crated - entry2.quantity_crated, entry1.quantity_crated) != 0
-      OR COALESCE(entry1.quantity_shippable - entry2.quantity_shippable, entry1.quantity_shippable) != 0
-      OR COALESCE(entry1.quantity_uncrated - entry2.quantity_uncrated, entry1.quantity_uncrated) != 0
-    )
   `,
 })
 export class StockpileDiff {
@@ -202,4 +198,22 @@ export class StockpileDiff {
   @Expose()
   @Column({ type: 'interval', name: 'since_previous' })
   sincePrevious: IPostgresInterval;
+
+  getValue(): string {
+    const counts = [];
+
+    if (this.diffShippable) {
+      counts.push(`${this.diffShippable > 0 ? '+' : ''}${this.diffShippable}sc`);
+    }
+
+    if (this.diffCrated) {
+      counts.push(`${this.diffCrated > 0 ? '+' : ''}${this.diffCrated}c`);
+    }
+
+    if (this.diff) {
+      counts.push(`${this.diff > 0 ? '+' : ''}${this.diff}`);
+    }
+
+    return counts.length ? counts.join(', ') : 'No change';
+  }
 }

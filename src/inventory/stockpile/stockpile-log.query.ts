@@ -84,6 +84,11 @@ export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
     return this;
   }
 
+  withGuild() {
+    this.qb.leftJoinAndSelect('log.guild', 'guild');
+    return this;
+  }
+
   withAccessRules() {
     this.qb
       .leftJoinAndSelect('stockpile.access', 'access')

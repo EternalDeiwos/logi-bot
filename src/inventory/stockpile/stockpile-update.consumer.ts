@@ -7,11 +7,14 @@ import { flattenDepth, mapKeys, uniq } from 'lodash';
 import { DiscordAPIInteraction } from 'src/types';
 import { CatalogService } from 'src/game/catalog/catalog.service';
 import { AccessService } from 'src/core/access/access.service';
+import { AccessDecision } from 'src/core/access/access-decision';
 import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
 import { InsertStockpileEntry, StockpileReportRecord } from './stockpile-entry.entity';
 import { StockpileService } from './stockpile.service';
 import { Stockpile } from './stockpile.entity';
-import { AccessDecision } from 'src/core/access/access-decision';
+
+// groups[stockpile][itemCode]
+export type GroupedStockpileEntry = Record<string, Record<string, InsertStockpileEntry>>;
 
 @Injectable()
 export class StockpileUpdateConsumer {
@@ -53,8 +56,17 @@ export class StockpileUpdateConsumer {
     }) as StockpileReportRecord[];
 
     const codeName = uniq(records.map((r) => r.CodeName));
-    // groups[stockpile][itemCode]
     const groups = await this.mergeRecords(records, log, codeName, interaction);
+    const entries = await this.createEntries(groups, log);
+    await this.stockpileService.updateStockpile(entries);
+    await this.stockpileService.completeLogProcessing({ id: payload.id });
+
+    this.logger.log(
+      `Stockpile at the ${log.expandedLocation.getName()} updated by ${log.crew.name}`,
+    );
+  }
+
+  private async createEntries(groups: GroupedStockpileEntry, log: StockpileLog) {
     const updateStockpileRefs = Object.keys(groups);
     const excludeCatalogByStockpile = Object.fromEntries(
       Object.entries(groups).map(([stockpileId, group]) => [stockpileId, Object.keys(group)]),
@@ -72,7 +84,7 @@ export class StockpileUpdateConsumer {
           .getMany()
       : [];
 
-    const entries = [
+    return [
       // flatten groups into 1d array
       ...flattenDepth(
         Object.values(groups).map((group) => Object.values(group)),
@@ -80,13 +92,6 @@ export class StockpileUpdateConsumer {
       ),
       ...this.reconcileGhosts(ghosts, log),
     ];
-
-    await this.stockpileService.updateStockpile(entries);
-    await this.stockpileService.completeLogProcessing({ id: payload.id });
-
-    this.logger.log(
-      `Stockpile at the ${log.expandedLocation.getName()} updated by ${log.crew.name}`,
-    );
   }
 
   private reconcileGhosts(ghosts: Stockpile[], log: StockpileLog): InsertStockpileEntry[] {
@@ -116,7 +121,7 @@ export class StockpileUpdateConsumer {
     log: StockpileLog,
     codeName: string[],
     interaction: DiscordAPIInteraction,
-  ): Promise<Record<string, Record<string, InsertStockpileEntry>>> {
+  ): Promise<GroupedStockpileEntry> {
     const guild = await this.guildManager.fetch(interaction.guildId);
     const member = await guild.members.fetch(interaction.member);
     const accessArgs = await this.accessService.getTestArgs({
