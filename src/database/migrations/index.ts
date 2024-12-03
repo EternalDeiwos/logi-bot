@@ -8,3 +8,4 @@ export * from './1726260822577-refactor';
 export * from './1726307788459-game-tables';
 export * from './1726315986907-game-views';
 export * from './1732298879418-stockpiles';
+export * from './1733243029192-game-stockpile-history';

@@ -203,7 +203,7 @@ export class GuildCommand {
     @Options() { log }: SetLogChannelCommandParams,
   ) {
     if (!log) {
-      throw new ValidationError('VALIDATION_FAILED', 'Log channel not provided');
+      throw new ValidationError('VALIDATION_FAILED', 'Log channel not provided').asDisplayable();
     }
 
     return this.setConfig('globalLogChannel', context, log.id);
@@ -219,7 +219,7 @@ export class GuildCommand {
     @Options() { audit }: SetAuditChannelCommandParams,
   ) {
     if (!audit) {
-      throw new ValidationError('VALIDATION_FAILED', 'Audit channel not provided');
+      throw new ValidationError('VALIDATION_FAILED', 'Audit channel not provided').asDisplayable();
     }
 
     return this.setConfig('crewAuditChannel', context, audit.id);
@@ -235,9 +235,28 @@ export class GuildCommand {
     @Options() { category }: SetCategoryCommandParams,
   ) {
     if (!category) {
-      throw new ValidationError('VALIDATION_FAILED', 'Category not provided');
+      throw new ValidationError('VALIDATION_FAILED', 'Category not provided').asDisplayable();
     }
 
     return this.setConfig('globalVoiceCategory', context, category.id);
+  }
+
+  @Subcommand({
+    name: 'set_stockpile_log',
+    description: 'Set the log channel for stockpile updates. Guild Admin only',
+    dmPermission: false,
+  })
+  async onGuildSetStockpileUpdatesChannel(
+    @Context() context: SlashCommandContext,
+    @Options() { log }: SetLogChannelCommandParams,
+  ) {
+    if (!log) {
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        'Stockpile log channel not provided',
+      ).asDisplayable();
+    }
+
+    return this.setConfig('stockpileLogChannel', context, log.id);
   }
 }

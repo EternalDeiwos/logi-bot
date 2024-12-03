@@ -46,7 +46,7 @@ export class StockpileContentPromptBuilder extends BasePromptBuilder {
       throw new InternalError(
         'INTERNAL_SERVER_ERROR',
         "Stockpile categories exceeded Discord's limits. If you are seeing this message then it is due to a bug. Please report it.",
-      );
+      ).asDisplayable();
     }
 
     for (

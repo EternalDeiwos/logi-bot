@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InsertResult, UpdateResult } from 'typeorm';
+import { Client, GuildManager } from 'discord.js';
+import { groupBy } from 'lodash';
 import { ValidationError } from 'src/errors';
 import { WarService } from 'src/game/war/war.service';
 import { InsertStockpile } from './stockpile.entity';
@@ -17,11 +19,17 @@ import { StockpileLogQueryBuilder } from './stockpile-log.query';
 import { InsertStockpileEntry } from './stockpile-entry.entity';
 import { StockpileEntryQueryBuilder } from './stockpile-entry.query';
 import { InsertStockpileAccess, SelectStockpileAccess } from './stockpile-access.entity';
+import { StockpileLogDiffQueryBuilder } from './stockpile-diff.query';
+import { StockpileDiffRepository } from './stockpile-diff.repository';
+import { StockpileDiffPromptBuilder } from './stockpile-diff.prompt';
+
+const MAX_EMBEDS = 2;
 
 export abstract class StockpileService {
   abstract query(): StockpileQueryBuilder;
   abstract queryLog(): StockpileLogQueryBuilder;
   abstract queryEntries(): StockpileEntryQueryBuilder;
+  abstract queryDiff(): StockpileLogDiffQueryBuilder;
   abstract registerStockpile(data: InsertStockpile): Promise<void>;
   abstract registerLog(data: InsertStockpileLog): Promise<InsertResult>;
   abstract updateStockpile(data: InsertStockpileEntry[]): Promise<InsertResult>;
@@ -38,12 +46,15 @@ export class StockpileServiceImpl extends StockpileService {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly client: Client,
+    private readonly guildManager: GuildManager,
     private readonly warService: WarService,
     private readonly stockpileRepo: StockpileRepository,
     private readonly logRepo: StockpileLogRepository,
     private readonly currentEntryRepo: CurrentStockpileEntryRepository,
     private readonly entryRepo: StockpileEntryRepository,
     private readonly accessRepo: StockpileAccessRepository,
+    private readonly diffRepo: StockpileDiffRepository,
   ) {
     super();
   }
@@ -60,6 +71,10 @@ export class StockpileServiceImpl extends StockpileService {
     const gameVersion = this.configService.getOrThrow<string>('APP_FOXHOLE_VERSION');
     const catalogVersion = this.configService.getOrThrow<string>('APP_CATALOG_VERSION');
     return new StockpileEntryQueryBuilder(this.currentEntryRepo, gameVersion, catalogVersion);
+  }
+
+  queryDiff(): StockpileLogDiffQueryBuilder {
+    return new StockpileLogDiffQueryBuilder(this.diffRepo);
   }
 
   async registerStockpile(data: InsertStockpile) {
@@ -94,7 +109,54 @@ export class StockpileServiceImpl extends StockpileService {
   }
 
   async completeLogProcessing(logRef: SelectStockpileLog) {
-    return await this.logRepo.update(logRef, { processedAt: new Date() });
+    const result = await this.logRepo.update(logRef, { processedAt: new Date() });
+    const log = await this.queryLog().byLog(logRef).withCrew().withGuild().getOneOrFail();
+
+    if (log.guild.config.stockpileLogChannel) {
+      const guild = await this.guildManager.fetch(log.guild.guildSf);
+      const member = await guild.members.fetch(log.createdBy);
+
+      const diff = await this.queryDiff()
+        .byCurrentLog(logRef)
+        .withStockpile()
+        .withAccessRules()
+        .withLocation()
+        .withCatalog()
+        .order()
+        .getMany();
+
+      const groups = groupBy(
+        diff,
+        (d) => `${d.stockpile.name} @ ${d.stockpile.expandedLocation.getMajorName()}`,
+      );
+
+      const prompt = new StockpileDiffPromptBuilder(await this.client.application.emojis.fetch());
+
+      for (const [group, entries] of Object.entries(groups)) {
+        prompt.displayFields(entries, {
+          title: group,
+          footer: {
+            iconURL: member.displayAvatarURL(),
+            text: `Updated by ${member.displayName} and @${log.crew.shortName}`,
+          },
+        });
+      }
+
+      const logChannel = await guild.channels.fetch(log.guild.config.stockpileLogChannel);
+      const options = prompt.build();
+
+      if (options.embeds?.length && logChannel.isSendable()) {
+        for (let count = 0; count < options.embeds.length; count += MAX_EMBEDS) {
+          const { embeds, ...rest } = options;
+          await logChannel.send({
+            ...rest,
+            embeds: embeds.slice(count, count + MAX_EMBEDS),
+          });
+        }
+      }
+    }
+
+    return result;
   }
 
   async grantAccess(data: InsertStockpileAccess) {
