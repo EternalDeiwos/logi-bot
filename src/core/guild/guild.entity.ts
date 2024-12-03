@@ -21,6 +21,7 @@ export type GuildConfig = {
   crewCreatorRole?: string;
   crewViewerRole?: string;
   crewLeaderRole?: string;
+  stockpileLogChannel?: string;
 };
 
 @Entity()
