@@ -199,7 +199,7 @@ export class StockpileDiff {
   @Column({ type: 'interval', name: 'since_previous' })
   sincePrevious: IPostgresInterval;
 
-  getValue(): string {
+  getDiff(): string {
     const counts = [];
 
     if (this.diffShippable) {
@@ -215,5 +215,23 @@ export class StockpileDiff {
     }
 
     return counts.length ? counts.join(', ') : 'No change';
+  }
+
+  getValue(): string {
+    const counts = [];
+
+    if (this.currentQuantityShippable) {
+      counts.push(`${this.currentQuantityShippable}sc`);
+    }
+
+    if (this.currentQuantityCrated) {
+      counts.push(`${this.currentQuantityCrated}c`);
+    }
+
+    if (this.currentQuantity) {
+      counts.push(this.currentQuantity);
+    }
+
+    return counts.length ? counts.join(' + ') : 'None';
   }
 }

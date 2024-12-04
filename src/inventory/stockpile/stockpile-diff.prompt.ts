@@ -3,7 +3,7 @@ import { BasePromptBuilder } from 'src/bot/prompt';
 import { InternalError } from 'src/errors';
 import { StockpileDiff } from './stockpile-diff.entity';
 
-const ITEMS_PER_TABLE = 14;
+const ITEMS_PER_TABLE = 20;
 const DEFAULT_EMBED_OPTIONS: EmbedData = {
   title: 'Stockpile',
   color: Colors.DarkGreen,
@@ -18,12 +18,12 @@ export class StockpileDiffPromptBuilder extends BasePromptBuilder {
   }
 
   displayFields(diff: StockpileDiff[], options: EmbedData = {}) {
-    const [name, stockpile, change] = diff.reduce(
+    const [name, quantity, change] = diff.reduce(
       (state, d) => {
-        const [name, stockpile, change] = state;
+        const [name, quantity, change] = state;
         name.push(d.catalog.data.DisplayName);
-        stockpile.push(`${d.stockpile.name} @ ${d.stockpile.expandedLocation.getMajorName()}`);
-        change.push(d.getValue());
+        quantity.push(d.getValue());
+        change.push(d.getDiff());
         return state;
       },
       [[], [], []] as [string[], string[], string[]],
@@ -33,7 +33,8 @@ export class StockpileDiffPromptBuilder extends BasePromptBuilder {
       const { title, ...rest } = options;
       const embed = new EmbedBuilder({
         ...DEFAULT_EMBED_OPTIONS,
-        title: this.length ? `${title} Cont'd` : title,
+        title,
+        // title: this.length ? `${title} Cont'd` : title,
         ...rest,
       }).setTimestamp();
 
@@ -43,10 +44,10 @@ export class StockpileDiffPromptBuilder extends BasePromptBuilder {
         count += ITEMS_PER_TABLE
       ) {
         const nameSlice = name.slice(count, count + ITEMS_PER_TABLE).join('\n');
-        const stockpileSlice = stockpile.slice(count, count + ITEMS_PER_TABLE).join('\n');
+        const quantitySlice = quantity.slice(count, count + ITEMS_PER_TABLE).join('\n');
         const changeSlice = change.slice(count, count + ITEMS_PER_TABLE).join('\n');
 
-        if (nameSlice.length > 1024 || stockpileSlice.length > 1024 || changeSlice.length > 1024) {
+        if (nameSlice.length > 1024 || quantitySlice.length > 1024 || changeSlice.length > 1024) {
           throw new InternalError(
             'INTERNAL_SERVER_ERROR',
             "Stockpile diff table exceeded Discord's message size limits. If you are seeing this message then it is due to a bug. Please report it.",
@@ -60,8 +61,8 @@ export class StockpileDiffPromptBuilder extends BasePromptBuilder {
             inline: true,
           },
           {
-            name: 'Stockpile',
-            value: stockpileSlice,
+            name: 'Quantity',
+            value: quantitySlice,
             inline: true,
           },
           {
