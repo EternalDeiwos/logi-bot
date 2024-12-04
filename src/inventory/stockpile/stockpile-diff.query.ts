@@ -102,7 +102,16 @@ export class StockpileLogDiffQueryBuilder extends CommonQueryBuilder<StockpileDi
 
   order() {
     this.qb
-      .addOrderBy('GREATEST(diff.diff_uncrated, diff.diff_crated, diff.diff_shippable)', 'DESC')
+      .addOrderBy(
+        `
+        GREATEST(
+          CASE WHEN "diff"."diff_uncrated"=0 THEN -9999999 ELSE "diff"."diff_uncrated" END,
+          CASE WHEN "diff"."diff_crated"=0 THEN -9999999 ELSE "diff"."diff_crated" END,
+          CASE WHEN "diff"."diff_shippable"=0 THEN -9999999 ELSE "diff"."diff_shippable" END
+        )
+        `,
+        'DESC',
+      )
       .addOrderBy('catalog.category')
       .addOrderBy('catalog.display_name')
       .addOrderBy('catalog.id')
