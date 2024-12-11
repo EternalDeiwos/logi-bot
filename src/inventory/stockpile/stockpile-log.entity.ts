@@ -18,6 +18,7 @@ import { Guild } from 'src/core/guild/guild.entity';
 import { ExpandedPoi, Poi } from 'src/game/poi/poi.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 import { StockpileEntry } from './stockpile-entry.entity';
+import { StockpileDiff } from './stockpile-diff.entity';
 
 export type SelectStockpileLog = DeepPartial<Pick<StockpileLog, 'id'>>;
 export type InsertStockpileLog = DeepPartial<
@@ -37,6 +38,7 @@ export type InsertStockpileLog = DeepPartial<
 
 @Entity()
 export class StockpileLog {
+  @Expose()
   @PrimaryColumn({
     type: 'uuid',
     default: () => 'uuidv7()',
@@ -127,6 +129,12 @@ export class StockpileLog {
   @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => StockpileEntry, (entry) => entry.log)
   entries: StockpileEntry[];
+
+  @Expose()
+  @Type(() => StockpileDiff)
+  @Transform(({ value }) => (value ? value : null))
+  @OneToMany(() => StockpileDiff, (diff) => diff.currentLog)
+  diff: StockpileDiff[];
 
   @Column({ type: 'timestamptz', name: 'processed_at', nullable: true })
   processedAt: Date;

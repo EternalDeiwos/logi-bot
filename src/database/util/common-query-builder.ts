@@ -51,6 +51,11 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
     return this;
   }
 
+  offset(offset: number) {
+    this.qb.offset(offset);
+    return this;
+  }
+
   getMany() {
     return this.qb.getMany();
   }

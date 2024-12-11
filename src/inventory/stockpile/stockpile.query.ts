@@ -3,7 +3,6 @@ import { CommonQueryBuilder } from 'src/database/util';
 import { SelectStockpile, Stockpile } from './stockpile.entity';
 import { SelectPoi } from 'src/game/poi/poi.entity';
 import { SelectCatalog } from 'src/game/catalog/catalog.entity';
-import { SelectGuild } from 'src/core/guild/guild.entity';
 
 const searchWhere = (alias: string = 'stockpile') => {
   return new Brackets((qb) => qb.where(`${alias}.name ILIKE :query`));
@@ -32,36 +31,6 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
     this.qb.andWhere('stockpile.id IN (:...stockpiles)', {
       stockpiles: stockpileRef.map((c) => c.id),
     });
-
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild | SelectGuild[]) {
-    if (!Array.isArray(guildRef)) {
-      guildRef = [guildRef];
-    }
-
-    const params = guildRef.reduce(
-      (acc, g) => {
-        if (g.id) acc.guilds.push(g.id);
-        if (g.guildSf) acc.discordGuilds.push(g.guildSf);
-        return acc;
-      },
-      { guilds: [], discordGuilds: [] },
-    );
-
-    this.qb.andWhere(
-      new Brackets((qb) => {
-        if (params.guilds.length) {
-          qb.where('stockpile.guild_id IN (:...guilds)');
-        }
-
-        if (params.discordGuilds.length) {
-          qb.orWhere('guild.guild_sf IN (:...discordGuilds)');
-        }
-      }),
-      params,
-    );
 
     return this;
   }
