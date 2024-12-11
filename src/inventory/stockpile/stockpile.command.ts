@@ -17,6 +17,7 @@ import { DeltaCommand } from 'src/inventory/inventory.command-group';
 import { PoiSelectAutocompleteInterceptor } from 'src/game/poi/poi-select.interceptor';
 import { GuildService } from 'src/core/guild/guild.service';
 import { BotService } from 'src/bot/bot.service';
+import { CrewService } from 'src/core/crew/crew.service';
 import { AccessDecision } from 'src/core/access/access-decision';
 import { AccessService } from 'src/core/access/access.service';
 import { StockpileService } from './stockpile.service';
@@ -162,6 +163,7 @@ export class StockpileCommand {
     private readonly client: Client,
     private readonly guildService: GuildService,
     private readonly botService: BotService,
+    private readonly crewService: CrewService,
     private readonly stockpileService: StockpileService,
     private readonly accessService: AccessService,
   ) {}
@@ -209,9 +211,9 @@ export class StockpileCommand {
   })
   async onLogStockpile(
     @Context() [interaction]: SlashCommandContext,
-    @Options() { reportAttachment, crew, locationId, message }: StockpileLogCommandParams,
+    @Options() { reportAttachment, crew: crewRef, locationId, message }: StockpileLogCommandParams,
   ) {
-    const channelRef = crew || interaction.channelId;
+    const channelRef = crewRef || interaction.channelId;
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const guild = await this.guildService
       .query()
@@ -223,6 +225,19 @@ export class StockpileCommand {
 
     if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
       throw new AuthError('FORBIDDEN', 'Not allowed to update stockpiles').asDisplayable();
+    }
+
+    const crewCount = await this.crewService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .byCrew({ crewSf: channelRef })
+      .getCount();
+
+    if (!crewCount) {
+      throw new ValidationError(
+        'VALIDATION_FAILED',
+        'No crew selected. Please select a crew or run this command in a crew channel.',
+      ).asDisplayable();
     }
 
     const result = await this.stockpileService.registerLog({
