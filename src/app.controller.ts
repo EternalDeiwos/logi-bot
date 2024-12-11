@@ -1,4 +1,4 @@
-import { Controller, Get, Redirect, Res, VERSION_NEUTRAL } from '@nestjs/common';
+import { Controller, Get, HttpCode, Redirect, Res, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Expose } from 'class-transformer';
@@ -99,6 +99,8 @@ export class AppController {
   }
 
   @Get('invite')
+  @HttpCode(303)
+  @ApiResponse({ status: 303, description: 'Redirect to invite the bot to your server' })
   @Redirect('https://discord.com/api/oauth2/authorize', 303)
   inviteBot(@Res() res: Response) {
     const scope = this.configService.getOrThrow<string>('DISCORD_BOT_SCOPE');
@@ -106,5 +108,14 @@ export class AppController {
     const permissions = this.permissions.getPermissions();
     const params = `client_id=${client_id}&permissions=${permissions.valueOf()}&scope=${encodeURIComponent(scope)}`;
     return res.redirect(303, `https://discord.com/api/oauth2/authorize?${params}`);
+  }
+
+  @Get('discord')
+  @HttpCode(303)
+  @ApiResponse({ status: 303, description: 'Redirect to configured discord member invitation' })
+  @Redirect('https://discord.gg', 303)
+  inviteDiscord(@Res() res: Response) {
+    const url = this.configService.getOrThrow<string>('DISCORD_INVITE_LINK');
+    return res.redirect(303, url);
   }
 }
