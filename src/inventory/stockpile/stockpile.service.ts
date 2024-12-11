@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InsertResult, UpdateResult } from 'typeorm';
-import { Client, GuildManager } from 'discord.js';
+import { DeleteResult, InsertResult, UpdateResult } from 'typeorm';
+import { Client, GuildManager, Snowflake } from 'discord.js';
 import { groupBy } from 'lodash';
 import { ValidationError } from 'src/errors';
 import { WarService } from 'src/game/war/war.service';
-import { InsertStockpile } from './stockpile.entity';
+import { InsertStockpile, SelectStockpile } from './stockpile.entity';
 import { StockpileRepository } from './stockpile.repository';
 import { StockpileLogRepository } from './stockpile-log.repository';
 import {
@@ -38,6 +38,14 @@ export abstract class StockpileService {
   abstract revokeAccess(
     accessRef: SelectStockpileAccess | SelectStockpileAccess[],
   ): Promise<UpdateResult>;
+  abstract deleteStockpile(
+    logRef: SelectStockpile | SelectStockpile[],
+    deletedBy: Snowflake,
+  ): Promise<DeleteResult>;
+  abstract deleteLog(
+    logRef: SelectStockpileLog | SelectStockpileLog[],
+    deletedBy: Snowflake,
+  ): Promise<DeleteResult>;
 }
 
 @Injectable()
@@ -173,6 +181,32 @@ export class StockpileServiceImpl extends StockpileService {
       .update()
       .set({ deletedAt: new Date() })
       .where('access.id IN (:...access)', { access: accessRef.map((a) => a.id) })
+      .execute();
+  }
+
+  async deleteStockpile(stockpileRef: SelectStockpile | SelectStockpile[], deletedBy: Snowflake) {
+    if (!Array.isArray(stockpileRef)) {
+      stockpileRef = [stockpileRef];
+    }
+
+    return await this.stockpileRepo
+      .createQueryBuilder('stockpile')
+      .update()
+      .set({ deletedAt: new Date(), deletedBy })
+      .where('stockpile.id IN (:...stockpiles)', { stockpiles: stockpileRef.map((s) => s.id) })
+      .execute();
+  }
+
+  async deleteLog(logRef: SelectStockpileLog | SelectStockpileLog[], deletedBy: Snowflake) {
+    if (!Array.isArray(logRef)) {
+      logRef = [logRef];
+    }
+
+    return await this.logRepo
+      .createQueryBuilder('log')
+      .update()
+      .set({ deletedAt: new Date(), deletedBy })
+      .where('id IN (:...logs)', { logs: logRef.map((l) => l.id) })
       .execute();
   }
 }

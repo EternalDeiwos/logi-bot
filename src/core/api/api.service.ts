@@ -6,15 +6,15 @@ import { createHash } from 'crypto';
 import { CompactSign } from 'jose';
 
 export class APITokenPayload {
-  @ApiProperty()
+  @ApiProperty({ example: '1234567890' })
   @Expose()
   aud: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '1234567890' })
   @Expose()
   sub: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: Date.now() })
   @Expose()
   iat: number;
 

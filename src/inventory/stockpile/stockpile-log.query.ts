@@ -1,9 +1,8 @@
-import { Brackets, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
 import { SelectPoi } from 'src/game/poi/poi.entity';
 import { SelectCrew } from 'src/core/crew/crew.entity';
-import { SelectGuild } from 'src/core/guild/guild.entity';
 
 export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
   constructor(repo: Repository<StockpileLog>) {
@@ -26,28 +25,6 @@ export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
     }
 
     this.qb.andWhere('log.location_id IN (:...poi)', { poi: poiRef.map((c) => c.id) });
-
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild | SelectGuild[]) {
-    if (!Array.isArray(guildRef)) {
-      guildRef = [guildRef];
-    }
-
-    this.qb.andWhere(
-      new Brackets((qb) =>
-        qb.where('log.guild_id IN (:...guilds)').orWhere('guild.guild_sf IN (:...discordGuilds)'),
-      ),
-      guildRef.reduce(
-        (acc, g) => {
-          if (g.id) acc.guilds.push(g.id);
-          if (g.guildSf) acc.discordGuilds.push(g.guildSf);
-          return acc;
-        },
-        { guilds: [], discordGuilds: [] },
-      ),
-    );
 
     return this;
   }
@@ -93,6 +70,18 @@ export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
     this.qb
       .leftJoinAndSelect('stockpile.access', 'access')
       .leftJoinAndSelect('access.rule', 'rule');
+    return this;
+  }
+
+  withDiff() {
+    this.qb
+      .leftJoinAndSelect('log.diff', 'diff')
+      .leftJoinAndSelect('diff.stockpile', 'diff_stockpile');
+    return this;
+  }
+
+  withDiffCatalog() {
+    this.qb.leftJoinAndSelect('diff.catalog', 'diff_catalog');
     return this;
   }
 }
