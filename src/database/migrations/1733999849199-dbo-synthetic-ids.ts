@@ -208,7 +208,7 @@ export class DboSyntheticIds1733999849199 implements MigrationInterface {
       `ALTER TABLE "app"."crew" ADD CONSTRAINT "uk_guild_crew_deleted_at" UNIQUE NULLS NOT DISTINCT ("guild_id", "crew_channel_sf", "deleted_at")`,
     );
     await queryRunner.query(
-      `ALTER TABLE "app"."crew_share" ADD CONSTRAINT "uk_share_target_guild_crew_deleted_at" UNIQUE NULLS NOT DISTINCT ("target_guild_id", "crew_channel_sf", "deleted_at")`,
+      `ALTER TABLE "app"."crew_share" ADD CONSTRAINT "uk_share_target_guild_crew_deleted_at" UNIQUE NULLS NOT DISTINCT ("target_guild_id", "crew_id", "deleted_at")`,
     );
     await queryRunner.query(
       `ALTER TABLE "app"."tag_template" ADD CONSTRAINT "fk_tag_template_crew_id" FOREIGN KEY ("crew_id") REFERENCES "app"."crew"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
