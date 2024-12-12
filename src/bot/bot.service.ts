@@ -11,6 +11,7 @@ export type CommandInteraction = Exclude<Interaction, AutocompleteInteraction>;
 export type Reply =
   | Awaited<ReturnType<CommandInteraction['reply']>>
   | Awaited<ReturnType<CommandInteraction['followUp']>>;
+const MAX_EMBEDS = 8;
 
 export abstract class BotService {
   abstract replyOrFollowUp(
@@ -57,14 +58,14 @@ export class BotServiceImpl extends BotService {
       interaction = interaction.pop();
     }
 
-    if (options.embeds && options.embeds.length > 10) {
+    if (options.embeds && options.embeds.length > MAX_EMBEDS) {
       const { embeds, ...rest } = options;
       const result = [];
-      for (let count = 0; count < embeds.length; count += 10) {
+      for (let count = 0; count < embeds.length; count += MAX_EMBEDS) {
         result.push(
           await this.replyOrFollowUp(interaction, {
             ...rest,
-            embeds: embeds.slice(count, count + 10),
+            embeds: embeds.slice(count, count + MAX_EMBEDS),
           }),
         );
       }
