@@ -9,4 +9,8 @@ export * from './1726307788459-game-tables';
 export * from './1726315986907-game-views';
 export * from './1732298879418-stockpiles';
 export * from './1733243029192-game-stockpile-history';
+<<<<<<< HEAD
 export * from './1735249864392-stockpile-entry-current-war';
+=======
+export * from './1733999849199-dbo-synthetic-ids';
+>>>>>>> bf65d06 (feat(crew/ticket): generate synthetic id)

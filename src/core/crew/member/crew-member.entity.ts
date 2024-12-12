@@ -37,15 +37,22 @@ export class CrewMember {
     type: 'int8',
     name: 'crew_channel_sf',
   })
-  @RelationId((member: CrewMember) => member.crew)
   @Index('crew_channel_sf_idx_crew_member')
   crewSf: Snowflake;
 
+  @Column({
+    type: 'uuid',
+    name: 'crew_id',
+  })
+  @RelationId((member: CrewMember) => member.crew)
+  @Index('crew_id_idx_crew_member')
+  crewId: Snowflake;
+
   @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
-    name: 'crew_channel_sf',
-    referencedColumnName: 'crewSf',
-    foreignKeyConstraintName: 'fk_crew_member_crew_channel_sf',
+    name: 'crew_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_crew_member_crew_id',
   })
   crew: Crew;
 

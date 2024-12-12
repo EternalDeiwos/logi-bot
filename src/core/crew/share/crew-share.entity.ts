@@ -22,23 +22,29 @@ export type SelectCrewShare = DeepPartial<Pick<CrewShare, 'guildId' | 'crewSf'>>
 @Entity('crew_share')
 @Unique('uk_share_target_guild_crew_deleted_at', ['guildId', 'crewSf', 'deletedAt'])
 export class CrewShare {
+  @PrimaryColumn({
+    type: 'uuid',
+    name: 'crew_id',
+    primaryKeyConstraintName: 'pk_crew_share',
+  })
+  @RelationId((share: CrewShare) => share.crew)
+  crewId: Snowflake;
+
   /**
    * Snowflake for crew Discord channel
    * @type Snowflake
    */
-  @PrimaryColumn({
+  @Column({
     type: 'int8',
     name: 'crew_channel_sf',
-    primaryKeyConstraintName: 'pk_crew_share',
   })
-  @RelationId((share: CrewShare) => share.crew)
   crewSf: Snowflake;
 
   @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE' })
   @JoinColumn({
-    name: 'crew_channel_sf',
-    referencedColumnName: 'crewSf',
-    foreignKeyConstraintName: 'fk_crew_share_crew_channel_sf',
+    name: 'crew_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_crew_share_crew_id',
   })
   crew: Crew;
 

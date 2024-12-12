@@ -76,11 +76,21 @@ export class ForumTagTemplate {
   @Index('crew_channel_sf_idx_tag_template')
   crewSf: Snowflake;
 
+  @Column({
+    type: 'uuid',
+    name: 'crew_id',
+    nullable: true,
+    comment: 'Crew for which the tag was created, to identify tickets for a specific crew.',
+  })
+  @RelationId((tag: ForumTagTemplate) => tag.crew)
+  @Index('crew_id_idx_tag_template')
+  crewId: string;
+
   @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', nullable: true, eager: true })
   @JoinColumn({
-    name: 'crew_channel_sf',
-    referencedColumnName: 'crewSf',
-    foreignKeyConstraintName: 'fk_tag_template_crew_channel_sf',
+    name: 'crew_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_tag_template_crew_id',
   })
   @Expose()
   @Transform(({ value }) => (value ? value : null))
