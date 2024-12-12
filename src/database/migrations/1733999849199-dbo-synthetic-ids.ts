@@ -205,10 +205,10 @@ export class DboSyntheticIds1733999849199 implements MigrationInterface {
       `CREATE INDEX "crew_id_idx_stockpile_log" ON "app"."stockpile_log" ("crew_id") `,
     );
     await queryRunner.query(
-      `ALTER TABLE "app"."crew" ADD CONSTRAINT "uk_guild_crew_deleted_at" UNIQUE ("guild_id", "crew_channel_sf", "deleted_at")`,
+      `ALTER TABLE "app"."crew" ADD CONSTRAINT "uk_guild_crew_deleted_at" UNIQUE NULLS NOT DISTINCT ("guild_id", "crew_channel_sf", "deleted_at")`,
     );
     await queryRunner.query(
-      `ALTER TABLE "app"."crew_share" ADD CONSTRAINT "uk_share_target_guild_crew_deleted_at" UNIQUE ("target_guild_id", "crew_channel_sf", "deleted_at")`,
+      `ALTER TABLE "app"."crew_share" ADD CONSTRAINT "uk_share_target_guild_crew_deleted_at" UNIQUE NULLS NOT DISTINCT ("target_guild_id", "crew_channel_sf", "deleted_at")`,
     );
     await queryRunner.query(
       `ALTER TABLE "app"."tag_template" ADD CONSTRAINT "fk_tag_template_crew_id" FOREIGN KEY ("crew_id") REFERENCES "app"."crew"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
@@ -341,14 +341,14 @@ export class DboSyntheticIds1733999849199 implements MigrationInterface {
       `ALTER TABLE "app"."crew_share" ADD CONSTRAINT "PK_28b09d73c2c1af3dc9cf9d66d58" PRIMARY KEY ("crew_channel_sf", "target_guild_id", "crew_id")`,
     );
     await queryRunner.query(
-      `ALTER TABLE "app"."crew_share" ADD CONSTRAINT "uk_share_target_guild_crew_deleted_at" UNIQUE ("crew_channel_sf", "deleted_at", "target_guild_id")`,
+      `ALTER TABLE "app"."crew_share" ADD CONSTRAINT "uk_share_target_guild_crew_deleted_at" UNIQUE NULLS NOT DISTINCT ("crew_channel_sf", "deleted_at", "target_guild_id")`,
     );
     await queryRunner.query(`ALTER TABLE "app"."crew" DROP CONSTRAINT "pk_crew_id"`);
     await queryRunner.query(
       `ALTER TABLE "app"."crew" ADD CONSTRAINT "PK_744198c692ecba5f2da7d18c58b" PRIMARY KEY ("crew_channel_sf", "id")`,
     );
     await queryRunner.query(
-      `ALTER TABLE "app"."crew" ADD CONSTRAINT "uk_guild_crew_deleted_at" UNIQUE ("crew_channel_sf", "deleted_at", "guild_id")`,
+      `ALTER TABLE "app"."crew" ADD CONSTRAINT "uk_guild_crew_deleted_at" UNIQUE NULLS NOT DISTINCT ("crew_channel_sf", "deleted_at", "guild_id")`,
     );
     await queryRunner.query(`ALTER TABLE "app"."ticket" DROP CONSTRAINT "pk_ticket_id"`);
     await queryRunner.query(

@@ -62,20 +62,6 @@ export class ForumTagTemplate {
   @Transform(({ value }) => (value ? value : null))
   guild: Guild;
 
-  /**
-   * Snowflake for crew Discord channel
-   * @type Snowflake
-   */
-  @Column({
-    type: 'int8',
-    name: 'crew_channel_sf',
-    nullable: true,
-    comment: 'Crew for which the tag was created, to identify tickets for a specific crew.',
-  })
-  @RelationId((tag: ForumTagTemplate) => tag.crew)
-  @Index('crew_channel_sf_idx_tag_template')
-  crewSf: Snowflake;
-
   @Column({
     type: 'uuid',
     name: 'crew_id',

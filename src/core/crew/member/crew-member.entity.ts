@@ -20,11 +20,11 @@ import { Guild } from 'src/core/guild/guild.entity';
 export type InsertCrewMember = DeepPartial<
   Omit<CrewMember, 'crew' | 'guild' | 'createdAt' | 'deletedAt' | 'requireAccess'>
 >;
-export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'memberSf' | 'crewSf'>>;
+export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'memberSf' | 'crewId'>>;
 export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'access'>>;
 
 @Entity('crew_member')
-@Unique('uk_crew_channel_member_deleted_at', ['crewSf', 'memberSf', 'deletedAt'])
+@Unique('uk_crew_member_user_deleted_at', ['crewId', 'memberSf', 'deletedAt'])
 export class CrewMember {
   @PrimaryColumn({
     type: 'uuid',
@@ -32,13 +32,6 @@ export class CrewMember {
     primaryKeyConstraintName: 'pk_crew_member_id',
   })
   id: string;
-
-  @Column({
-    type: 'int8',
-    name: 'crew_channel_sf',
-  })
-  @Index('crew_channel_sf_idx_crew_member')
-  crewSf: Snowflake;
 
   @Column({
     type: 'uuid',

@@ -41,7 +41,7 @@ export type InsertCrew = DeepPartial<
     | 'getCrewOwner'
   >
 >;
-export type SelectCrew = DeepPartial<Pick<Crew, 'crewSf'>>;
+export type SelectCrew = DeepPartial<Pick<Crew, 'id' | 'crewSf'>>;
 export type UpdateCrew = DeepPartial<Pick<Crew, 'hasMovePrompt' | 'isPermanent' | 'isSecureOnly'>>;
 export type DeleteCrew = SelectCrew & { deletedBySf?: Snowflake };
 export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
@@ -67,6 +67,7 @@ export class Crew {
     type: 'int8',
     name: 'crew_channel_sf',
   })
+  @Index('crew_channel_sf_idx_crew')
   crewSf: Snowflake;
 
   @Expose()

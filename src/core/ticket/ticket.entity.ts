@@ -55,12 +55,6 @@ export class Ticket {
   @Index('previous_ticket_id_idx_ticket')
   previousTicketId: string;
 
-  @Expose()
-  @Column({ type: 'int8', name: 'previous_thread_sf', nullable: true })
-  @RelationId((ticket: Ticket) => ticket.previous)
-  @Index('previous_thread_sf_idx_ticket')
-  previousThreadSf: Snowflake;
-
   @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true })
   @Expose()
   @Transform(({ value }) => (value && 'id' in value ? value : null))
@@ -70,15 +64,6 @@ export class Ticket {
     foreignKeyConstraintName: 'fk_ticket_previous_ticket_id',
   })
   previous: Ticket;
-
-  /**
-   * Snowflake for crew Discord channel
-   * @type Snowflake
-   */
-  @Column({ type: 'int8', name: 'crew_channel_sf' })
-  @Expose()
-  @Index('crew_channel_sf_idx_ticket')
-  crewSf: Snowflake;
 
   @Column({ type: 'uuid', name: 'crew_id' })
   @Expose()

@@ -46,11 +46,6 @@ export class StockpileLog {
   })
   id: string;
 
-  @Column({ name: 'crew_channel_sf', type: 'int8', nullable: true })
-  @RelationId((log: StockpileLog) => log.crew)
-  @Index('crew_channel_sf_idx_stockpile_log')
-  crewSf: string;
-
   @Column({ name: 'crew_id', type: 'uuid', nullable: true })
   @RelationId((log: StockpileLog) => log.crew)
   @Index('crew_id_idx_stockpile_log')

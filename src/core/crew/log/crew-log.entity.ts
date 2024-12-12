@@ -47,11 +47,6 @@ export class CrewLog {
   })
   guild: Guild;
 
-  @Column({ type: 'int8', name: 'crew_channel_sf' })
-  @Expose()
-  @Index('crew_channel_sf_idx_crew_log')
-  crewSf: Snowflake;
-
   @Column({ type: 'uuid', name: 'crew_id' })
   @Expose()
   @Index('crew_id_idx_crew_log')

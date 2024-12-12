@@ -17,10 +17,10 @@ import { Crew } from 'src/core/crew/crew.entity';
 export type InsertCrewShare = DeepPartial<
   Omit<CrewShare, 'crew' | 'guild' | 'createdAt' | 'deletedAt'>
 >;
-export type SelectCrewShare = DeepPartial<Pick<CrewShare, 'guildId' | 'crewSf'>>;
+export type SelectCrewShare = DeepPartial<Pick<CrewShare, 'guildId' | 'crewId'>>;
 
 @Entity('crew_share')
-@Unique('uk_share_target_guild_crew_deleted_at', ['guildId', 'crewSf', 'deletedAt'])
+@Unique('uk_share_target_guild_crew_deleted_at', ['guildId', 'crewId', 'deletedAt'])
 export class CrewShare {
   @PrimaryColumn({
     type: 'uuid',
@@ -29,16 +29,6 @@ export class CrewShare {
   })
   @RelationId((share: CrewShare) => share.crew)
   crewId: Snowflake;
-
-  /**
-   * Snowflake for crew Discord channel
-   * @type Snowflake
-   */
-  @Column({
-    type: 'int8',
-    name: 'crew_channel_sf',
-  })
-  crewSf: Snowflake;
 
   @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE' })
   @JoinColumn({
