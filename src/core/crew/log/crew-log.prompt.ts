@@ -1,9 +1,20 @@
-import { Colors, EmbedBuilder, Guild as DiscordGuild, GuildMember, roleMention } from 'discord.js';
+import { Logger } from '@nestjs/common';
+import {
+  Colors,
+  EmbedBuilder,
+  Guild as DiscordGuild,
+  GuildMember,
+  roleMention,
+  ButtonStyle,
+  ButtonBuilder,
+  ActionRowBuilder,
+} from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
 import { Crew } from 'src/core/crew/crew.entity';
 
 export class CrewLogPromptBuilder extends BasePromptBuilder {
-  addCrewDeleteMessage(
+  private readonly logger = new Logger(CrewLogPromptBuilder.name);
+  addCrewLogMessage(
     discordGuild: DiscordGuild,
     crew: Crew,
     member: GuildMember,
@@ -30,6 +41,18 @@ export class CrewLogPromptBuilder extends BasePromptBuilder {
     return this.add({
       content: roleMention(crew.roleSf),
       allowedMentions: { roles: [crew.roleSf] },
+    });
+  }
+
+  addCrewJoinButton(crew: Crew) {
+    this.logger.debug('CREW JOIN', crew.crewSf, JSON.stringify(crew));
+    const join = new ButtonBuilder()
+      .setCustomId(`crew/join/${crew.crewSf}`)
+      .setLabel('Join Crew')
+      .setStyle(ButtonStyle.Primary);
+
+    return this.add({
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(join)],
     });
   }
 }

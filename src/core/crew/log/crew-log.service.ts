@@ -48,13 +48,9 @@ export class CrewLogServiceImpl extends CrewLogService {
     const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
     const createdAt = new Date();
 
-    const prompt = new CrewLogPromptBuilder().addCrewDeleteMessage(
-      discordGuild,
-      crew,
-      member,
-      data.content,
-      createdAt,
-    );
+    const prompt = new CrewLogPromptBuilder()
+      .addCrewLogMessage(discordGuild, crew, member, data.content, createdAt)
+      .addCrewJoinButton(crew);
 
     const message = await channel.send(
       prompt.clone<CrewLogPromptBuilder>().addCrewMention(crew).build(),

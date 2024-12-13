@@ -393,17 +393,21 @@ export class CrewCommand {
     return this.joinCrew(context, data);
   }
 
-  @Button('crew/join')
-  async onCrewJoinRequest(@Context() [interaction]: ButtonContext) {
+  @Button('crew/join/:crew')
+  async onCrewJoinRequest(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('crew') crewRef: Snowflake,
+  ) {
+    this.logger.debug('CREW JOIN HANDLER', { crewRef, channelId: interaction.channelId });
     const memberRef = interaction?.member?.user?.id ?? interaction?.user?.id;
-    const channel = await interaction.guild.channels.fetch(interaction.channelId);
+    const channel = await interaction.guild.channels.fetch(crewRef || interaction.channelId);
 
     if (!channel.permissionsFor(memberRef).has(PermissionsBitField.Flags.ViewChannel)) {
       throw new AuthError('FORBIDDEN', 'Forbidden');
     }
 
     await this.memberService.registerCrewMember(
-      interaction.channelId,
+      crewRef || interaction.channelId,
       memberRef,
       CrewMemberAccess.MEMBER,
     );

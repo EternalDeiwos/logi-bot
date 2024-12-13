@@ -4,6 +4,7 @@ import {
   ButtonStyle,
   Colors,
   EmbedBuilder,
+  Snowflake,
   userMention,
 } from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
@@ -31,9 +32,9 @@ export class CrewInfoPromptBuilder extends BasePromptBuilder {
     return this.add({ embeds: [embed] });
   }
 
-  public addCrewControls() {
+  public addCrewControls(crew: Crew) {
     const join = new ButtonBuilder()
-      .setCustomId('crew/join')
+      .setCustomId(`crew/join/${crew.crewSf}`)
       .setLabel('Join Crew')
       .setStyle(ButtonStyle.Primary);
 

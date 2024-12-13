@@ -381,7 +381,7 @@ export class TicketServiceImpl extends TicketService {
     const prompt = new TicketStatusPromptBuilder().addIndividualCrewStatus(discordGuild, crew);
 
     if (targetChannel.id === crew.crewSf) {
-      prompt.add(new CrewInfoPromptBuilder().addCrewControls());
+      prompt.add(new CrewInfoPromptBuilder().addCrewControls(crew));
     }
 
     await targetChannel.send(prompt.build());

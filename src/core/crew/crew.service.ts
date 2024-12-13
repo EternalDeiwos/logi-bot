@@ -457,7 +457,7 @@ export class CrewServiceImpl extends CrewService {
     const prompt = new CrewStatusPromptBuilder().addIndividualCrewStatus(discordGuild, crew);
 
     if (targetChannel.id === crew.crewSf) {
-      prompt.add(new CrewInfoPromptBuilder().addCrewControls());
+      prompt.add(new CrewInfoPromptBuilder().addCrewControls(crew));
     }
 
     await targetChannel.send(prompt.build());
@@ -522,7 +522,7 @@ export class CrewServiceImpl extends CrewService {
     const members = await this.memberService.query().byCrew(crew).getMany();
     const prompt = new CrewInfoPromptBuilder()
       .addCrewPromptMessage(crew, members)
-      .addCrewControls();
+      .addCrewControls(crew);
     const message = await channel.send(prompt.build());
     await message.pin();
   }
