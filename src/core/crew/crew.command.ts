@@ -393,12 +393,16 @@ export class CrewCommand {
     return this.joinCrew(context, data);
   }
 
+  @Button('crew/join')
+  async onCrewChannelJoinRequest(@Context() context: ButtonContext) {
+    return this.onCrewJoinRequest(context);
+  }
+
   @Button('crew/join/:crew')
   async onCrewJoinRequest(
     @Context() [interaction]: ButtonContext,
-    @ComponentParam('crew') crewRef: Snowflake,
+    @ComponentParam('crew') crewRef?: Snowflake,
   ) {
-    this.logger.debug('CREW JOIN HANDLER', { crewRef, channelId: interaction.channelId });
     const memberRef = interaction?.member?.user?.id ?? interaction?.user?.id;
     const channel = await interaction.guild.channels.fetch(crewRef || interaction.channelId);
 

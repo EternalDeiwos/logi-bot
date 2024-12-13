@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import {
   Colors,
   EmbedBuilder,
@@ -13,7 +12,6 @@ import { BasePromptBuilder } from 'src/bot/prompt';
 import { Crew } from 'src/core/crew/crew.entity';
 
 export class CrewLogPromptBuilder extends BasePromptBuilder {
-  private readonly logger = new Logger(CrewLogPromptBuilder.name);
   addCrewLogMessage(
     discordGuild: DiscordGuild,
     crew: Crew,
@@ -45,7 +43,6 @@ export class CrewLogPromptBuilder extends BasePromptBuilder {
   }
 
   addCrewJoinButton(crew: Crew) {
-    this.logger.debug('CREW JOIN', crew.crewSf, JSON.stringify(crew));
     const join = new ButtonBuilder()
       .setCustomId(`crew/join/${crew.crewSf}`)
       .setLabel('Join Crew')
