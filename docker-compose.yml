@@ -9,6 +9,23 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?required}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?required}
 
+  kanboard:
+    image: kanboard/kanboard
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:8081:80
+    volumes:
+      - kanboard-data:/var/www/app/data
+      - kanboard-plugins:/var/www/app/plugins
+      - kanboard-ssl:/etc/nginx/ssl
+    environment:
+      PLUGIN_INSTALLER: 'true'
+      DB_DRIVER: postgres
+      DB_HOSTNAME: postgres
+      DB_USERNAME: '${POSTGRES_USER:?required}'
+      DB_PASSWORD: '${POSTGRES_PASSWORD:?required}'
+      DB_NAME: '${KANBOARD_DB:?required}'
+
   postgres:
     image: ghcr.io/eternaldeiwos/postgresql:16
     restart: unless-stopped
@@ -24,4 +41,7 @@ services:
       POSTGRES_SCHEMA: '${POSTGRES_SCHEMA:?required}'
 
 volumes:
+  kanboard-data: {}
+  kanboard-plugins: {}
+  kanboard-ssl: {}
   bot-db-data: {}

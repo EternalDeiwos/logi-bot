@@ -7,4 +7,6 @@ psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" --dbname "${POSTGRES_DB}" 
 	create extension "vector" with schema public;
 	create extension "uuidv7-sql" with schema public;
 	create extension "uuid-ossp";
+
+	create database ${KANBOARD_DB} owner ${POSTGRES_USER};
 EOSQL
