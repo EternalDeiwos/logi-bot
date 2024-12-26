@@ -170,6 +170,18 @@ export class StockpileEntry {
       .withDeleted()
       .leftJoinAndSelect('entry.log', 'l')
       .leftJoinAndSelect('entry.expandedCatalog', 'c')
+      .innerJoin(
+        () =>
+          ds
+            .createQueryBuilder()
+            .subQuery()
+            .addSelect('war_number')
+            .from(War, 'war')
+            .addOrderBy('war.war_number', 'DESC')
+            .limit(1),
+        'w',
+        'w.war_number=entry.war_number',
+      )
       .andWhere('l.deleted_at IS NULL')
       .orderBy('entry.stockpile_id')
       .addOrderBy('entry.catalog_id')
