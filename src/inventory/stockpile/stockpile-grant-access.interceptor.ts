@@ -38,6 +38,7 @@ export class StockpileGrantAccessAutocompleteInterceptor extends AutocompleteInt
     if (focused.name === 'stockpile') {
       const results = await this.stockpileService
         .query()
+        .forCurrentWar()
         .withPoi()
         .withGuild()
         .byGuild({ guildSf: interaction.guildId })

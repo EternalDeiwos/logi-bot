@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { BaseError } from 'src/errors';
 import { WarRepository } from './war.repository';
 import { WarFaction } from './war.entity';
+import { WarQueryBuilder } from './war.query';
 
 type WarData = {
   warNumber: string;
@@ -21,6 +22,10 @@ export class WarService {
     private readonly configService: ConfigService,
     private readonly warRepo: WarRepository,
   ) {}
+
+  query() {
+    return new WarQueryBuilder(this.warRepo);
+  }
 
   async getCurrent() {
     try {

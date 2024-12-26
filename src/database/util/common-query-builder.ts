@@ -79,4 +79,8 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
   getCount() {
     return this.qb.getCount();
   }
+
+  getQuery() {
+    return this.qb;
+  }
 }

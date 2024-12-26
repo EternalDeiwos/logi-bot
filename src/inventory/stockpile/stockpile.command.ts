@@ -275,10 +275,12 @@ export class StockpileCommand {
     const accessArgs = await this.accessService.getTestArgs(interaction);
     const stockpiles = await this.stockpileService
       .query()
+      .forCurrentWar()
       .withGuild()
       .byGuild({ guildSf: interaction.guildId })
       .withAccessRules()
       .getMany();
+
     const accessibleStockpiles = stockpiles.filter((stockpile) =>
       stockpile.access.some((access) =>
         AccessDecision.fromEntry(access.rule).permit(...accessArgs),

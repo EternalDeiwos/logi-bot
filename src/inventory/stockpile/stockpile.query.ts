@@ -1,15 +1,19 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectStockpile, Stockpile } from './stockpile.entity';
 import { SelectPoi } from 'src/game/poi/poi.entity';
 import { SelectCatalog } from 'src/game/catalog/catalog.entity';
+import { WarQueryBuilder } from 'src/game/war/war.query';
+import { SelectStockpile, Stockpile } from './stockpile.entity';
 
 const searchWhere = (alias: string = 'stockpile') => {
   return new Brackets((qb) => qb.where(`${alias}.name ILIKE :query`));
 };
 
 export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
-  constructor(repo: Repository<Stockpile>) {
+  constructor(
+    repo: Repository<Stockpile>,
+    private readonly currentWarQuery: WarQueryBuilder,
+  ) {
     super(repo, 'stockpile');
   }
 
@@ -122,6 +126,17 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
     this.qb
       .leftJoinAndSelect('stockpile.access', 'access')
       .leftJoinAndSelect('access.rule', 'rule');
+    return this;
+  }
+
+  forCurrentWar() {
+    this.qb
+      .addCommonTableExpression(this.currentWarQuery.getQuery(), 'current_war')
+      .innerJoin(
+        () => this.qb.subQuery().addSelect('war_number').from('current_war', 'current_war'),
+        'war',
+        'war.war_number=stockpile.war_number',
+      );
     return this;
   }
 

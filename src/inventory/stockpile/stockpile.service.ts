@@ -68,7 +68,7 @@ export class StockpileServiceImpl extends StockpileService {
   }
 
   query() {
-    return new StockpileQueryBuilder(this.stockpileRepo);
+    return new StockpileQueryBuilder(this.stockpileRepo, this.warService.query().byCurrent());
   }
 
   queryLog() {
