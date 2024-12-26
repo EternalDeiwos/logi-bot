@@ -77,6 +77,7 @@ export class StockpileSearchAutocompleteInterceptor extends AutocompleteIntercep
       const accessArgs = await this.accessService.getTestArgs(interaction);
       const query = await this.stockpileService
         .query()
+        .forCurrentWar()
         .withPoi()
         .withGuild()
         .withAccessRules()
