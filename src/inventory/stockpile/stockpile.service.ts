@@ -86,7 +86,7 @@ export class StockpileServiceImpl extends StockpileService {
   }
 
   async registerStockpile(data: InsertStockpile) {
-    const war = await this.warService.getCurrent();
+    const war = await this.warService.query().byCurrent().getOneOrFail();
 
     if (data.name.length > 10) {
       throw new ValidationError(
@@ -107,7 +107,7 @@ export class StockpileServiceImpl extends StockpileService {
   }
 
   async registerLog(data: InsertStockpileLog) {
-    const war = await this.warService.getCurrent();
+    const war = await this.warService.query().byCurrent().getOneOrFail();
     const log = this.logRepo.create({ ...data, warNumber: war.warNumber });
     return this.logRepo.insert(log);
   }

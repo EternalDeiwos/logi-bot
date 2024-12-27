@@ -14,25 +14,25 @@ type WarData = {
   conquestEndTime: number;
 };
 
+export abstract class WarService {
+  abstract query(): WarQueryBuilder;
+  abstract fetchWar(): Promise<WarData>;
+  abstract updateWar(): Promise<number>;
+}
+
 @Injectable()
-export class WarService {
+export class WarServiceImpl extends WarService {
   private readonly logger = new Logger(WarService.name);
 
   constructor(
     private readonly configService: ConfigService,
     private readonly warRepo: WarRepository,
-  ) {}
+  ) {
+    super();
+  }
 
   query() {
     return new WarQueryBuilder(this.warRepo);
-  }
-
-  async getCurrent() {
-    try {
-      return await this.warRepo.getCurrent();
-    } catch (err) {
-      throw new BaseError('QUERY_FAILED', 'Failed to get current war', err);
-    }
   }
 
   async fetchWar(): Promise<WarData> {
