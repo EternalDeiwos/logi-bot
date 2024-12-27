@@ -1,6 +1,5 @@
 import { Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectGuild } from 'src/core/guild/guild.entity';
 import { SelectTeam, Team } from './team.entity';
 
 export class TeamQueryBuilder extends CommonQueryBuilder<Team> {
@@ -11,17 +10,6 @@ export class TeamQueryBuilder extends CommonQueryBuilder<Team> {
 
   byTeam(teamRef: SelectTeam) {
     this.qb.andWhere('team.id=:id', teamRef);
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild) {
-    if (guildRef.id) {
-      this.qb.andWhere('team.guild_id=:id');
-    } else {
-      this.qb.andWhere('guild.guild_sf=:guildSf');
-    }
-
-    this.qb.setParameters(guildRef);
     return this;
   }
 

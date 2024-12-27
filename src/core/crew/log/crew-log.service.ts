@@ -73,7 +73,7 @@ export class CrewLogServiceImpl extends CrewLogService {
     return await this.logRepo.insert({
       guildId: crew.guildId,
       messageSf: message.id,
-      crewSf: crew.crewSf,
+      crewId: crew.id,
       content: data.content,
       createdAt,
       createdBy: memberRef,

@@ -1,10 +1,9 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectStockpileLog } from './stockpile-log.entity';
 import { SelectPoi } from 'src/game/poi/poi.entity';
-import { SelectGuild } from 'src/core/guild/guild.entity';
 import { SelectCatalog } from 'src/game/catalog/catalog.entity';
 import { SelectStockpile } from './stockpile.entity';
+import { SelectStockpileLog } from './stockpile-log.entity';
 import { CurrentStockpileEntry } from './stockpile-entry.entity';
 
 type SelectCatalogId = Pick<SelectCatalog, 'id'>;
@@ -79,36 +78,6 @@ export class StockpileEntryQueryBuilder extends CommonQueryBuilder<CurrentStockp
     }
 
     this.qb.andWhere('catalog.code_name IN (:...codeName)', { codeName });
-
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild | SelectGuild[]) {
-    if (!Array.isArray(guildRef)) {
-      guildRef = [guildRef];
-    }
-
-    const params = guildRef.reduce(
-      (acc, g) => {
-        if (g.id) acc.guilds.push(g.id);
-        if (g.guildSf) acc.discordGuilds.push(g.guildSf);
-        return acc;
-      },
-      { guilds: [], discordGuilds: [] },
-    );
-
-    this.qb.andWhere(
-      new Brackets((qb) => {
-        if (params.guilds.length) {
-          qb.where('entry.guild_id IN (:...guilds)');
-        }
-
-        if (params.discordGuilds.length) {
-          qb.orWhere('guild.guild_sf IN (:...discordGuilds)');
-        }
-      }),
-      params,
-    );
 
     return this;
   }

@@ -45,7 +45,7 @@ yarn
 
 Configuration options for both Docker Compose and the application are set by editing [`.env`](./.env). The file is tracked in the repository so do not use it to store secrets; instead set secret values using `.env.local` which accepts the same values and will override those provided elsewhere. Note that this only works for `docker-compose.yml` if you use multiple `--env-file` flags, or use the helper script provided (`yarn docker-compose ...`).
 
-A full list of application configuration options can be found [here](./src/config/config.service.ts).
+A full list of application configuration options can be found [here](./src/app.config.ts).
 
 #### Start Docker Containers
 

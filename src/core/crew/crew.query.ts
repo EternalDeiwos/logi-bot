@@ -2,7 +2,7 @@ import { Brackets, Repository } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectGuild } from 'src/core/guild/guild.entity';
-import { Crew, SelectCrew } from './crew.entity';
+import { Crew } from './crew.entity';
 
 const searchWhere = (crewAlias: string = 'crew') => {
   return new Brackets((qb) =>
@@ -36,29 +36,6 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
       roleSf,
     });
 
-    return this;
-  }
-
-  byCrew(crewRef: SelectCrew | SelectCrew[]) {
-    if (!Array.isArray(crewRef)) {
-      crewRef = [crewRef];
-    }
-
-    this.qb.where('crew.crew_channel_sf IN (:...crews)', {
-      crews: crewRef.map((c) => c.crewSf),
-    });
-
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild) {
-    if (guildRef.id) {
-      this.qb.where(new Brackets((qb) => qb.where('crew.guild_id=:id')));
-    } else {
-      this.qb.where(new Brackets((qb) => qb.where('guild.guild_sf=:guildSf')));
-    }
-
-    this.qb.setParameters(guildRef);
     return this;
   }
 

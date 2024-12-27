@@ -227,13 +227,13 @@ export class StockpileCommand {
       throw new AuthError('FORBIDDEN', 'Not allowed to update stockpiles').asDisplayable();
     }
 
-    const crewCount = await this.crewService
+    const crew = await this.crewService
       .query()
       .byGuild({ guildSf: interaction.guildId })
       .byCrew({ crewSf: channelRef })
-      .getCount();
+      .getOne();
 
-    if (!crewCount) {
+    if (!crew) {
       throw new ValidationError(
         'VALIDATION_FAILED',
         'No crew selected. Please select a crew or run this command in a crew channel.',
@@ -241,7 +241,7 @@ export class StockpileCommand {
     }
 
     const result = await this.stockpileService.registerLog({
-      crewSf: channelRef,
+      crewId: crew.id,
       createdBy: memberRef,
       guildId: guild.id,
       locationId,

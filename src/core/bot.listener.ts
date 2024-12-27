@@ -54,7 +54,7 @@ export class BotEventListener {
     const member = await guild.members.fetchMe();
     const ticket = await this.ticketService
       .query()
-      .byThread({ threadSf: oldThread.id })
+      .byTicket({ threadSf: oldThread.id })
       .withCrew()
       .getOneOrFail();
 
@@ -98,7 +98,7 @@ export class BotEventListener {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     const ticket = await this.ticketService
       .query()
-      .byThread({ threadSf: thread.id })
+      .byTicket({ threadSf: thread.id })
       .withCrew()
       .getOneOrFail();
 
@@ -123,7 +123,7 @@ export class BotEventListener {
       prompt.addMoveSelector(
         { threadSf: thread.id },
         thread.guildId,
-        crews.filter((crew) => ![ticket.crewSf].includes(crew.crewSf)),
+        crews.filter((crew) => ![ticket.crewId].includes(crew.id)),
       );
     }
 

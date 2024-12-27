@@ -5,7 +5,6 @@ import {
   userMention,
   Colors,
   Guild as DiscordGuild,
-  messageLink,
 } from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
 import { CrewMemberAccess, TicketTag } from 'src/types';

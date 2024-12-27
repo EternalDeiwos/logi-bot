@@ -28,9 +28,9 @@ export class PollingService implements OnApplicationBootstrap {
 
   async bootstrapWar() {
     try {
-      const count = await this.warService.getCurrent();
+      const war = await this.warService.query().byCurrent().getOne();
 
-      if (count) {
+      if (war) {
         return this.logger.log('Active war detected');
       }
     } catch (err) {

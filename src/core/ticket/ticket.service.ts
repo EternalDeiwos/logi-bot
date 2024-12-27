@@ -10,7 +10,7 @@ import { SelectGuild } from 'src/core/guild/guild.entity';
 import { Team } from 'src/core/team/team.entity';
 import { CrewInfoPromptBuilder } from 'src/core/crew/crew-info.prompt';
 import { CrewService } from 'src/core/crew/crew.service';
-import { SelectCrew } from 'src/core/crew/crew.entity';
+import { SelectCrewChannel } from 'src/core/crew/crew.entity';
 import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
@@ -45,9 +45,10 @@ export const tagsRemoved: { [K in TicketTag]: TicketTag[] } = {
     TicketTag.DONE,
     TicketTag.MOVED,
   ],
-  [TicketTag.ABANDONED]: [TicketTag.DONE, TicketTag.DECLINED, TicketTag.MOVED],
+  [TicketTag.ABANDONED]: [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.MOVED],
   [TicketTag.DONE]: [
     TicketTag.IN_PROGRESS,
+    TicketTag.ACCEPTED,
     TicketTag.REPEATABLE,
     TicketTag.ABANDONED,
     TicketTag.DECLINED,
@@ -77,13 +78,13 @@ export const tagsRemoved: { [K in TicketTag]: TicketTag[] } = {
 
 export abstract class TicketService {
   abstract query(): TicketQueryBuilder;
-  abstract createTicket(crewRef: SelectCrew, ticket?: InsertTicket): Promise<InsertResult>;
+  abstract createTicket(crewRef: SelectCrewChannel, ticket?: InsertTicket): Promise<InsertResult>;
   abstract moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket);
   abstract deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake);
   abstract updateTicket(ticket: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket>;
 
   abstract sendIndividualStatus(
-    crewRef: SelectCrew,
+    crewRef: SelectCrewChannel,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ): Promise<void>;
@@ -114,7 +115,7 @@ export class TicketServiceImpl extends TicketService {
     return new TicketQueryBuilder(this.ticketRepo);
   }
 
-  async createTicket(crewRef: SelectCrew, ticket?: InsertTicket) {
+  async createTicket(crewRef: SelectCrewChannel, ticket?: InsertTicket) {
     const crew = await this.crewService
       .query()
       .byCrew(crewRef)
@@ -154,9 +155,9 @@ export class TicketServiceImpl extends TicketService {
 
     const prompt = new TicketInfoPromptBuilder().addTicketMessage(ticket, crew);
 
-    if (ticket.previousThreadSf) {
+    if (ticket.previousTicketId) {
       const originalGuildRef = await this.ticketRepo.getOriginalGuild({
-        threadSf: ticket.previousThreadSf,
+        id: ticket.previousTicketId,
       });
 
       if (originalGuildRef.id !== crew.guildId) {
@@ -184,19 +185,19 @@ export class TicketServiceImpl extends TicketService {
   }
 
   async moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket) {
-    const ticket = await this.ticketRepo.findOneOrFail({
-      where: ticketRef,
-      withDeleted: true,
-    });
-
+    const ticket = await this.query().withDeleted().byTicket(ticketRef).getOneOrFail();
+    const targetCrew = await this.crewService
+      .query()
+      .byCrew({ id: ticketOverride.crewId })
+      .getOneOrFail();
     const result = await this.createTicket(
-      { crewSf: ticketOverride.crewSf },
+      { crewSf: targetCrew.crewSf },
       {
         name: ticket.name,
         content: ticket.content,
         ...ticketOverride,
         createdBy: ticket.createdBy,
-        previousThreadSf: ticket.threadSf,
+        previousTicketId: ticket.id,
       },
     );
 
@@ -240,7 +241,7 @@ export class TicketServiceImpl extends TicketService {
 
     const ticket = await this.query()
       .withDeleted()
-      .byThread({ threadSf: data.threadSf })
+      .byTicket({ threadSf: data.threadSf })
       .withCrew()
       .withTeam()
       .getOneOrFail();
@@ -350,7 +351,7 @@ export class TicketServiceImpl extends TicketService {
   }
 
   public async sendIndividualStatus(
-    crewRef: SelectCrew,
+    crewRef: SelectCrewChannel,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {

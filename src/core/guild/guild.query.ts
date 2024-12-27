@@ -9,16 +9,6 @@ export class GuildQueryBuilder extends CommonQueryBuilder<Guild> {
     super(repo, 'guild');
   }
 
-  byGuild(guildRef: SelectGuild) {
-    if (guildRef.id) {
-      this.qb.andWhere('guild.id=:id', { id: guildRef.id });
-    } else {
-      this.qb.andWhere('guild.guild_sf=:guildSf', { guildSf: guildRef.guildSf });
-    }
-
-    return this;
-  }
-
   search(query: string) {
     this.qb.andWhere('guild.name ILIKE :query', { query: `%${query}%` });
     return this;

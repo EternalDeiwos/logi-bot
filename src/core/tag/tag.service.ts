@@ -137,7 +137,7 @@ export class TagServiceImpl extends TagService {
     return await this.templateRepo.insert({
       name: crew.shortName,
       guildId: crew.guildId,
-      crewSf: crew.crewSf,
+      crewId: crew.id,
       createdBy: crew.createdBy,
       moderated: true,
     });

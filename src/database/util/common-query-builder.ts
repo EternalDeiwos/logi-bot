@@ -1,5 +1,6 @@
-import { SelectGuild } from 'src/core/guild/guild.entity';
 import { Brackets, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
+import { SelectCrew } from 'src/core/crew/crew.entity';
+import { SelectGuild } from 'src/core/guild/guild.entity';
 
 export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
   protected readonly qb: SelectQueryBuilder<Entity>;
@@ -33,6 +34,36 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
 
         if (params.discordGuilds.length) {
           qb.orWhere('guild.guild_sf IN (:...discordGuilds)');
+        }
+      }),
+      params,
+    );
+
+    return this;
+  }
+
+  byCrew(crewRef: SelectCrew | SelectCrew[]) {
+    if (!Array.isArray(crewRef)) {
+      crewRef = [crewRef];
+    }
+
+    const params = crewRef.reduce(
+      (acc, c) => {
+        if (c.id) acc.crews.push(c.id);
+        if (c.crewSf) acc.crewChannels.push(c.crewSf);
+        return acc;
+      },
+      { crews: [], crewChannels: [] },
+    );
+
+    this.qb.andWhere(
+      new Brackets((qb) => {
+        if (params.crews.length) {
+          qb.where(`${this.alias}.crew_id IN (:...crews)`);
+        }
+
+        if (params.crewChannels.length) {
+          qb.orWhere('crew.crew_channel_sf IN (:...crewChannels)');
         }
       }),
       params,

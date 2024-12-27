@@ -1,8 +1,6 @@
 import { Brackets, Repository } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectGuild } from 'src/core/guild/guild.entity';
-import { SelectCrew } from 'src/core/crew/crew.entity';
 import { CrewMember, SelectCrewMember } from './crew-member.entity';
 import { CrewMemberAccess } from 'src/types';
 
@@ -18,7 +16,7 @@ export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
   byCrewMember(memberRef: SelectCrewMember) {
     this.qb.andWhere(
       new Brackets((qb) =>
-        qb.where('member.member_sf=:memberSf AND member.crew_channel_sf=:crewSf', memberRef),
+        qb.where('member.member_sf=:memberSf AND member.crew_id=:crewId', memberRef),
       ),
     );
     return this;
@@ -35,30 +33,6 @@ export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
     }
 
     this.qb.andWhere('member.member_sf IN (:...memberSf)', { memberSf });
-
-    return this;
-  }
-
-  byCrew(crewRef: SelectCrew | SelectCrew[]) {
-    if (!Array.isArray(crewRef)) {
-      crewRef = [crewRef];
-    }
-
-    this.qb.andWhere('member.crew_channel_sf IN (:...crews)', {
-      crews: crewRef.map((c) => c.crewSf),
-    });
-
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild) {
-    if (guildRef.id) {
-      this.qb.andWhere(new Brackets((qb) => qb.where('member.guild_id=:id', { id: guildRef.id })));
-    } else {
-      this.qb.andWhere(
-        new Brackets((qb) => qb.where('guild.guild_sf=:guildSf', { guildSf: guildRef.guildSf })),
-      );
-    }
 
     return this;
   }

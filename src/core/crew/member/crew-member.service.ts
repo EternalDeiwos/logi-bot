@@ -93,7 +93,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     channelRef?: Snowflake,
   ): Promise<GuildMember> {
     if (memberRef instanceof CrewMember) {
-      channelRef = memberRef.crewSf;
+      channelRef = memberRef.crewId;
       memberRef = memberRef.memberSf;
     }
 
@@ -132,7 +132,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       guildId: crew.guildId,
       name: member.displayName,
       access,
-      crewSf: crew.crewSf,
+      crewId: crew.id,
     });
 
     if (
@@ -150,7 +150,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   async updateCrewMember(crewMember: SelectCrewMember, data: UpdateCrewMember) {
     const result = await this.memberRepo.updateReturning(
       {
-        crewSf: Equal(crewMember.crewSf),
+        crewId: Equal(crewMember.crewId),
         memberSf: Equal(crewMember.memberSf),
         deletedAt: IsNull(),
       },
@@ -211,7 +211,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     }
 
     const result = await this.memberRepo.updateReturning(
-      { memberSf: Equal(memberRef as Snowflake), crewSf: Equal(crew.crewSf), deletedAt: IsNull() },
+      { memberSf: Equal(memberRef as Snowflake), crewId: Equal(crew.id), deletedAt: IsNull() },
       { deletedAt: new Date() },
     );
 
@@ -338,13 +338,13 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     for (const crewMember of members) {
       let channel: GuildBasedChannel | null;
       try {
-        channel = await discordGuild.channels.fetch(crewMember.crewSf);
+        channel = await discordGuild.channels.fetch(crewMember.crew.crewSf);
       } catch (err) {
         this.logger.warn(err.message);
       }
 
       if (!channel) {
-        await this.removeCrewMember(crewMember.crewSf, member);
+        await this.removeCrewMember(crewMember.crew, member);
         continue;
       }
 

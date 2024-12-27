@@ -49,6 +49,7 @@ import { Crew } from './crew.entity';
 import { CrewDeletePromptBuilder } from './crew-delete.prompt';
 import { CrewDeleteModalBuilder } from './crew-delete.modal';
 import { CrewLogModalBuilder } from './crew-log.modal';
+import { channel } from 'diagnostics_channel';
 
 export class CreateCrewCommandParams {
   @StringOption({
@@ -512,9 +513,10 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
+    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     const targetMember = await this.memberService
       .query()
-      .byCrewMember({ crewSf: channelRef, memberSf: data.member.id })
+      .byCrewMember({ crewId: crew.id, memberSf: data.member.id })
       .getOne();
 
     if (!targetMember) {
@@ -525,7 +527,7 @@ export class CrewCommand {
     }
 
     await this.memberService.updateCrewMember(
-      { crewSf: channelRef, memberSf: targetMember.memberSf },
+      { crewId: crew.id, memberSf: targetMember.memberSf },
       {
         access: CrewMemberAccess.OWNER,
       },
@@ -543,7 +545,7 @@ export class CrewCommand {
       }
 
       await this.memberService.updateCrewMember(
-        { crewSf: owner.crewSf, memberSf: owner.memberSf },
+        { crewId: owner.crewId, memberSf: owner.memberSf },
         {
           access: CrewMemberAccess.ADMIN,
         },
@@ -574,9 +576,10 @@ export class CrewCommand {
       throw new AuthError('FORBIDDEN', 'You are not a member of this team').asDisplayable();
     }
 
+    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     const targetMember = await this.memberService
       .query()
-      .byCrewMember({ crewSf: channelRef, memberSf: data.member.id })
+      .byCrewMember({ crewId: crew.id, memberSf: data.member.id })
       .getOne();
 
     if (!targetMember) {
@@ -668,6 +671,15 @@ export class CrewCommand {
 
     const channelRef = data.crew || interaction.channelId;
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+
+    if (crew.guild.guildSf !== interaction.guildId) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'You cannot archive crews shared from another guild',
+      ).asDisplayable();
+    }
+
     if (
       !(await this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.ADMIN))
     ) {
@@ -938,9 +950,10 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
+    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     const result = await this.shareService.shareCrew({
       guildId: data.guild,
-      crewSf: channelRef,
+      crewId: crew.id,
       createdBy: memberRef,
     });
 

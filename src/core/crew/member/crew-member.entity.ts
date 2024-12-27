@@ -18,7 +18,7 @@ import { Crew } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 
 export type InsertCrewMember = DeepPartial<
-  Omit<CrewMember, 'crew' | 'guild' | 'createdAt' | 'deletedAt' | 'requireAccess'>
+  Omit<CrewMember, 'id' | 'crew' | 'guild' | 'createdAt' | 'deletedAt' | 'requireAccess'>
 >;
 export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'memberSf' | 'crewId'>>;
 export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'access'>>;

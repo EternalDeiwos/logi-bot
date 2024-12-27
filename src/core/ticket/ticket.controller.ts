@@ -52,7 +52,7 @@ export class TicketController {
   async getOneTicket(@Auth() auth: APITokenPayload, @Param('thread') threadSf: string) {
     const ticket = await this.ticketService
       .query()
-      .byThread({ threadSf })
+      .byTicket({ threadSf })
       .withCrew()
       .withTeam()
       .withPreviousCrew()
