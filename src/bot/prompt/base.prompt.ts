@@ -1,8 +1,10 @@
-import { BaseMessageOptions } from 'discord.js';
-import { countBy, mergeWith } from 'lodash';
+import { BaseMessageOptions, MessageCreateOptions, MessageFlags } from 'discord.js';
+import { mergeWith } from 'lodash';
 
 export class BasePromptBuilder {
-  public static base: BaseMessageOptions = {};
+  public static base: MessageCreateOptions = {
+    flags: [MessageFlags.SuppressNotifications],
+  };
   private options: BaseMessageOptions[];
 
   constructor(options: BaseMessageOptions = {}) {
