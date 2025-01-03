@@ -8,7 +8,7 @@ export class BasePromptBuilder {
   private options: BaseMessageOptions[];
 
   constructor(options: BaseMessageOptions = {}) {
-    this.options = [{ ...options, ...(this.constructor as typeof BasePromptBuilder).base }];
+    this.options = [{ ...(this.constructor as typeof BasePromptBuilder).base, ...options }];
   }
 
   private static customizer(objValue: any, srcValue: any) {
