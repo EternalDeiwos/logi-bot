@@ -1,4 +1,4 @@
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
 import { Guild, SelectGuild } from 'src/core/guild/guild.entity';
 
@@ -7,6 +7,36 @@ export class GuildQueryBuilder extends CommonQueryBuilder<Guild> {
 
   constructor(repo: Repository<Guild>) {
     super(repo, 'guild');
+  }
+
+  byGuild(guildRef: SelectGuild | SelectGuild[]) {
+    if (!Array.isArray(guildRef)) {
+      guildRef = [guildRef];
+    }
+
+    const params = guildRef.reduce(
+      (acc, g) => {
+        if (g.id) acc.guilds.push(g.id);
+        if (g.guildSf) acc.discordGuilds.push(g.guildSf);
+        return acc;
+      },
+      { guilds: [], discordGuilds: [] },
+    );
+
+    this.qb.andWhere(
+      new Brackets((qb) => {
+        if (params.guilds.length) {
+          qb.where(`${this.alias}.id IN (:...guilds)`);
+        }
+
+        if (params.discordGuilds.length) {
+          qb.orWhere(`${this.alias}.guild_sf IN (:...discordGuilds)`);
+        }
+      }),
+      params,
+    );
+
+    return this;
   }
 
   search(query: string) {
