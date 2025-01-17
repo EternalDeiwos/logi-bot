@@ -31,10 +31,17 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
         `${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'}.`,
       );
 
-    fields.push({
-      name: 'Members',
-      value: crew.members.map((member) => `- ${userMention(member.memberSf)}`).join('\n') || 'None',
-    });
+    if (crew.members.length > 30) {
+      embed.setDescription(
+        `${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'} and has ${crew.members.length} ${crew.members.length > 1 || !crew.members.length ? 'members' : 'member'}.`,
+      );
+    } else {
+      fields.push({
+        name: 'Members',
+        value:
+          crew.members.map((member) => `- ${userMention(member.memberSf)}`).join('\n') || 'None',
+      });
+    }
 
     if (crew.logs.length) {
       const { content, crewSf: channel, messageSf: message } = crew.logs.pop();
