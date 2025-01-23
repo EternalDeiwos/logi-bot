@@ -193,25 +193,25 @@ export class TicketCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
-      .byThread({ threadSf: threadRef })
+      .withCrew()
+      .byTicket({ threadSf: threadRef })
       .getOneOrFail();
 
-    if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
+    if (!(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef))) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew members can perform this action',
       ).asDisplayable();
     }
 
-    const crew = await this.crewService.query().byCrew({ crewSf: selected }).getOneOrFail();
-
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Moving ticket')],
     });
 
+    const targetCrew = await this.crewService.query().byCrew({ crewSf: selected }).getOneOrFail();
     const result = await this.ticketService.moveTicket(
       { threadSf: threadRef },
-      { guildId: crew.guildId, crewSf: selected, updatedBy: memberRef },
+      { guildId: ticket.crew.guildId, crewId: targetCrew.id, updatedBy: memberRef },
     );
   }
 
@@ -236,16 +236,14 @@ export class TicketCommand {
       '',
     ].join('\n');
 
-    const result = await this.ticketService.createTicket(
-      { crewSf: crewRef },
-      {
-        name: title,
-        content,
-        crewSf: crewRef,
-        createdBy: memberRef,
-        updatedBy: memberRef,
-      },
-    );
+    const crew = await this.crewService.query().byCrew({ crewSf: crewRef }).getOneOrFail();
+    const result = await this.ticketService.createTicket(crew, {
+      name: title,
+      content,
+      crewId: crew.id,
+      createdBy: memberRef,
+      updatedBy: memberRef,
+    });
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket created')],
@@ -269,10 +267,11 @@ export class TicketCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
-      .byThread({ threadSf: threadRef })
+      .withCrew()
+      .byTicket({ threadSf: threadRef })
       .getOneOrFail();
 
-    if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
+    if (!(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef))) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew members can perform this action',
@@ -300,9 +299,9 @@ export class TicketCommand {
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
     const ticketRef: SelectTicket = { threadSf: interaction.channelId };
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const ticket = await this.ticketService.query().byThread(ticketRef).getOneOrFail();
+    const ticket = await this.ticketService.query().withCrew().byTicket(ticketRef).getOneOrFail();
 
-    if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
+    if (!(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef))) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew members can perform this action',
@@ -319,7 +318,7 @@ export class TicketCommand {
       .addMoveSelector(
         ticket,
         ticket.guild.guildSf,
-        crews.filter((crew) => ![ticket.crewSf].includes(crew.crewSf)),
+        crews.filter((crew) => ![ticket.crew.crewSf].includes(crew.crewSf)),
       );
 
     await this.botService.replyOrFollowUp(interaction, prompt.build());
@@ -334,10 +333,10 @@ export class TicketCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
-      .byThread({ threadSf: interaction.channelId })
+      .byTicket({ threadSf: interaction.channelId })
       .getOneOrFail();
 
-    if (!(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef))) {
+    if (!(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef))) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew members can perform this action',
@@ -374,12 +373,13 @@ export class TicketCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
-      .byThread({ threadSf: interaction.channelId })
+      .withCrew()
+      .byTicket({ threadSf: interaction.channelId })
       .getOneOrFail();
 
     if (
       // Ticket owner can close their own tickets
-      !(await this.memberService.requireCrewAccess(ticket.crewSf, memberRef, false)) &&
+      !(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef, false)) &&
       !(tag === TicketTag.ABANDONED && ticket.createdBy === memberRef)
     ) {
       throw new AuthError(

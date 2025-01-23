@@ -44,7 +44,8 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
     }
 
     if (crew.logs.length) {
-      const { content, crewSf: channel, messageSf: message } = crew.logs.pop();
+      const { crewSf: channel } = crew;
+      const { content, messageSf: message } = crew.logs.pop();
       const redirectText = `See the full status here: ${messageLink(channel, message)}`;
       const value =
         content?.length > 400 ? `${content.substring(0, 400)}...\n\n${redirectText}` : content;

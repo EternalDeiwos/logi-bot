@@ -1,8 +1,7 @@
 import { Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
 import { SelectPoi } from 'src/game/poi/poi.entity';
-import { SelectCrew } from 'src/core/crew/crew.entity';
+import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
 
 export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
   constructor(repo: Repository<StockpileLog>) {
@@ -25,18 +24,6 @@ export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
     }
 
     this.qb.andWhere('log.location_id IN (:...poi)', { poi: poiRef.map((c) => c.id) });
-
-    return this;
-  }
-
-  byCrew(crewRef: SelectCrew | SelectCrew[]) {
-    if (!Array.isArray(crewRef)) {
-      crewRef = [crewRef];
-    }
-
-    this.qb.andWhere('log.crew_channel_sf IN (:...crews)', {
-      crews: crewRef.map((c) => c.crewSf),
-    });
 
     return this;
   }

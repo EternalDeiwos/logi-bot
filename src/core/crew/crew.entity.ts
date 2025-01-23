@@ -26,6 +26,7 @@ import { CrewShare } from './share/crew-share.entity';
 export type InsertCrew = DeepPartial<
   Omit<
     Crew,
+    | 'id'
     | 'guild'
     | 'team'
     | 'members'
@@ -40,7 +41,9 @@ export type InsertCrew = DeepPartial<
     | 'getCrewOwner'
   >
 >;
-export type SelectCrew = DeepPartial<Pick<Crew, 'crewSf'>>;
+export type SelectCrewId = DeepPartial<Pick<Crew, 'id'>>;
+export type SelectCrewChannel = DeepPartial<Pick<Crew, 'crewSf'>>;
+export type SelectCrew = SelectCrewId & SelectCrewChannel;
 export type UpdateCrew = DeepPartial<Pick<Crew, 'hasMovePrompt' | 'isPermanent' | 'isSecureOnly'>>;
 export type DeleteCrew = SelectCrew & { deletedBySf?: Snowflake };
 export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
@@ -49,16 +52,24 @@ export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
 @Unique('uk_guild_name_deleted_at', ['guildId', 'shortName', 'deletedAt'])
 @Unique('uk_guild_crew_deleted_at', ['guildId', 'crewSf', 'deletedAt'])
 export class Crew {
+  @Expose()
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_crew_id',
+  })
+  id: string;
+
   /**
    * Snowflake for crew Discord channel
    * @type Snowflake
    */
   @Expose()
-  @PrimaryColumn({
+  @Column({
     type: 'int8',
     name: 'crew_channel_sf',
-    primaryKeyConstraintName: 'pk_crew_channel_sf',
   })
+  @Index('crew_channel_sf_idx_crew')
   crewSf: Snowflake;
 
   @Expose()
@@ -165,6 +176,9 @@ export class Crew {
 
   @OneToMany(() => CrewShare, (share) => share.crew)
   shared: CrewShare[];
+
+  @Column({ type: 'timestamptz', name: 'processed_at', nullable: true })
+  processedAt: Date;
 
   @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })

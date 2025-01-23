@@ -18,13 +18,13 @@ import { Crew } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 
 export type InsertCrewMember = DeepPartial<
-  Omit<CrewMember, 'crew' | 'guild' | 'createdAt' | 'deletedAt' | 'requireAccess'>
+  Omit<CrewMember, 'id' | 'crew' | 'guild' | 'createdAt' | 'deletedAt' | 'requireAccess'>
 >;
-export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'memberSf' | 'crewSf'>>;
+export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'memberSf' | 'crewId'>>;
 export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'access'>>;
 
 @Entity('crew_member')
-@Unique('uk_crew_channel_member_deleted_at', ['crewSf', 'memberSf', 'deletedAt'])
+@Unique('uk_crew_member_user_deleted_at', ['crewId', 'memberSf', 'deletedAt'])
 export class CrewMember {
   @PrimaryColumn({
     type: 'uuid',
@@ -34,18 +34,18 @@ export class CrewMember {
   id: string;
 
   @Column({
-    type: 'int8',
-    name: 'crew_channel_sf',
+    type: 'uuid',
+    name: 'crew_id',
   })
   @RelationId((member: CrewMember) => member.crew)
-  @Index('crew_channel_sf_idx_crew_member')
-  crewSf: Snowflake;
+  @Index('crew_id_idx_crew_member')
+  crewId: Snowflake;
 
   @ManyToOne(() => Crew, (crew) => crew.members, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({
-    name: 'crew_channel_sf',
-    referencedColumnName: 'crewSf',
-    foreignKeyConstraintName: 'fk_crew_member_crew_channel_sf',
+    name: 'crew_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_crew_member_crew_id',
   })
   crew: Crew;
 

@@ -14,10 +14,10 @@ export class CrewMemberRepository extends CommonRepository<CrewMember> {
       .select('member.access', 'access')
       .leftJoinAndSelect('member.guild', 'guild')
       .leftJoinAndSelect('member.crew', 'crew')
-      .where('member.crew_channel_sf=:crewSf AND member.member_sf=:memberSf', payload)
+      .where('member.crew_id=:crewId AND member.member_sf=:memberSf', payload)
       .getQueryAndParameters();
 
-    const conflictColumns = ['crewSf', 'memberSf', 'deletedAt'].map(
+    const conflictColumns = ['crewId', 'memberSf', 'deletedAt'].map(
       (prop) => this.metadata.findColumnWithPropertyName(prop).databaseName,
     );
     const [insertQuery, params] = this.createQueryBuilder()

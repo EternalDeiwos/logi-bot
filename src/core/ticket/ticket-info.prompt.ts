@@ -12,7 +12,7 @@ import {
 } from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
 import { PromptEmbed } from 'src/bot/embed';
-import { Crew } from 'src/core/crew/crew.entity';
+import { Crew, SelectCrewChannel } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { InsertTicket, SelectTicket } from './ticket.entity';
 
@@ -158,5 +158,14 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
         new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, repeatable, done, close),
       ],
     });
+  }
+
+  addCrewJoinButton(crew: SelectCrewChannel) {
+    const join = new ButtonBuilder()
+      .setCustomId(`crew/join/${crew.crewSf}`)
+      .setLabel('Join Crew')
+      .setStyle(ButtonStyle.Primary);
+
+    return this.add({ components: [new ActionRowBuilder<ButtonBuilder>().addComponents(join)] });
   }
 }

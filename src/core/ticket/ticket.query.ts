@@ -1,7 +1,5 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectGuild } from 'src/core/guild/guild.entity';
-import { SelectCrew } from 'src/core/crew/crew.entity';
 import { SelectTicket, Ticket } from './ticket.entity';
 
 export class TicketQueryBuilder extends CommonQueryBuilder<Ticket> {
@@ -13,38 +11,33 @@ export class TicketQueryBuilder extends CommonQueryBuilder<Ticket> {
       .leftJoinAndSelect('ticket.previous', 'previous');
   }
 
-  byThread(ticketRef: SelectTicket | SelectTicket[]) {
+  byTicket(ticketRef: SelectTicket | SelectTicket[]) {
     if (!Array.isArray(ticketRef)) {
       ticketRef = [ticketRef];
     }
 
-    this.qb.where('ticket.thread_sf IN (:...tickets)', {
-      tickets: ticketRef.map((c) => c.threadSf),
-    });
+    const params = ticketRef.reduce(
+      (acc, t) => {
+        if (t.id) acc.ids.push(t.id);
+        if (t.threadSf) acc.threads.push(t.threadSf);
+        return acc;
+      },
+      { threads: [], ids: [] },
+    );
 
-    return this;
-  }
+    this.qb.andWhere(
+      new Brackets((qb) => {
+        if (params.ids.length) {
+          qb.where(`${this.alias}.ticket_id IN (:...ids)`);
+        }
 
-  byCrew(crewRef: SelectCrew | SelectCrew[]) {
-    if (!Array.isArray(crewRef)) {
-      crewRef = [crewRef];
-    }
+        if (params.threads.length) {
+          qb.orWhere('ticket.thread_sf IN (:...threads)');
+        }
+      }),
+      params,
+    );
 
-    this.qb.where('ticket.crew_channel_sf IN (:...crews)', {
-      crews: crewRef.map((c) => c.crewSf),
-    });
-
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild) {
-    if (guildRef.id) {
-      this.qb.where(new Brackets((qb) => qb.where('ticket.guild_id=:id')));
-    } else {
-      this.qb.where(new Brackets((qb) => qb.where('guild.guild_sf=:guildSf')));
-    }
-
-    this.qb.setParameters(guildRef);
     return this;
   }
 

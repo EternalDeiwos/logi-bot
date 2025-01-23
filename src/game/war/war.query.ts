@@ -8,7 +8,7 @@ export class WarQueryBuilder extends CommonQueryBuilder<War> {
   }
 
   byCurrent() {
-    this.qb.select('war.war_number', 'war_number').orderBy('war.war_number', 'DESC').limit(1);
+    this.qb.addSelect('war.war_number', 'war_number').orderBy('war.war_number', 'DESC').limit(1);
     return this;
   }
 }

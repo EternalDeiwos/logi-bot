@@ -213,7 +213,7 @@ export class RegionService {
   }
 
   async fetchRegionLog(): Promise<RegionLog[]> {
-    const war = await this.warService.getCurrent();
+    const war = await this.warService.query().byCurrent().getOneOrFail();
 
     try {
       const metadata = await this.currentRegionRepo.getRegionLogMetadata();

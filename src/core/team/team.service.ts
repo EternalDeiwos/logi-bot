@@ -65,7 +65,7 @@ export class TeamServiceImpl extends TeamService {
     const filteredTemplates = templates.filter((template) => {
       return (
         // Crew tags only appear on their team's forum
-        (!template.crewSf || template.crew?.team?.id === team.id) &&
+        (!template.crewId || template.crew?.team?.id === team.id) &&
         // Don't create tags that already exist
         !team.tags.find((tag) => template.id === tag.templateId)
       );

@@ -7,7 +7,7 @@ import {
   TextInputStyle,
   userMention,
 } from 'discord.js';
-import { SelectCrew } from 'src/core/crew/crew.entity';
+import { SelectCrewChannel } from 'src/core/crew/crew.entity';
 
 type TicketFormFields = 'title' | 'what' | 'where' | 'when';
 type TicketFormProperties = { [K in TicketFormFields]?: { emoji?: string; value?: string } };
@@ -33,7 +33,7 @@ ${
 `.trim();
   }
 
-  addForm(crewRef: SelectCrew, { title, what, where, when }: TicketFormProperties = {}) {
+  addForm(crewRef: SelectCrewChannel, { title, what, where, when }: TicketFormProperties = {}) {
     const titleInput = new TextInputBuilder()
       .setCustomId('ticket/form/title')
       .setLabel((title?.emoji ? `${title.emoji} ` : '') + 'Title')

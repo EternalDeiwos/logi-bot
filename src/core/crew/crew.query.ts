@@ -16,6 +16,36 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     this.qb.leftJoinAndSelect('crew.guild', 'guild');
   }
 
+  byCrew(crewRef: SelectCrew | SelectCrew[]) {
+    if (!Array.isArray(crewRef)) {
+      crewRef = [crewRef];
+    }
+
+    const params = crewRef.reduce(
+      (acc, c) => {
+        if (c.id) acc.crews.push(c.id);
+        if (c.crewSf) acc.crewChannels.push(c.crewSf);
+        return acc;
+      },
+      { crews: [], crewChannels: [] },
+    );
+
+    this.qb.andWhere(
+      new Brackets((qb) => {
+        if (params.crews.length) {
+          qb.where(`${this.alias}.id IN (:...crews)`);
+        }
+
+        if (params.crewChannels.length) {
+          qb.orWhere(`${this.alias}.crew_channel_sf IN (:...crewChannels)`);
+        }
+      }),
+      params,
+    );
+
+    return this;
+  }
+
   byMember(memberSf: Snowflake | Snowflake[]) {
     if (!Array.isArray(memberSf)) {
       memberSf = [memberSf];
@@ -36,29 +66,6 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
       roleSf,
     });
 
-    return this;
-  }
-
-  byCrew(crewRef: SelectCrew | SelectCrew[]) {
-    if (!Array.isArray(crewRef)) {
-      crewRef = [crewRef];
-    }
-
-    this.qb.where('crew.crew_channel_sf IN (:...crews)', {
-      crews: crewRef.map((c) => c.crewSf),
-    });
-
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild) {
-    if (guildRef.id) {
-      this.qb.where(new Brackets((qb) => qb.where('crew.guild_id=:id')));
-    } else {
-      this.qb.where(new Brackets((qb) => qb.where('guild.guild_sf=:guildSf')));
-    }
-
-    this.qb.setParameters(guildRef);
     return this;
   }
 

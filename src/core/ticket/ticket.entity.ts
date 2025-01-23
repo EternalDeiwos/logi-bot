@@ -17,14 +17,22 @@ import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
 export type InsertTicket = DeepPartial<
-  Omit<Ticket, 'crew' | 'previous' | 'guild' | 'updatedAt' | 'createdAt' | 'deletedAt'>
+  Omit<Ticket, 'id' | 'crew' | 'previous' | 'guild' | 'updatedAt' | 'createdAt' | 'deletedAt'>
 >;
-export type SelectTicket = DeepPartial<Pick<Ticket, 'threadSf'>>;
+export type SelectTicket = DeepPartial<Pick<Ticket, 'threadSf' | 'id'>>;
 
 @Entity()
 export class Ticket {
   @Expose()
-  @PrimaryColumn({ type: 'int8', name: 'thread_sf', primaryKeyConstraintName: 'pk_thread_sf' })
+  @PrimaryColumn({
+    type: 'uuid',
+    default: () => 'uuidv7()',
+    primaryKeyConstraintName: 'pk_ticket_id',
+  })
+  id: string;
+
+  @Expose()
+  @Column({ type: 'int8', name: 'thread_sf' })
   threadSf: Snowflake;
 
   @Column({ type: 'uuid', name: 'guild_id' })
@@ -42,38 +50,34 @@ export class Ticket {
   guild: Guild;
 
   @Expose()
-  @Column({ type: 'int8', name: 'previous_thread_sf', nullable: true })
+  @Column({ type: 'uuid', name: 'previous_ticket_id', nullable: true })
   @RelationId((ticket: Ticket) => ticket.previous)
-  @Index('previous_thread_sf_idx_ticket')
-  previousThreadSf: Snowflake;
+  @Index('previous_ticket_id_idx_ticket')
+  previousTicketId: string;
 
   @ManyToOne(() => Ticket, { onDelete: 'RESTRICT', nullable: true })
   @Expose()
-  @Transform(({ value }) => (value && 'threadSf' in value ? value : null))
+  @Transform(({ value }) => (value && 'id' in value ? value : null))
   @JoinColumn({
-    name: 'previous_thread_sf',
-    referencedColumnName: 'threadSf',
-    foreignKeyConstraintName: 'fk_ticket_previous_thread_sf',
+    name: 'previous_ticket_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_ticket_previous_ticket_id',
   })
   previous: Ticket;
 
-  /**
-   * Snowflake for crew Discord channel
-   * @type Snowflake
-   */
-  @Column({ type: 'int8', name: 'crew_channel_sf' })
+  @Column({ type: 'uuid', name: 'crew_id' })
   @Expose()
   @RelationId((ticket: Ticket) => ticket.crew)
-  @Index('crew_channel_sf_idx_ticket')
-  crewSf: Snowflake;
+  @Index('crew_id_idx_ticket')
+  crewId: string;
 
   @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', eager: true })
   @Expose()
   @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
-    name: 'crew_channel_sf',
-    referencedColumnName: 'crewSf',
-    foreignKeyConstraintName: 'fk_ticket_crew_channel_sf',
+    name: 'crew_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_ticket_crew_id',
   })
   crew: Crew;
 
@@ -89,6 +93,9 @@ export class Ticket {
   @Column({ name: 'sort_order', default: '' })
   @Index('sort_order_idx_ticket')
   sortOrder: string;
+
+  @Column({ type: 'timestamptz', name: 'processed_at', nullable: true })
+  processedAt: Date;
 
   @Expose()
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })

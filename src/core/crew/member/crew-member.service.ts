@@ -16,6 +16,7 @@ import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberRepository } from './crew-member.repository';
 import { CrewMember, SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
 import { CrewMemberQueryBuilder } from './crew-member.query';
+import { CrewJoinPromptBuilder } from '../crew-join.prompt';
 
 export abstract class CrewMemberService {
   abstract query(): CrewMemberQueryBuilder;
@@ -93,7 +94,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     channelRef?: Snowflake,
   ): Promise<GuildMember> {
     if (memberRef instanceof CrewMember) {
-      channelRef = memberRef.crewSf;
+      channelRef = memberRef.crewId;
       memberRef = memberRef.memberSf;
     }
 
@@ -132,7 +133,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       guildId: crew.guildId,
       name: member.displayName,
       access,
-      crewSf: crew.crewSf,
+      crewId: crew.id,
     });
 
     if (
@@ -144,13 +145,20 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       this.logger.log(`${member.displayName} added to crew leaders in ${crew.guild.name}`);
     }
 
+    const prompt = new CrewJoinPromptBuilder().addJoinMessage(crew, member);
+    const channel = await member.guild.channels.fetch(crew.crewSf);
+
+    if (channel && channel.isTextBased()) {
+      await channel.send(prompt.build());
+    }
+
     return result;
   }
 
   async updateCrewMember(crewMember: SelectCrewMember, data: UpdateCrewMember) {
     const result = await this.memberRepo.updateReturning(
       {
-        crewSf: Equal(crewMember.crewSf),
+        crewId: Equal(crewMember.crewId),
         memberSf: Equal(crewMember.memberSf),
         deletedAt: IsNull(),
       },
@@ -211,7 +219,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     }
 
     const result = await this.memberRepo.updateReturning(
-      { memberSf: Equal(memberRef as Snowflake), crewSf: Equal(crew.crewSf), deletedAt: IsNull() },
+      { memberSf: Equal(memberRef as Snowflake), crewId: Equal(crew.id), deletedAt: IsNull() },
       { deletedAt: new Date() },
     );
 
@@ -338,13 +346,13 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     for (const crewMember of members) {
       let channel: GuildBasedChannel | null;
       try {
-        channel = await discordGuild.channels.fetch(crewMember.crewSf);
+        channel = await discordGuild.channels.fetch(crewMember.crew.crewSf);
       } catch (err) {
         this.logger.warn(err.message);
       }
 
       if (!channel) {
-        await this.removeCrewMember(crewMember.crewSf, member);
+        await this.removeCrewMember(crewMember.crew, member);
         continue;
       }
 

@@ -59,9 +59,8 @@ export class AccessDecision {
 
   private testCrew(crewRef: SelectCrew, memberSf: Snowflake, members: SelectCrewMember[]) {
     return (
-      members.findIndex(
-        (member) => member.crewSf === crewRef.crewSf && memberSf === member.memberSf,
-      ) > -1
+      members.findIndex((member) => member.crewId === crewRef.id && memberSf === member.memberSf) >
+      -1
     );
   }
 }

@@ -1,9 +1,8 @@
-import { HttpStatus, ParseFilePipeBuilder, UploadedFile } from '@nestjs/common';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { StockpileLog } from 'src/inventory/stockpile/stockpile-log.entity';
 
 export class InsertStockpileLogDto extends PickType(StockpileLog, [
-  'crewSf',
+  'crewId',
   'locationId',
   'message',
 ] as const) {

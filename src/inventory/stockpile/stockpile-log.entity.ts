@@ -46,19 +46,19 @@ export class StockpileLog {
   })
   id: string;
 
-  @Column({ name: 'crew_channel_sf', type: 'int8', nullable: true })
+  @Column({ name: 'crew_id', type: 'uuid', nullable: true })
   @RelationId((log: StockpileLog) => log.crew)
-  @Index('crew_channel_sf_idx_stockpile_log')
-  crewSf: string;
+  @Index('crew_id_idx_stockpile_log')
+  crewId: string;
 
   @ManyToOne(() => Crew, { onDelete: 'NO ACTION' })
   @Expose()
   @Type(() => Crew)
   @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
-    name: 'crew_channel_sf',
-    referencedColumnName: 'crewSf',
-    foreignKeyConstraintName: 'fk_stockpile_log_crew_channel_sf',
+    name: 'crew_id',
+    referencedColumnName: 'id',
+    foreignKeyConstraintName: 'fk_stockpile_log_crew_id',
   })
   crew: Crew;
 

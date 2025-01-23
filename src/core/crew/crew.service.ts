@@ -293,6 +293,7 @@ export class CrewServiceImpl extends CrewService {
 
           const triageTag = await this.tagService
             .queryTag()
+            .withCrews()
             .byTeam({ id: ticket.crew.teamId })
             .search(TicketTag.TRIAGE)
             .getOneOrFail();
@@ -317,6 +318,7 @@ export class CrewServiceImpl extends CrewService {
     try {
       const tagTemplate = await this.tagService
         .queryTemplate()
+        .withCrews()
         .byCrew(crew)
         .withTags()
         .withTagTeams()

@@ -13,29 +13,29 @@ export class TicketRepository extends CommonRepository<Ticket> {
   async getOriginalGuild(ticketRef: SelectTicket): Promise<SelectGuild> {
     const [{ guild_id: guildId }] = await this.query(
       `
-      WITH RECURSIVE ticket_tree (thread_sf, guild_id, previous_thread_sf) AS (
+      WITH RECURSIVE ticket_tree (id, guild_id, previous_ticket_id) AS (
         (
           SELECT
-            thread_sf,
+            id,
             guild_id,
-            previous_thread_sf
+            previous_ticket_id
           FROM "app"."ticket"
-          WHERE thread_sf=$1
+          WHERE id=$1
         )
         UNION ALL
         (
           SELECT
-            t.thread_sf,
+            t.id,
             t.guild_id,
-            t.previous_thread_sf
+            t.previous_ticket_id
           FROM "app"."ticket" t, ticket_tree tt
-          WHERE tt.previous_thread_sf = t.thread_sf
+          WHERE tt.previous_ticket_id = t.id
         )
       )
       SELECT guild_id FROM ticket_tree
-      WHERE previous_thread_sf IS NULL
+      WHERE previous_ticket_id IS NULL
     `,
-      [ticketRef.threadSf],
+      [ticketRef.id],
     );
 
     return { id: guildId };

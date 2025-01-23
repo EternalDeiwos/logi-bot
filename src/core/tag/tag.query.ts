@@ -1,8 +1,7 @@
 import { Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectTeam } from 'src/core/team/team.entity';
 import { ForumTag, SelectTag } from './tag.entity';
-import { SelectTeam } from '../team/team.entity';
 
 export class TagQueryBuilder extends CommonQueryBuilder<ForumTag> {
   constructor(repo: Repository<ForumTag>) {
@@ -17,17 +16,6 @@ export class TagQueryBuilder extends CommonQueryBuilder<ForumTag> {
 
   byTeam(teamRef: SelectTeam) {
     this.qb.andWhere('tag.team_id=:teamId', { teamId: teamRef.id });
-    return this;
-  }
-
-  byGuild(guildRef: SelectGuild) {
-    if (guildRef.id) {
-      this.qb.andWhere('tag.guild_id=:id');
-    } else {
-      this.qb.andWhere('guild.guild_sf=:guildSf');
-    }
-
-    this.qb.setParameters(guildRef);
     return this;
   }
 
