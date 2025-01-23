@@ -2,7 +2,7 @@ import { Brackets, Repository } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectGuild } from 'src/core/guild/guild.entity';
-import { Crew } from './crew.entity';
+import { Crew, SelectCrew } from './crew.entity';
 
 const searchWhere = (crewAlias: string = 'crew') => {
   return new Brackets((qb) =>
@@ -14,6 +14,36 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
   constructor(repo: Repository<Crew>) {
     super(repo, 'crew');
     this.qb.leftJoinAndSelect('crew.guild', 'guild');
+  }
+
+  byCrew(crewRef: SelectCrew | SelectCrew[]) {
+    if (!Array.isArray(crewRef)) {
+      crewRef = [crewRef];
+    }
+
+    const params = crewRef.reduce(
+      (acc, c) => {
+        if (c.id) acc.crews.push(c.id);
+        if (c.crewSf) acc.crewChannels.push(c.crewSf);
+        return acc;
+      },
+      { crews: [], crewChannels: [] },
+    );
+
+    this.qb.andWhere(
+      new Brackets((qb) => {
+        if (params.crews.length) {
+          qb.where(`${this.alias}.id IN (:...crews)`);
+        }
+
+        if (params.crewChannels.length) {
+          qb.orWhere(`${this.alias}.crew_channel_sf IN (:...crewChannels)`);
+        }
+      }),
+      params,
+    );
+
+    return this;
   }
 
   byMember(memberSf: Snowflake | Snowflake[]) {

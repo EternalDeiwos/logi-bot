@@ -57,7 +57,7 @@ export class StockpileAccess {
   @JoinColumn({
     name: 'stockpile_id',
     referencedColumnName: 'id',
-    foreignKeyConstraintName: 'fk_stockpile_entry_stockpile_id',
+    foreignKeyConstraintName: 'fk_stockpile_access_stockpile_id',
   })
   stockpile: Stockpile;
 
