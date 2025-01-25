@@ -26,12 +26,24 @@ import { AccessRuleMode } from 'src/core/access/access-rule';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
 import { CounterCreateAutocompleteInterceptor } from './counter-create.interceptor';
+import { CounterSelectAutocompleteInterceptor } from './counter-select.interceptor';
 import { InsertCounterEntryDto } from './dto/insert-counter-entry.dto';
 import { SelectCounterAccess } from './counter-access.entity';
 import { CounterUpdateModalBuilder } from './ui/counter-update.modal';
 import { CounterKind, CurrentCounter } from './counter.entity';
 import { CounterService } from './counter.service';
 import { SelectCrew } from 'src/core/crew/crew.entity';
+import { CounterStaticUpdatePromptBuilder } from './ui/counter-static.prompt';
+
+export class SelectCounterCommandParams {
+  @StringOption({
+    name: 'counter',
+    description: 'Select a counter',
+    autocomplete: true,
+    required: true,
+  })
+  counter: string;
+}
 
 export class CreateCounterCommandParams {
   @StringOption({
@@ -125,7 +137,7 @@ export class CounterCommand {
         mode: AccessRuleMode.ANY,
         spec: [
           {
-            crew,
+            crew: { id: crew.id },
             crewRole: CrewMemberAccess.ADMIN,
           },
           {
@@ -202,7 +214,7 @@ export class CounterCommand {
         mode: AccessRuleMode.ANY,
         spec: [
           {
-            crew,
+            crew: { id: crew.id },
             crewRole: CrewMemberAccess.ADMIN,
           },
           {
@@ -312,5 +324,102 @@ export class CounterCommand {
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Counters updated')],
     });
+  }
+
+  @UseInterceptors(CounterSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'delete',
+    description: 'Delete crew counter',
+    dmPermission: false,
+  })
+  async onDeleteCounter(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCounterCommandParams,
+  ) {
+    const counter = await this.counterService
+      .query()
+      .withGuild()
+      .byGuild({ guildSf: interaction.guildId })
+      .byCounter({ id: data.counter })
+      .withAccessRules()
+      .withCrew()
+      .getOneOrFail();
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecision(AccessRuleType.PERMIT, {
+        mode: AccessRuleMode.ANY,
+        spec: [
+          {
+            crew: { id: counter.crew.id },
+            crewRole: CrewMemberAccess.ADMIN,
+          },
+          {
+            guildAdmin: true,
+          },
+        ],
+      }).deny(...accessArgs)
+    ) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only crew administrators may delete counters',
+      ).asDisplayable();
+    }
+
+    await this.counterService.deleteCounter(
+      { id: data.counter },
+      interaction.member?.user?.id ?? interaction.user?.id,
+    );
+
+    const prompt = new CounterStaticUpdatePromptBuilder()
+      .addCounter(counter)
+      .add({ embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Counter deleted')] });
+
+    await this.botService.replyOrFollowUp(interaction, prompt.build());
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'show',
+    description: 'Show crew counters',
+    dmPermission: false,
+  })
+  async onShowCounter(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    const counters = await this.counterService
+      .query()
+      .withGuild()
+      .byGuild({ guildSf: interaction.guildId })
+      .withCrew()
+      .byCrew({ crewSf: data.crew || interaction.channelId })
+      .forCurrentWar()
+      .withAccessRules()
+      .withCatalog()
+      .getMany();
+
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const prompt = new CounterStaticUpdatePromptBuilder();
+
+    for (const counter of counters) {
+      if (
+        new AccessDecision(AccessRuleType.PERMIT, {
+          mode: AccessRuleMode.ANY,
+          spec: [
+            {
+              crew: { id: counter.crew.id },
+            },
+            {
+              guildAdmin: true,
+            },
+          ],
+        }).permit(...accessArgs)
+      ) {
+        prompt.addCounter(counter);
+      }
+    }
+
+    await this.botService.replyOrFollowUp(interaction, { ...prompt.build(), ephemeral: false });
   }
 }

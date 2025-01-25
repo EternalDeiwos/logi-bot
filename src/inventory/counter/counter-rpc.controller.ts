@@ -25,7 +25,7 @@ export class CounterRpcController {
 
   @Post('/counter.grant_access')
   @ApiBody({ type: InsertCounterAccessDto, description: 'Configuration' })
-  async grantStockpileAccess(@Auth() auth: APITokenPayload, @Body() body: InsertCounterAccessDto) {
+  async grantCounterAccess(@Auth() auth: APITokenPayload, @Body() body: InsertCounterAccessDto) {
     const counter = await this.counterService
       .query()
       .withGuild()
