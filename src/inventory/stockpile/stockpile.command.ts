@@ -10,6 +10,7 @@ import {
 import { QueryFailedError } from 'typeorm';
 import { groupBy } from 'lodash';
 import { Attachment, Client, PermissionsBitField } from 'discord.js';
+import { AccessMode } from 'src/types';
 import { AuthError, ValidationError } from 'src/errors';
 import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
@@ -148,6 +149,14 @@ export class GrantStockpileAccessCommandParams {
     required: true,
   })
   ruleId: string;
+
+  @StringOption({
+    name: 'access',
+    description: 'Level of access',
+    autocomplete: true,
+    required: false,
+  })
+  access: string;
 }
 
 @Injectable()
@@ -205,11 +214,31 @@ export class StockpileCommand {
 
   @UseInterceptors(StockpileUpdateAutocompleteInterceptor)
   @Subcommand({
+    name: 'update',
+    description: 'Update stockpile contents. Alias for "/delta stockpile log"',
+    dmPermission: false,
+  })
+  async onUpdateStockpile(
+    @Context() context: SlashCommandContext,
+    @Options() params: StockpileLogCommandParams,
+  ) {
+    return this.updateStockpile(context, params);
+  }
+
+  @UseInterceptors(StockpileUpdateAutocompleteInterceptor)
+  @Subcommand({
     name: 'log',
-    description: 'Update stockpile contents',
+    description: 'Update stockpile contents. Alias for "/delta stockpile update"',
     dmPermission: false,
   })
   async onLogStockpile(
+    @Context() context: SlashCommandContext,
+    @Options() params: StockpileLogCommandParams,
+  ) {
+    return this.updateStockpile(context, params);
+  }
+
+  private async updateStockpile(
     @Context() [interaction]: SlashCommandContext,
     @Options() { reportAttachment, crew: crewRef, locationId, message }: StockpileLogCommandParams,
   ) {
@@ -222,10 +251,6 @@ export class StockpileCommand {
 
     const report = await fetch(reportAttachment.url);
     const raw = await report.text();
-
-    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
-      throw new AuthError('FORBIDDEN', 'Not allowed to update stockpiles').asDisplayable();
-    }
 
     const crew = await this.crewService
       .query()
@@ -375,10 +400,15 @@ export class StockpileCommand {
       throw new ValidationError('NOT_FOUND', 'Rule does not exist').asDisplayable();
     }
 
+    const access = Object.entries(AccessMode).find(
+      ([k, v]) => k === options.access,
+    )[1] as AccessMode;
+
     try {
       await this.stockpileService.grantAccess({
         stockpileId: options.stockpileId,
         ruleId: options.ruleId,
+        access,
         createdBy: interaction.user.id,
       });
     } catch (err) {

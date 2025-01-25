@@ -7,6 +7,13 @@ export enum CrewMemberAccess {
   MEMBER = 10,
 }
 
+export enum AccessMode {
+  OWNER = 0,
+  ADMIN = 1,
+  WRITE = 10,
+  READ = 100,
+}
+
 export enum TicketTag {
   TRIAGE = 'Triage',
   ACCEPTED = 'Accepted',

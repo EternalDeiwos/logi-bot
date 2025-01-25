@@ -33,8 +33,10 @@ export class PollingService implements OnApplicationBootstrap {
 
   @Cron('3 * * * *')
   setBotStatus() {
+    const nodeEnv = this.configService.getOrThrow('NODE_ENV');
+    const state = nodeEnv === 'development' ? 'unstable' : `v${pkg.version}`;
     this.client.user.setPresence({
-      activities: [{ name: 'activity', type: ActivityType.Custom, state: `v${pkg.version}` }],
+      activities: [{ name: 'activity', type: ActivityType.Custom, state }],
       status: PresenceUpdateStatus.Online,
     });
     this.logger.log('Bot status updated');

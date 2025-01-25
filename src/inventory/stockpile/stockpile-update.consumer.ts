@@ -1,10 +1,9 @@
 import { RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { GuildManager } from 'discord.js';
 import { parse } from 'csv-parse/sync';
 import { ConsumeMessage } from 'amqplib';
 import { flattenDepth, mapKeys, uniq } from 'lodash';
-import { DiscordAPIInteraction } from 'src/types';
+import { AccessMode, DiscordAPIInteraction } from 'src/types';
 import { CatalogService } from 'src/game/catalog/catalog.service';
 import { AccessService } from 'src/core/access/access.service';
 import { AccessDecision } from 'src/core/access/access-decision';
@@ -21,7 +20,6 @@ export class StockpileUpdateConsumer {
   private readonly logger = new Logger(StockpileUpdateConsumer.name);
 
   constructor(
-    private readonly guildManager: GuildManager,
     private readonly accessService: AccessService,
     private readonly stockpileService: StockpileService,
     private readonly catalogService: CatalogService,
@@ -122,13 +120,7 @@ export class StockpileUpdateConsumer {
     codeName: string[],
     interaction: DiscordAPIInteraction,
   ): Promise<GroupedStockpileEntry> {
-    const guild = await this.guildManager.fetch(interaction.guildId);
-    const member = await guild.members.fetch(interaction.member);
-    const accessArgs = await this.accessService.getTestArgs({
-      guildId: interaction.guildId,
-      user: { id: interaction.member },
-      member: { roles: Array.from(member.roles.valueOf().keys()) },
-    });
+    const accessArgs = await this.accessService.getTestArgs(interaction);
     const items = await this.catalogService.query().byCodeName(codeName).getMany();
     const catalog = mapKeys(items, (r) => r.name);
 
@@ -146,9 +138,9 @@ export class StockpileUpdateConsumer {
         }
 
         if (
-          !stockpile.access.some((access) =>
-            AccessDecision.fromEntry(access.rule).permit(...accessArgs),
-          )
+          !stockpile.access
+            .filter((access) => access.access <= AccessMode.WRITE)
+            .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
         ) {
           this.logger.warn(
             `Access control failed in processing ${record.CodeName} for ${record['Stockpile Name']} at the ${log.expandedLocation.getName()}`,

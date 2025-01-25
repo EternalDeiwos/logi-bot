@@ -7,6 +7,7 @@ import { GuildModule } from 'src/core/guild/guild.module';
 import { CoreModule } from 'src/core/core.module';
 import { PoiModule } from 'src/game/poi/poi.module';
 import { CatalogModule } from 'src/game/catalog/catalog.module';
+import { RegionModule } from 'src/game/region/region.module';
 import { Stockpile } from './stockpile.entity';
 import { StockpileRepository } from './stockpile.repository';
 import { StockpileLog } from './stockpile-log.entity';
@@ -48,6 +49,7 @@ import { StockpileLogController } from './stockpile-log.controller';
     WarModule,
     PoiModule,
     CatalogModule,
+    RegionModule,
   ],
   providers: [
     StockpileRepository,
