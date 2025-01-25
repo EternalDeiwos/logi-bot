@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AutocompleteInteraction } from 'discord.js';
 import { AutocompleteInterceptor } from 'necord';
 import { CrewService } from 'src/core/crew/crew.service';
-import { PoiService } from 'src/game/poi/poi.service';
+import { RegionService } from 'src/game/region/region.service';
 
 @Injectable()
 export class StockpileUpdateAutocompleteInterceptor extends AutocompleteInterceptor {
@@ -12,15 +12,16 @@ export class StockpileUpdateAutocompleteInterceptor extends AutocompleteIntercep
   private readonly crewService: CrewService;
 
   @Inject()
-  private readonly poiService: PoiService;
+  private readonly regionService: RegionService;
 
   public async transformOptions(interaction: AutocompleteInteraction) {
     const focused = interaction.options.getFocused(true);
 
     if (focused.name === 'location') {
-      const results = await this.poiService
+      const results = await this.regionService
         .query()
-        .withStockpiles()
+        .withPoi()
+        .onlyStorage()
         .search(focused.value.toString())
         .getMany();
 

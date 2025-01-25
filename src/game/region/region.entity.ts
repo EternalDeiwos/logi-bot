@@ -1,4 +1,4 @@
-import { Expose } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import {
   Entity,
   Column,
@@ -8,7 +8,12 @@ import {
   ViewEntity,
   ViewColumn,
   PrimaryColumn,
+  DeepPartial,
+  OneToMany,
 } from 'typeorm';
+import { Poi } from '../poi/poi.entity';
+
+export type SelectRegion = DeepPartial<Pick<Region, 'id'>>;
 
 @Entity()
 @Unique('uk_hex_major_minor_deleted_at', ['hexId', 'majorName', 'minorName', 'deletedAt'])
@@ -54,8 +59,36 @@ export class Region {
   @Expose()
   y: number;
 
+  @OneToMany(() => Poi, (poi) => poi.region)
+  @Type(() => Poi)
+  @Transform(({ value }) => (value ? value : null))
+  @Expose()
+  poi: Poi[];
+
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt: Date;
+
+  getName() {
+    let result = '';
+
+    if (this.minorName) {
+      result += this.getMinorName();
+    } else if (this.majorName) {
+      result += this.getMajorName();
+    } else {
+      result += this.hexName;
+    }
+
+    return result;
+  }
+
+  getMinorName() {
+    return `${this.minorName} near ${this.getMajorName()}`;
+  }
+
+  getMajorName() {
+    return `${this.majorName}, ${this.hexName}`;
+  }
 }
 
 @ViewEntity({
@@ -99,4 +132,32 @@ export class CurrentRegion {
   @ViewColumn()
   @Expose()
   y: number;
+
+  @OneToMany(() => Poi, (poi) => poi.region)
+  @Type(() => Poi)
+  @Transform(({ value }) => (value ? value : null))
+  @Expose()
+  poi: Poi[];
+
+  getName() {
+    let result = '';
+
+    if (this.minorName) {
+      result += this.getMinorName();
+    } else if (this.majorName) {
+      result += this.getMajorName();
+    } else {
+      result += this.hexName;
+    }
+
+    return result;
+  }
+
+  getMinorName() {
+    return `${this.minorName} near ${this.getMajorName()}`;
+  }
+
+  getMajorName() {
+    return `${this.majorName}, ${this.hexName}`;
+  }
 }

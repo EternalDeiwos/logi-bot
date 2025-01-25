@@ -3,6 +3,7 @@ import { AutocompleteInteraction } from 'discord.js';
 import { AutocompleteInterceptor } from 'necord';
 import { AccessService } from 'src/core/access/access.service';
 import { StockpileService } from './stockpile.service';
+import { AccessMode } from 'src/types';
 
 @Injectable()
 export class StockpileGrantAccessAutocompleteInterceptor extends AutocompleteInterceptor {
@@ -54,6 +55,17 @@ export class StockpileGrantAccessAutocompleteInterceptor extends AutocompleteInt
             value: result.id,
           };
         }),
+      );
+    }
+
+    if (focused.name === 'access') {
+      return interaction.respond(
+        Object.keys(AccessMode)
+          .filter((k) => k.toLowerCase().includes(focused.value.toLowerCase()))
+          .map((name) => ({
+            name,
+            value: name,
+          })),
       );
     }
   }

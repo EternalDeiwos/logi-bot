@@ -29,6 +29,9 @@ import { ErrorTraceConsumer } from './error.consumer';
               name: 'stockpile',
             },
             {
+              name: 'counter',
+            },
+            {
               name: 'retry',
             },
             {

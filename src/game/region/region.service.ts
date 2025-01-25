@@ -7,6 +7,7 @@ import { WarService } from 'src/game/war/war.service';
 import { BaseError } from 'src/errors';
 import { CurrentRegionLogRepository, RegionLogRepository } from './region-log.repository';
 import { CurrentRegionRepository, RegionRepository } from './region.repository';
+import { RegionQueryBuilder } from './region.query';
 import { RegionLog } from './region-log.entity';
 import { Region } from './region.entity';
 
@@ -32,6 +33,10 @@ export class RegionService {
     private readonly logRepo: RegionLogRepository,
     private readonly currentLogRepo: CurrentRegionLogRepository,
   ) {}
+
+  query() {
+    return new RegionQueryBuilder(this.currentRegionRepo);
+  }
 
   private async fetchHexes(): Promise<HexData[]> {
     const api = this.configService.getOrThrow<string>('CLAPFOOT_API_URI');

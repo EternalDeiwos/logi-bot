@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Snowflake } from 'discord.js';
-import { SelectCrewMember } from 'src/core/crew/member/crew-member.entity';
+import { CrewMemberAccess } from 'src/types';
+import { CrewMember } from 'src/core/crew/member/crew-member.entity';
 import { SelectCrew } from 'src/core/crew/crew.entity';
 import { AccessEntry, AccessRuleType } from './access.entity';
 import { AccessRule, AccessRuleMode } from './access-rule';
@@ -28,39 +29,57 @@ export class AccessDecision {
     return (this.type === AccessRuleType.DENY && this.test(...args)) || !this.test(...args);
   }
 
-  private test(memberSf: Snowflake, roles: Snowflake[], members: SelectCrewMember[]): boolean {
+  private test(
+    memberSf: Snowflake,
+    roles: Snowflake[],
+    members: CrewMember[],
+    guildAdmin: boolean,
+  ): boolean {
     return this.rule.mode === AccessRuleMode.ALL
-      ? this.rule.spec.every((inner) => this.testInner(inner, memberSf, roles, members))
-      : this.rule.spec.some((inner) => this.testInner(inner, memberSf, roles, members));
+      ? this.rule.spec.every((inner) => this.testInner(inner, memberSf, roles, members, guildAdmin))
+      : this.rule.spec.some((inner) => this.testInner(inner, memberSf, roles, members, guildAdmin));
   }
 
   private testInner(
     inner: AccessRuleInner,
     memberSf: Snowflake,
     roles: Snowflake[],
-    members: SelectCrewMember[],
+    members: CrewMember[],
+    guildAdmin: boolean,
   ): boolean {
-    return (
+    const result =
       (!inner.member || inner.member === memberSf) &&
       (!inner.role || roles.includes(inner.role)) &&
-      (!inner.crew || this.testCrew(inner.crew, memberSf, members)) &&
-      (!inner.rule || this.testRule(inner.rule, memberSf, roles, members))
-    );
+      (!inner.crew ||
+        this.testCrew(inner.crew, memberSf, members, inner.crewRole || CrewMemberAccess.MEMBER)) &&
+      (!inner.rule || this.testRule(inner.rule, memberSf, roles, members)) &&
+      (!inner.guildAdmin || guildAdmin);
+
+    if (result) {
+      this.logger.log(`Rule passed for ${memberSf}: ${JSON.stringify(inner)}`);
+    }
+
+    return result;
   }
 
   private testRule(
     rule: AccessRule,
     memberSf: Snowflake,
     roles: Snowflake[],
-    members: SelectCrewMember[],
+    members: CrewMember[],
   ): boolean {
-    return new AccessDecision(this.type, rule).test(memberSf, roles, members);
+    return new AccessDecision(this.type, rule).test(memberSf, roles, members, false);
   }
 
-  private testCrew(crewRef: SelectCrew, memberSf: Snowflake, members: SelectCrewMember[]) {
-    return (
-      members.findIndex((member) => member.crewId === crewRef.id && memberSf === member.memberSf) >
-      -1
+  private testCrew(
+    crewRef: SelectCrew,
+    memberSf: Snowflake,
+    members: CrewMember[],
+    crewRole: CrewMemberAccess,
+  ) {
+    const member = members.find(
+      (member) => member.crewId === crewRef.id && memberSf === member.memberSf,
     );
+    return member && member.access <= crewRole;
   }
 }

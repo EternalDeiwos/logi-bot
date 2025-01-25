@@ -145,7 +145,7 @@ export class StockpileServiceImpl extends StockpileService {
           title: group,
           footer: {
             iconURL: member.displayAvatarURL(),
-            text: `Updated by ${member.displayName} and @${log.crew.shortName}`,
+            text: `WC${log.warNumber} • Updated by ${member.displayName} and @${log.crew.shortName}`,
           },
         });
       }

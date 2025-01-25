@@ -18,6 +18,7 @@ export class CrewLogPromptBuilder extends BasePromptBuilder {
     member: GuildMember,
     content: string,
     createdAt: Date,
+    warNumber: string,
   ) {
     const embed = new EmbedBuilder()
       .setTitle(`Crew Update: ${crew.name}`)
@@ -26,7 +27,7 @@ export class CrewLogPromptBuilder extends BasePromptBuilder {
       .setDescription(content)
       .setFooter({
         iconURL: member.avatarURL() ?? member.user.avatarURL(),
-        text: `Submitted by ${member.displayName}`,
+        text: `WC${warNumber} • Submitted by ${member.displayName}`,
       })
       .setTimestamp(createdAt);
 

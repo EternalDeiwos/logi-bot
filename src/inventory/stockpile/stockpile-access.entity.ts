@@ -13,6 +13,7 @@ import {
   DeleteDateColumn,
   Unique,
 } from 'typeorm';
+import { AccessMode } from 'src/types';
 import { AccessEntry } from 'src/core/access/access.entity';
 import { Stockpile } from './stockpile.entity';
 
@@ -31,6 +32,10 @@ export class StockpileAccess {
   })
   @Expose()
   id: string;
+
+  @Expose()
+  @Column({ type: 'enum', enum: AccessMode, default: AccessMode.READ })
+  access: AccessMode;
 
   @Column({ name: 'rule_id', type: 'uuid' })
   @RelationId((entry: StockpileAccess) => entry.rule)
