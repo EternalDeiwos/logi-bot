@@ -200,12 +200,16 @@ export class Counter {
 })
 export class CurrentCounter {
   @Column({ type: 'uuid' })
+  @Expose()
   id: string;
 
   @Column({ name: 'crew_id', type: 'uuid', nullable: true })
   crewId: string;
 
   @ManyToOne(() => Crew)
+  @Expose()
+  @Type(() => Crew)
+  @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
     name: 'crew_id',
     referencedColumnName: 'id',
@@ -229,6 +233,7 @@ export class CurrentCounter {
   expandedCatalog: ExpandedCatalog;
 
   @Column({ type: 'int8', name: 'war_number' })
+  @Expose()
   warNumber: string;
 
   @ManyToOne(() => War)
@@ -239,6 +244,7 @@ export class CurrentCounter {
   war: War;
 
   @Column({ type: 'uuid', name: 'guild_id' })
+  @Expose()
   guildId: string;
 
   @ManyToOne(() => Guild)
@@ -272,7 +278,14 @@ export class CurrentCounter {
   @OneToMany(() => CounterAccess, (access) => access.counter)
   @Type(() => CounterAccess)
   @Transform(({ value }) => (value ? value : null))
+  @Expose()
   access: CounterAccess[];
+
+  @OneToMany(() => CounterEntry, (entry) => entry.counter)
+  @Type(() => CounterEntry)
+  @Transform(({ value }) => (value ? value : null))
+  @Expose()
+  items: CounterEntry[];
 
   @Expose()
   @Column({ type: 'int8', name: 'created_by_sf' })

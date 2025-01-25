@@ -15,6 +15,7 @@ import { Counter } from './counter.entity';
 
 @Entity('counter_entry')
 export class CounterEntry {
+  @Expose()
   @PrimaryColumn({
     type: 'uuid',
     default: () => 'uuidv7()',
@@ -22,6 +23,7 @@ export class CounterEntry {
   })
   id: string;
 
+  @Expose()
   @Column({ name: 'counter_id', type: 'uuid' })
   @RelationId((entry: CounterEntry) => entry.counter)
   @Index('counter_id_idx_counter_entry')

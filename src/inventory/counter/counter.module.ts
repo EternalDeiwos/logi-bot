@@ -17,6 +17,7 @@ import { CounterAccessRepository } from './counter-access.repository';
 import { CounterEntry } from './counter-entry.entity';
 import { CounterEntryRepository } from './counter-entry.repository';
 import { CounterUpdateConsumer } from './counter-update.consumer';
+import { CounterController } from './counter.controller';
 
 @Module({
   imports: [
@@ -38,7 +39,7 @@ import { CounterUpdateConsumer } from './counter-update.consumer';
     CounterCommand,
     CounterUpdateConsumer,
   ],
-  controllers: [CounterRpcController],
+  controllers: [CounterRpcController, CounterController],
   exports: [CounterService],
 })
 export class CounterModule {}
