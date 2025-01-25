@@ -3,6 +3,7 @@ import { UpdateResult } from 'typeorm';
 import {
   CategoryChannel,
   ChannelType,
+  Client,
   DiscordAPIError,
   GuildManager,
   GuildTextBasedChannel,
@@ -26,6 +27,9 @@ import { TeamService } from 'src/core/team/team.service';
 import { SelectTeam } from 'src/core/team/team.entity';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { TicketService } from 'src/core/ticket/ticket.service';
+import { AccessService } from 'src/core/access/access.service';
+import { AccessRuleMode } from 'src/core/access/access-rule';
+import { AccessEntry, AccessRuleType, SelectAccessEntry } from 'src/core/access/access.entity';
 import { WarService } from 'src/game/war/war.service';
 import { ArchiveCrew, Crew, InsertCrew, SelectCrew, UpdateCrew } from './crew.entity';
 import { CrewRepository } from './crew.repository';
@@ -59,6 +63,7 @@ export abstract class CrewService {
     memberRef: Snowflake,
   ): Promise<void>;
   abstract crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel): Promise<void>;
+  abstract getOrCreateDefaultCrewAccessRule(crew: Crew): Promise<AccessEntry>;
 }
 
 @Injectable()
@@ -66,6 +71,7 @@ export class CrewServiceImpl extends CrewService {
   private readonly logger = new Logger(CrewService.name);
 
   constructor(
+    private readonly client: Client,
     private readonly guildManager: GuildManager,
     private readonly discordService: DiscordService,
     private readonly teamService: TeamService,
@@ -74,6 +80,7 @@ export class CrewServiceImpl extends CrewService {
     private readonly memberService: CrewMemberService,
     private readonly crewRepo: CrewRepository,
     private readonly warService: WarService,
+    private readonly accessService: AccessService,
   ) {
     super();
   }
@@ -534,5 +541,53 @@ export class CrewServiceImpl extends CrewService {
       .addCrewControls(crew);
     const message = await channel.send(prompt.build());
     await message.pin();
+  }
+
+  async getOrCreateDefaultCrewAccessRule(crew: Crew) {
+    if (!crew) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid crew');
+    }
+
+    let entry = await this.accessService
+      .query()
+      .byGuild({ id: crew.guildId })
+      .byCrew(crew)
+      .getOne();
+
+    if (entry) {
+      return entry;
+    }
+
+    const result = await this.accessService.createRule({
+      guildId: crew.guildId,
+      description: `Allow ${crew.name} member`,
+      type: AccessRuleType.PERMIT,
+      rule: {
+        mode: AccessRuleMode.ANY,
+        spec: [
+          {
+            crew: { id: crew.id },
+          },
+          {
+            guildAdmin: true,
+          },
+        ],
+      },
+      updatedBy: this.client.user.id,
+    });
+
+    if (result?.identifiers) {
+      const [{ id }] = result.identifiers as SelectAccessEntry[];
+      return await this.accessService
+        .query()
+        .byGuild({ id: crew.guildId })
+        .byEntry({ id })
+        .getOneOrFail();
+    } else {
+      this.logger.warn(
+        `Failed to create default rule for crew ${crew.name} in ${crew.guild.name}`,
+        { result },
+      );
+    }
   }
 }
