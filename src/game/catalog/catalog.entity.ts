@@ -14,6 +14,47 @@ export type SelectCatalog = DeepPartial<
   Pick<Catalog, 'id' | 'gameVersion' | 'catalogVersion' | 'name'>
 >;
 
+export const CatalogCategoryNameMap = {
+  ['EItemProfileType::Accessory']: 'Infantry Wearable',
+  ['EItemProfileType::HandheldWeapon']: 'Infantry Weapons',
+  ['EItemProfileType::HeavyAmmo']: 'Explosives',
+  ['EItemProfileType::LargeItemAmmo']: 'Explosives',
+  ['EItemProfileType::LargeResource']: 'Facility Intermediates',
+  ['EItemProfileType::LightAmmo']: 'Infantry Ammo',
+  ['EItemProfileType::LiquidAmmo']: 'Infantry Ammo',
+  ['EItemProfileType::OnSiteResources']: 'Bunker',
+  ['EItemProfileType::RawResource']: 'Resources',
+  ['EItemProfileType::RefinedFuel']: 'Fuel',
+  ['EItemProfileType::RefinedResource']: 'Refined',
+  ['EItemProfileType::RefinedResourceFastRetrieve']: 'Refined',
+  ['EItemProfileType::StackableTool']: 'Infantry Medical',
+  ['EItemProfileType::Supplies']: 'Supplies',
+  ['EItemProfileType::Throwable']: 'Grenades',
+  ['EItemProfileType::Tool']: 'Infantry Tools',
+  ['EItemProfileType::TorpedoAmmo']: 'Torpedo',
+  ['EItemProfileType::Uniform']: 'Uniforms',
+  ['EItemProfileType::UniqueItem']: 'Unique Items',
+  ['EItemProfileType::UnstackableRawResource']: 'Wreckage',
+  ['EShippableType::Normal']: 'Normal Shippable',
+  ['EShippableType::Small']: 'Resource Containers',
+  ['EVehicleProfileType::BeachableShip']: 'Motorboats',
+  ['EVehicleProfileType::Bicycle']: 'Bicycles',
+  ['EVehicleProfileType::CombatShip']: 'Ships',
+  ['EVehicleProfileType::Construction']: 'Utility Construction Vehicles',
+  ['EVehicleProfileType::FieldWeapon']: 'Pushguns',
+  ['EVehicleProfileType::OpenRoofWheeledTransport']: 'Motorcycles',
+  ['EVehicleProfileType::Rail']: 'Rail Engines',
+  ['EVehicleProfileType::RailCar']: 'Rail Cars',
+  ['EVehicleProfileType::Ship']: 'Barge',
+  ['EVehicleProfileType::SuperTank']: 'Super Tank',
+  ['EVehicleProfileType::Tank']: 'Tank',
+  ['EVehicleProfileType::TrackedTransport']: 'Tracked',
+  ['EVehicleProfileType::Trailer']: 'Trailer',
+  ['EVehicleProfileType::WheeledArmoured']: 'Armoured Car',
+  ['EVehicleProfileType::WheeledTransport']: 'Logi Vehicles',
+};
+export type CatalogCategory = keyof typeof CatalogCategoryNameMap;
+
 @Entity()
 @Unique('uk_foxhole_catalog_name', ['gameVersion', 'catalogVersion', 'name'])
 export class Catalog {

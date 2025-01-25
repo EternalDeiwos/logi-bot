@@ -3,14 +3,20 @@ import { CommonQueryBuilder } from 'src/database/util';
 import { SelectStockpileLog } from './stockpile-log.entity';
 import { SelectPoi } from 'src/game/poi/poi.entity';
 import { SelectGuild } from 'src/core/guild/guild.entity';
-import { SelectCatalog } from 'src/game/catalog/catalog.entity';
+import {
+  CatalogCategory,
+  CatalogCategoryNameMap,
+  SelectCatalog,
+} from 'src/game/catalog/catalog.entity';
 import { SelectStockpile } from './stockpile.entity';
 import { CurrentStockpileEntry } from './stockpile-entry.entity';
 
 type SelectCatalogId = Pick<SelectCatalog, 'id'>;
 
 const searchWhere = (alias: string = 'catalog') => {
-  return new Brackets((qb) => qb.where(`(${alias}.data->'DisplayName')::text ILIKE :query`));
+  return new Brackets((qb) =>
+    qb.where(`${alias}.display_name ILIKE :query`).orWhere(`${alias}.category IN (:...categories)`),
+  );
 };
 
 export class StockpileEntryQueryBuilder extends CommonQueryBuilder<CurrentStockpileEntry> {
@@ -158,7 +164,13 @@ export class StockpileEntryQueryBuilder extends CommonQueryBuilder<CurrentStockp
   }
 
   searchByCatalog(query: string) {
-    this.qb.andWhere(searchWhere(), { query: `%${query}%` });
+    const q = query.toLowerCase();
+    const categories = Object.entries(CatalogCategoryNameMap)
+      .filter(([category, description]) => {
+        return category.toLowerCase().includes(q) || description.toLowerCase().includes(q);
+      })
+      .map(([c]) => c) as CatalogCategory[];
+    this.qb.andWhere(searchWhere(), { query: `%${q}%`, categories });
     return this;
   }
 
