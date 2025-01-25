@@ -1,17 +1,21 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
+import { ActivityType, Client, PresenceUpdateStatus } from 'discord.js';
 import { BaseError } from 'src/errors';
 import { WarService } from 'src/game/war/war.service';
 import { RegionService } from 'src/game/region/region.service';
 import { PoiService } from 'src/game/poi/poi.service';
 import { CatalogService } from 'src/game/catalog/catalog.service';
 
+import * as pkg from '../../package.json';
+
 @Injectable()
 export class PollingService implements OnApplicationBootstrap {
   private readonly logger = new Logger(PollingService.name);
 
   constructor(
+    private readonly client: Client,
     private readonly configService: ConfigService,
     private readonly warService: WarService,
     private readonly regionService: RegionService,
@@ -20,10 +24,20 @@ export class PollingService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
+    this.setBotStatus();
     await this.bootstrapWar();
     await this.bootstrapRegion();
     await this.bootstrapPoi();
     await this.bootstrapCatalog();
+  }
+
+  @Cron('3 * * * *')
+  setBotStatus() {
+    this.client.user.setPresence({
+      activities: [{ name: 'activity', type: ActivityType.Custom, state: `v${pkg.version}` }],
+      status: PresenceUpdateStatus.Online,
+    });
+    this.logger.log('Bot status updated');
   }
 
   async bootstrapWar() {
