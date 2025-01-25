@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BotModule } from 'src/bot/bot.module';
 import { RMQModule } from 'src/rmq/rmq.module';
+import { WarModule } from 'src/game/war/war.module';
 import { ApiModule } from './api/api.module';
 import { GuildModule } from './guild/guild.module';
 import { Team } from './team/team.entity';
@@ -55,6 +56,7 @@ import { AccessModule } from './access/access.module';
       Guild,
       CrewShare,
     ]),
+    WarModule,
   ],
   providers: [
     BotEventListener,

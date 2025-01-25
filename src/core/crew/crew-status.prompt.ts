@@ -19,7 +19,7 @@ export type TicketProperties = {
 };
 
 export class CrewStatusPromptBuilder extends BasePromptBuilder {
-  addIndividualCrewStatus(discordGuild: DiscordGuild, crew: Crew) {
+  addIndividualCrewStatus(discordGuild: DiscordGuild, crew: Crew, war?: string | number) {
     const fields: { name: string; value: string }[] = [];
     const owner = crew.members.find((member) => member.access === CrewMemberAccess.OWNER);
     const embed = new EmbedBuilder()
@@ -30,6 +30,12 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
       .setDescription(
         `${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'}.`,
       );
+
+    if (war) {
+      embed.setFooter({
+        text: `WC${war}`,
+      });
+    }
 
     if (crew.members.length > 30) {
       embed.setDescription(
