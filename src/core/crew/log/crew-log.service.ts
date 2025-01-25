@@ -7,6 +7,7 @@ import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { CrewLogRepository } from './crew-log.repository';
 import { InsertCrewLog } from './crew-log.entity';
 import { CrewLogPromptBuilder } from './crew-log.prompt';
+import { WarService } from 'src/game/war/war.service';
 
 export abstract class CrewLogService {
   /**
@@ -31,6 +32,7 @@ export class CrewLogServiceImpl extends CrewLogService {
     private readonly guildManager: GuildManager,
     private readonly crewService: CrewService,
     private readonly memberService: CrewMemberService,
+    private readonly warService: WarService,
     private readonly logRepo: CrewLogRepository,
   ) {
     super();
@@ -40,6 +42,7 @@ export class CrewLogServiceImpl extends CrewLogService {
     const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
+    const war = await this.warService.query().byCurrent().getOneOrFail();
 
     if (!channel || !channel.isTextBased()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
@@ -49,7 +52,7 @@ export class CrewLogServiceImpl extends CrewLogService {
     const createdAt = new Date();
 
     const prompt = new CrewLogPromptBuilder()
-      .addCrewLogMessage(discordGuild, crew, member, data.content, createdAt)
+      .addCrewLogMessage(discordGuild, crew, member, data.content, createdAt, war.warNumber)
       .addCrewJoinButton(crew);
 
     const message = await channel.send(
