@@ -42,13 +42,13 @@ export class AccessEntryQueryBuilder extends CommonQueryBuilder<AccessEntry> {
       new Brackets((qb) => {
         if (params.crews.length) {
           qb.orWhere(
-            `(SELECT spec->'crew'->>'id' FROM jsonb_array_elements(entry.rule->'spec') spec) IN (:...crews)`,
+            `(SELECT spec->'crew'->>'id' FROM jsonb_array_elements(entry.rule->'spec') spec WHERE (spec->'crew') IS NOT NULL LIMIT 1) IN (:...crews)`,
           );
         }
 
         if (params.crewChannels.length) {
           qb.orWhere(
-            `(SELECT spec->'crew'->>'crewSf' FROM jsonb_array_elements(entry.rule->'spec') spec) IN (:...crewChannels)`,
+            `(SELECT spec->'crew'->>'crewSf' FROM jsonb_array_elements(entry.rule->'spec') spec WHERE (spec->'crew') IS NOT NULL LIMIT 1) IN (:...crewChannels)`,
           );
         }
       }),

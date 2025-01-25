@@ -400,7 +400,7 @@ export class CounterCommand {
       .getMany();
 
     const accessArgs = await this.accessService.getTestArgs(interaction);
-    const prompt = new CounterStaticUpdatePromptBuilder();
+    const prompt = new CounterStaticUpdatePromptBuilder().addUpdateControls(counters[0].crewId);
 
     for (const counter of counters) {
       if (

@@ -43,11 +43,15 @@ export class CatalogQueryBuilder extends CommonQueryBuilder<ExpandedCatalog> {
       .map(([c]) => c) as CatalogCategory[];
 
     this.qb.andWhere(
-      new Brackets((qb) =>
-        qb
-          .where(`${this.alias}.display_name ILIKE :query`)
-          .orWhere(`${this.alias}.category IN (:...categories)`),
-      ),
+      new Brackets((qb) => {
+        qb.where(`${this.alias}.display_name ILIKE :query`);
+
+        if (categories.length) {
+          qb.orWhere(`${this.alias}.category IN (:...categories)`);
+        }
+
+        return qb;
+      }),
       { query: `%${q}%`, categories },
     );
 
