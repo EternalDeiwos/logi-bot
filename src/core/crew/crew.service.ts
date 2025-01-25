@@ -26,6 +26,7 @@ import { TeamService } from 'src/core/team/team.service';
 import { SelectTeam } from 'src/core/team/team.entity';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { TicketService } from 'src/core/ticket/ticket.service';
+import { WarService } from 'src/game/war/war.service';
 import { ArchiveCrew, Crew, InsertCrew, SelectCrew, UpdateCrew } from './crew.entity';
 import { CrewRepository } from './crew.repository';
 import { CrewMemberService } from './member/crew-member.service';
@@ -72,6 +73,7 @@ export class CrewServiceImpl extends CrewService {
     @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
     private readonly memberService: CrewMemberService,
     private readonly crewRepo: CrewRepository,
+    private readonly warService: WarService,
   ) {
     super();
   }
@@ -456,7 +458,12 @@ export class CrewServiceImpl extends CrewService {
       throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
     }
 
-    const prompt = new CrewStatusPromptBuilder().addIndividualCrewStatus(discordGuild, crew);
+    const war = await this.warService.query().byCurrent().getOneOrFail();
+    const prompt = new CrewStatusPromptBuilder().addIndividualCrewStatus(
+      discordGuild,
+      crew,
+      war.warNumber,
+    );
 
     if (targetChannel.id === crew.crewSf) {
       prompt.add(new CrewInfoPromptBuilder().addCrewControls(crew));
