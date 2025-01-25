@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
-import { Client, GuildManager, Snowflake } from 'discord.js';
+import { GuildManager, Snowflake } from 'discord.js';
 import { ConsumeMessage } from 'amqplib';
 import { DiscordAPIInteraction } from 'src/types';
-import { CatalogService } from 'src/game/catalog/catalog.service';
-import { AccessService } from 'src/core/access/access.service';
-import { AccessDecision } from 'src/core/access/access-decision';
 import { CounterService } from './counter.service';
 import { InsertCounterEntryDto } from './dto/insert-counter-entry.dto';
 import { GuildService } from 'src/core/guild/guild.service';

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -7,12 +8,18 @@ import {
   HttpStatus,
   Logger,
   Param,
+  Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
+import { ApiBearerAuth, ApiBody, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { AuthGuard } from 'src/core/api/auth.guard';
 import { Auth } from 'src/core/api/auth.decorator';
 import { APITokenPayload } from 'src/core/api/api.service';
+import { GuildService } from 'src/core/guild/guild.service';
+import { InsertCounterEntryDto } from './dto/insert-counter-entry.dto';
+import { InsertCounterDto } from './dto/insert-counter.dto';
 import { CounterService } from './counter.service';
 import { CurrentCounter } from './counter.entity';
 
@@ -23,7 +30,12 @@ import { CurrentCounter } from './counter.entity';
 export class CounterController {
   private readonly logger = new Logger(CounterController.name);
 
-  constructor(private readonly counterService: CounterService) {}
+  constructor(
+    private readonly rmq: AmqpConnection,
+    private readonly configService: ConfigService,
+    private readonly guildService: GuildService,
+    private readonly counterService: CounterService,
+  ) {}
 
   @Get()
   @ApiResponse({ status: 200, description: 'Get a list of counters', type: [CurrentCounter] })
@@ -51,6 +63,7 @@ export class CounterController {
       .withEntries()
       .withAccessRules()
       .withCatalog()
+      .withCrew()
       .byGuild({ guildSf: auth.aud })
       .forCurrentWar()
       .byCounter({ id })
@@ -84,5 +97,58 @@ export class CounterController {
     }
 
     await this.counterService.deleteCounter({ id: counterId }, auth.sub);
+  }
+
+  @Post()
+  @ApiBody({ type: InsertCounterDto, description: 'Counter configuration' })
+  @HttpCode(201)
+  @ApiResponse({ status: 201, description: 'Created' })
+  @ApiResponse({ status: 401, description: 'Authentication Failed' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  async createCounter(@Auth() auth: APITokenPayload, @Body() data: InsertCounterDto) {
+    const guild = await this.guildService.query().byGuild({ guildSf: auth.aud }).getOneOrFail();
+    await this.counterService.registerCounter({
+      createdBy: auth.sub,
+      guildId: guild.id,
+      ...data,
+    });
+  }
+
+  @Post(':counter')
+  @ApiBody({ type: InsertCounterEntryDto, description: 'Counter configuration' })
+  @HttpCode(201)
+  @ApiResponse({ status: 201, description: 'Created' })
+  @ApiResponse({ status: 401, description: 'Authentication Failed' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  async updateCounter(
+    @Auth() auth: APITokenPayload,
+    @Param('counter') counter: string,
+    @Body() data: InsertCounterEntryDto,
+  ) {
+    const updates = [
+      {
+        createdBy: auth.sub,
+        counterId: counter,
+        ...data,
+      },
+    ];
+    await this.counterService.updateCounter(updates);
+
+    const expiration = this.configService.getOrThrow<number>('APP_QUEUE_RPC_EXPIRE');
+
+    await this.rmq.publish(
+      'counter',
+      'counter.update',
+      {
+        updates,
+        interaction: {
+          guildId: auth.aud,
+          user: auth.sub,
+        },
+      },
+      {
+        expiration,
+      },
+    );
   }
 }

@@ -551,7 +551,7 @@ export class CrewServiceImpl extends CrewService {
     let entry = await this.accessService
       .query()
       .byGuild({ id: crew.guildId })
-      .byCrew(crew)
+      .byCrew({ id: crew.id })
       .getOne();
 
     if (entry) {

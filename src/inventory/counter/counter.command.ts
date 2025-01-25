@@ -161,16 +161,6 @@ export class CounterCommand {
       createdBy: memberRef,
     });
 
-    if (counter?.identifiers) {
-      const [{ id }] = counter.identifiers as SelectCounterAccess[];
-      const rule = await this.crewService.getOrCreateDefaultCrewAccessRule(crew);
-      await this.counterService.grantAccess({
-        counterId: id,
-        createdBy: memberRef,
-        ruleId: rule.id,
-      });
-    }
-
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Counter registered')],
     });

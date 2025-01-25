@@ -12,6 +12,7 @@ import { CounterEntryQueryBuilder } from './counter-entry.query';
 import { CounterRepository, CurrentCounterRepository } from './counter.repository';
 import { CounterEntryRepository } from './counter-entry.repository';
 import { CounterAccessRepository } from './counter-access.repository';
+import { CrewService } from 'src/core/crew/crew.service';
 
 export abstract class CounterService {
   abstract query(): CounterQueryBuilder;
@@ -34,6 +35,7 @@ export class CounterServiceImpl extends CounterService {
 
   constructor(
     private readonly warService: WarService,
+    private readonly crewService: CrewService,
     private readonly counterRepo: CounterRepository,
     private readonly currentCounterRepo: CurrentCounterRepository,
     private readonly entryRepo: CounterEntryRepository,
@@ -52,8 +54,21 @@ export class CounterServiceImpl extends CounterService {
 
   async registerCounter(data: InsertCounterDto) {
     const war = await this.warService.query().byCurrent().getOneOrFail();
+    const crew = await this.crewService.query().byCrew({ id: data.crewId }).getOneOrFail();
     const counter = this.counterRepo.create({ ...data, warNumber: war.warNumber });
-    return await this.counterRepo.insert(counter);
+    const result = await this.counterRepo.insert(counter);
+
+    if (result?.identifiers) {
+      const [{ id }] = result.identifiers as SelectCounterAccess[];
+      const rule = await this.crewService.getOrCreateDefaultCrewAccessRule(crew);
+      await this.grantAccess({
+        counterId: id,
+        createdBy: counter.createdBy,
+        ruleId: rule.id,
+      });
+    }
+
+    return result;
   }
 
   async updateCounter(data: InsertCounterEntryDto[]) {
