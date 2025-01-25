@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InsertResult } from 'typeorm';
-import { Interaction } from 'discord.js';
+import { Interaction, PermissionsBitField } from 'discord.js';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { AccessEntryQueryBuilder } from './access.query';
 import { AccessEntryRepository } from './access.repository';
@@ -51,7 +51,8 @@ export class AccessServiceImpl extends AccessService {
       .byGuild({ guildSf: interaction.guildId })
       .byMember(memberSf)
       .getMany();
+    const guildAdmin = interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator);
 
-    return [memberSf, roles, members] as Parameters<AccessDecision['test']>;
+    return [memberSf, roles, members, guildAdmin] as Parameters<AccessDecision['test']>;
   }
 }
