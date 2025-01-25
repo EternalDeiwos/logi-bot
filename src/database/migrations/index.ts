@@ -11,5 +11,5 @@ export * from './1732298879418-stockpiles';
 export * from './1733243029192-game-stockpile-history';
 export * from './1733999849199-dbo-synthetic-ids';
 export * from './1734003735697-dbo-drop-natural-references';
-export * from './1735249864392-stockpile-entry-current-war';
 export * from './1735305176001-stockpile-entry-current-war';
+export * from './1737842330473-counters';
