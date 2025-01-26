@@ -47,7 +47,10 @@ export class AccessDecision {
     members: CrewMember[],
     guildAdmin: boolean,
   ): boolean {
+    const length = Object.keys(inner).length;
     const result =
+      length > 0 && // Empty rule always fails
+      (length !== 1 || ![false, null].includes(inner.guildAdmin)) && // Prevent guildAdmin=false becoming a tautology
       (!inner.member || inner.member === memberSf) &&
       (!inner.role || roles.includes(inner.role)) &&
       (!inner.crew ||
