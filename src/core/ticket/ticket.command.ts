@@ -25,8 +25,11 @@ import { SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
-import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { CrewService } from 'src/core/crew/crew.service';
+import { AccessService } from 'src/core/access/access.service';
+import { AccessDecision } from 'src/core/access/access-decision';
+import { AccessRuleType } from 'src/core/access/access.entity';
+import { AccessRuleMode } from 'src/core/access/access-rule';
 import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
@@ -68,8 +71,8 @@ export class TicketCommand {
     private readonly botService: BotService,
     private readonly guildService: GuildService,
     private readonly crewService: CrewService,
-    private readonly memberService: CrewMemberService,
     private readonly ticketService: TicketService,
+    private readonly accessService: AccessService,
   ) {}
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
@@ -197,7 +200,14 @@ export class TicketCommand {
       .byTicket({ threadSf: threadRef })
       .getOneOrFail();
 
-    if (!(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef))) {
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecision(AccessRuleType.PERMIT, {
+        mode: AccessRuleMode.ANY,
+        spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
+      }).deny(...accessArgs)
+    ) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew members can perform this action',
@@ -271,7 +281,14 @@ export class TicketCommand {
       .byTicket({ threadSf: threadRef })
       .getOneOrFail();
 
-    if (!(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef))) {
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecision(AccessRuleType.PERMIT, {
+        mode: AccessRuleMode.ANY,
+        spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
+      }).deny(...accessArgs)
+    ) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew members can perform this action',
@@ -298,10 +315,16 @@ export class TicketCommand {
   })
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
     const ticketRef: SelectTicket = { threadSf: interaction.channelId };
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService.query().withCrew().byTicket(ticketRef).getOneOrFail();
 
-    if (!(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef))) {
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecision(AccessRuleType.PERMIT, {
+        mode: AccessRuleMode.ANY,
+        spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
+      }).deny(...accessArgs)
+    ) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew members can perform this action',
@@ -336,7 +359,14 @@ export class TicketCommand {
       .byTicket({ threadSf: interaction.channelId })
       .getOneOrFail();
 
-    if (!(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef))) {
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecision(AccessRuleType.PERMIT, {
+        mode: AccessRuleMode.ANY,
+        spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
+      }).deny(...accessArgs)
+    ) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew members can perform this action',
@@ -355,11 +385,6 @@ export class TicketCommand {
     @ComponentParam('action') action: string,
     @ComponentParam('thread') threadRef: Snowflake,
   ) {
-    // const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    // const ticket = await this.ticketService
-    //   .query()
-    //   .byThread({ threadSf: threadRef })
-    //   .getOneOrFail();
     const tag = TicketActionToTag[action];
 
     if (!tag) {
@@ -377,10 +402,13 @@ export class TicketCommand {
       .byTicket({ threadSf: interaction.channelId })
       .getOneOrFail();
 
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
     if (
-      // Ticket owner can close their own tickets
-      !(await this.memberService.requireCrewAccess(ticket.crew.crewSf, memberRef, false)) &&
-      !(tag === TicketTag.ABANDONED && ticket.createdBy === memberRef)
+      new AccessDecision(AccessRuleType.PERMIT, {
+        mode: AccessRuleMode.ANY,
+        spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
+      }).deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
