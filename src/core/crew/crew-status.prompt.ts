@@ -22,6 +22,8 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
   addIndividualCrewStatus(discordGuild: DiscordGuild, crew: Crew, war?: string | number) {
     const fields: { name: string; value: string }[] = [];
     const owner = crew.members.find((member) => member.access === CrewMemberAccess.OWNER);
+    const admins = crew.members.filter((member) => member.access === CrewMemberAccess.ADMIN);
+    const leadership = [owner, ...admins];
     const embed = new EmbedBuilder()
       .setTitle(`Crew: ${crew.name}`)
       .setColor(Colors.DarkGreen)
@@ -37,6 +39,13 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
       });
     }
 
+    if (admins.length) {
+      fields.push({
+        name: 'Crew Admins',
+        value: leadership.map((member) => `- ${userMention(member.memberSf)}`).join('\n'),
+      });
+    }
+
     if (crew.members.length > 30) {
       embed.setDescription(
         `${channelMention(crew.crewSf)} is led by ${owner ? userMention(owner.memberSf) : 'nobody'} and has ${crew.members.length} ${crew.members.length > 1 || !crew.members.length ? 'members' : 'member'}.`,
@@ -45,7 +54,10 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
       fields.push({
         name: 'Members',
         value:
-          crew.members.map((member) => `- ${userMention(member.memberSf)}`).join('\n') || 'None',
+          crew.members
+            .filter((member) => leadership.findIndex((leader) => leader.id === member.id) === -1)
+            .map((member) => `- ${userMention(member.memberSf)}`)
+            .join('\n') || 'None',
       });
     }
 

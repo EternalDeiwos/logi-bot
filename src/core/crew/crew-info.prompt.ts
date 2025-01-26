@@ -4,7 +4,6 @@ import {
   ButtonStyle,
   Colors,
   EmbedBuilder,
-  Snowflake,
   userMention,
 } from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
@@ -24,10 +23,19 @@ To run a successful crew you should do the following:
 export class CrewInfoPromptBuilder extends BasePromptBuilder {
   public addCrewPromptMessage(crew: Crew, members: CrewMember[]) {
     const owner = members.find((member) => member.access === CrewMemberAccess.OWNER);
+    const admins = members.filter((member) => member.access === CrewMemberAccess.ADMIN);
     const embed = new EmbedBuilder()
       .setTitle(`Join ${crew.name}`)
       .setDescription(newCrewMessage(owner ? userMention(owner.memberSf) : 'nobody'))
       .setColor(Colors.DarkGreen);
+
+    if (admins.length) {
+      embed.addFields({
+        name: 'Crew Admins',
+        value: [owner, ...admins].map((member) => `- ${userMention(member.memberSf)}`).join('\n'),
+        inline: false,
+      });
+    }
 
     return this.add({ embeds: [embed] });
   }
