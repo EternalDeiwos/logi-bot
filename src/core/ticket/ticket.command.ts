@@ -208,10 +208,7 @@ export class TicketCommand {
         spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
       }).deny(...accessArgs)
     ) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only a crew members can perform this action',
-      ).asDisplayable();
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
 
     await this.botService.replyOrFollowUp(interaction, {
@@ -289,10 +286,7 @@ export class TicketCommand {
         spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
       }).deny(...accessArgs)
     ) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only a crew members can perform this action',
-      ).asDisplayable();
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
 
     const reason = interaction.fields.getTextInputValue('ticket/decline/reason');
@@ -325,10 +319,7 @@ export class TicketCommand {
         spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
       }).deny(...accessArgs)
     ) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only a crew members can perform this action',
-      ).asDisplayable();
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
 
     const crews = await this.crewService
@@ -367,10 +358,7 @@ export class TicketCommand {
         spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
       }).deny(...accessArgs)
     ) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only a crew members can perform this action',
-      ).asDisplayable();
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
 
     const prompt = new TicketInfoPromptBuilder()
@@ -410,10 +398,7 @@ export class TicketCommand {
         spec: [{ crew: { id: ticket.crew.id } }, { guildAdmin: true }],
       }).deny(...accessArgs)
     ) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only a crew members can perform this action',
-      ).asDisplayable();
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
 
     const result = await this.ticketService.updateTicket(
