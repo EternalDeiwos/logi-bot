@@ -3,11 +3,10 @@ import { GuildBasedChannel, GuildManager, Snowflake } from 'discord.js';
 import { InsertResult } from 'typeorm';
 import { InternalError } from 'src/errors';
 import { CrewService } from 'src/core/crew/crew.service';
-import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
+import { WarService } from 'src/game/war/war.service';
 import { CrewLogRepository } from './crew-log.repository';
 import { InsertCrewLog } from './crew-log.entity';
 import { CrewLogPromptBuilder } from './crew-log.prompt';
-import { WarService } from 'src/game/war/war.service';
 
 export abstract class CrewLogService {
   /**
@@ -31,7 +30,6 @@ export class CrewLogServiceImpl extends CrewLogService {
   constructor(
     private readonly guildManager: GuildManager,
     private readonly crewService: CrewService,
-    private readonly memberService: CrewMemberService,
     private readonly warService: WarService,
     private readonly logRepo: CrewLogRepository,
   ) {
@@ -48,7 +46,7 @@ export class CrewLogServiceImpl extends CrewLogService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
-    const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
+    const member = await discordGuild.members.fetch(memberRef);
     const createdAt = new Date();
 
     const prompt = new CrewLogPromptBuilder()

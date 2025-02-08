@@ -785,6 +785,12 @@ export class CrewCommand {
   ) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const reason = interaction.fields.getTextInputValue('crew/delete/reason');
+    const member = await this.memberService
+      .query()
+      .byMember(memberRef)
+      .byCrew({ crewSf: channelRef })
+      .byGuild({ guildSf: interaction.guildId })
+      .getOneOrFail();
 
     // No access control because this is used by the audit prompt, access is controlled to the prompt itself.
     const result = await this.crewService.deregisterCrew(channelRef, memberRef);
@@ -793,11 +799,11 @@ export class CrewCommand {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew deleted')],
     });
 
-    const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
+    const guildMember = await interaction.guild.members.fetch(member.memberSf);
 
     if (result) {
       await interaction.channel.send(
-        new CrewDeletePromptBuilder().addCrewDeleteMessage(result, member, reason).build(),
+        new CrewDeletePromptBuilder().addCrewDeleteMessage(result, guildMember, reason).build(),
       );
     }
   }

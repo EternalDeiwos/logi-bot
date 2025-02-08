@@ -7,21 +7,19 @@ import {
   PermissionsBitField,
   Snowflake,
 } from 'discord.js';
-import { ExternalError, InternalError } from 'src/errors';
+import { ExternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { SelectGuild } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
+import { CrewJoinPromptBuilder } from 'src/core/crew/crew-join.prompt';
 import { CrewMemberRepository } from './crew-member.repository';
-import { CrewMember, SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
+import { SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
 import { CrewMemberQueryBuilder } from './crew-member.query';
 
 export abstract class CrewMemberService {
   abstract query(): CrewMemberQueryBuilder;
-
-  abstract resolveGuildMember(member: CrewMember): Promise<GuildMember>;
-  abstract resolveGuildMember(memberRef: Snowflake, channelRef: Snowflake): Promise<GuildMember>;
 
   abstract registerCrewMember(
     channelRef: Snowflake,
@@ -86,38 +84,14 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     return new CrewMemberQueryBuilder(this.memberRepo);
   }
 
-  async resolveGuildMember(member: CrewMember): Promise<GuildMember>;
-  async resolveGuildMember(memberRef: Snowflake, channelRef: Snowflake): Promise<GuildMember>;
-  async resolveGuildMember(
-    memberRef: Snowflake | CrewMember,
-    channelRef?: Snowflake,
-  ): Promise<GuildMember> {
-    if (memberRef instanceof CrewMember) {
-      channelRef = memberRef.crewId;
-      memberRef = memberRef.memberSf;
-    }
-
-    if (!memberRef) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid member reference');
-    }
-
-    const crew = await this.crewService
-      .query()
-      .withDeleted()
-      .byCrew({ crewSf: channelRef })
-      .getOneOrFail();
-
-    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
-    return await discordGuild.members.fetch(memberRef);
-  }
-
   async registerCrewMember(
     channelRef: Snowflake,
     memberRef: Snowflake,
     access?: CrewMemberAccess,
   ): Promise<InsertResult> {
     const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
-    const member = await this.resolveGuildMember(memberRef, crew.crewSf);
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+    const member = await discordGuild.members.fetch(memberRef);
 
     try {
       await member.roles.add(crew.roleSf);
@@ -180,22 +154,23 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
   async removeCrewMember(channelRef: Snowflake | Crew, memberRef: Snowflake | GuildMember) {
     const crew =
-      channelRef instanceof Crew
-        ? channelRef
-        : await this.crewService
-            .query()
-            .withDeleted()
-            .byCrew({ crewSf: channelRef })
-            .getOneOrFail();
+      typeof channelRef === 'string'
+        ? await this.crewService.query().withDeleted().byCrew({ crewSf: channelRef }).getOneOrFail()
+        : channelRef;
+
+    const crewMember = await this.query()
+      .byCrew({ id: crew.id })
+      .byMember(typeof memberRef === 'string' ? memberRef : memberRef.id)
+      .getOneOrFail();
+
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
 
     let member: GuildMember;
     try {
       member =
-        memberRef instanceof GuildMember
-          ? memberRef
-          : await this.resolveGuildMember(memberRef, crew.crewSf);
-
-      memberRef = member.id;
+        typeof memberRef === 'string'
+          ? await discordGuild.members.fetch(crewMember.memberSf)
+          : memberRef;
     } catch {
       this.logger.debug(`Guild member ${memberRef} has already left the guild`);
     }
@@ -205,13 +180,14 @@ export class CrewMemberServiceImpl extends CrewMemberService {
         await member.roles.remove(crew.roleSf);
       }
     } catch (err) {
-      if (member.roles.cache.has(crew.roleSf)) {
+      const role = await discordGuild.roles.fetch(crew.roleSf);
+      if (role.members.has(crewMember.memberSf)) {
         throw new ExternalError('DISCORD_API_ERROR', 'Failed to remove member role', err);
       }
     }
 
     const result = await this.memberRepo.updateReturning(
-      { memberSf: Equal(memberRef as Snowflake), crewId: Equal(crew.id), deletedAt: IsNull() },
+      { memberSf: Equal(crewMember.memberSf), crewId: Equal(crew.id), deletedAt: IsNull() },
       { deletedAt: new Date() },
     );
 
