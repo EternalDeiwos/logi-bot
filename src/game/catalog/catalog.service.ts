@@ -31,8 +31,8 @@ export class CatalogServiceImpl extends CatalogService {
     return new CatalogQueryBuilder(this.expandedCatalogRepo, gameVersion, catalogVersion);
   }
 
-  getDefaultCatalogUri(gameVersion: string) {
-    return `https://raw.githubusercontent.com/GICodeWarrior/fir/main/foxhole/${gameVersion}/catalog.json`;
+  getDefaultCatalogUri(gameVersion: string, catalogVersion: string) {
+    return `https://eternaldeiwos.github.io/fig/${gameVersion}-${catalogVersion}/catalog.json`;
   }
 
   async countCurrent() {
@@ -96,7 +96,7 @@ export class CatalogServiceImpl extends CatalogService {
 
   updateDefaultCatalog(catalogVersion: string) {
     const gameVersion = this.configService.getOrThrow('APP_FOXHOLE_VERSION');
-    const uri = this.getDefaultCatalogUri(gameVersion);
+    const uri = this.getDefaultCatalogUri(gameVersion, catalogVersion);
     return this.updateCatalog(uri, gameVersion, catalogVersion);
   }
 }
