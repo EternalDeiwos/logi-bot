@@ -30,7 +30,7 @@ import { InsertCounterEntryDto } from './counter-entry.entity';
 import { CounterUpdateModalBuilder } from './ui/counter-update.modal';
 import { CounterKind, CurrentCounter } from './counter.entity';
 import { CounterService } from './counter.service';
-import { SelectCrew } from 'src/core/crew/crew.entity';
+import { SelectCrewDto } from 'src/core/crew/crew.entity';
 import { CounterStaticUpdatePromptBuilder } from './ui/counter-static.prompt';
 
 export class SelectCounterCommandParams {
@@ -167,13 +167,13 @@ export class CounterCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const crewRef: SelectCrew = { crewSf: data.crew || interaction.channelId };
+    const crewRef: SelectCrewDto = { crewSf: data.crew || interaction.channelId };
     return this.showCounterUpdateModal(interaction, crewRef);
   }
 
   private async showCounterUpdateModal(
     interaction: MessageComponentInteraction | CommandInteraction,
-    crewRef: SelectCrew,
+    crewRef: SelectCrewDto,
   ) {
     const crew = await this.crewService
       .query()

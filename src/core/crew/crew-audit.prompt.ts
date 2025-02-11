@@ -7,7 +7,7 @@ import {
   userMention,
 } from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
-import { Crew, SelectCrew } from './crew.entity';
+import { Crew, SelectCrewDto } from './crew.entity';
 
 export const crewAuditPrompt = (crew: Crew) =>
   `A new crew called **${crew.name}** was created by ${userMention(crew.createdBy)}. This prompt can be used to remove the team if there is something wrong.`;
@@ -25,7 +25,7 @@ export class CrewAuditPromptBuilder extends BasePromptBuilder {
     return this.add({ embeds: [embed] });
   }
 
-  public addCrewDeleteButton(crewRef: SelectCrew) {
+  public addCrewDeleteButton(crewRef: SelectCrewDto) {
     const deleteButton = new ButtonBuilder()
       .setCustomId(`crew/reqdelete/${crewRef.crewSf}`)
       .setLabel('Delete')

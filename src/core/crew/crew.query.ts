@@ -2,7 +2,7 @@ import { Brackets, Repository } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
-import { Crew, SelectCrew } from './crew.entity';
+import { Crew, SelectCrewDto } from './crew.entity';
 
 const searchWhere = (crewAlias: string = 'crew') => {
   return new Brackets((qb) =>
@@ -16,7 +16,7 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     this.qb.leftJoinAndSelect('crew.guild', 'guild');
   }
 
-  byCrew(crewRef: SelectCrew | SelectCrew[]) {
+  byCrew(crewRef: SelectCrewDto | SelectCrewDto[]) {
     if (!Array.isArray(crewRef)) {
       crewRef = [crewRef];
     }

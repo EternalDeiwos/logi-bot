@@ -1,5 +1,5 @@
 import { Brackets, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
-import { SelectCrew } from 'src/core/crew/crew.entity';
+import { SelectCrewDto } from 'src/core/crew/crew.entity';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
 
 export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
@@ -42,7 +42,7 @@ export abstract class CommonQueryBuilder<Entity extends ObjectLiteral> {
     return this;
   }
 
-  byCrew(crewRef: SelectCrew | SelectCrew[]) {
+  byCrew(crewRef: SelectCrewDto | SelectCrewDto[]) {
     if (!Array.isArray(crewRef)) {
       crewRef = [crewRef];
     }

@@ -1,3 +1,4 @@
+import { OmitType, IntersectionType, PickType, PartialType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -10,7 +11,6 @@ import {
   JoinColumn,
   Unique,
   DeleteDateColumn,
-  DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Expose, Transform, Type } from 'class-transformer';
@@ -22,31 +22,6 @@ import { Guild } from 'src/core/guild/guild.entity';
 import { CrewMember } from './member/crew-member.entity';
 import { CrewLog } from './log/crew-log.entity';
 import { CrewShare } from './share/crew-share.entity';
-
-export type InsertCrew = DeepPartial<
-  Omit<
-    Crew,
-    | 'id'
-    | 'guild'
-    | 'team'
-    | 'members'
-    | 'tags'
-    | 'tickets'
-    | 'logs'
-    | 'shared'
-    | 'createdAt'
-    | 'deletedAt'
-    | 'isDeleted'
-    | 'getCrewTag'
-    | 'getCrewOwner'
-  >
->;
-export type SelectCrewId = DeepPartial<Pick<Crew, 'id'>>;
-export type SelectCrewChannel = DeepPartial<Pick<Crew, 'crewSf'>>;
-export type SelectCrew = SelectCrewId & SelectCrewChannel;
-export type UpdateCrew = DeepPartial<Pick<Crew, 'hasMovePrompt' | 'isPermanent' | 'isSecureOnly'>>;
-export type DeleteCrew = SelectCrew & { deletedBySf?: Snowflake };
-export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
 
 @Entity()
 @Unique('uk_guild_name_deleted_at', ['guildId', 'shortName', 'deletedAt'])
@@ -205,4 +180,34 @@ export class Crew {
     const members = await this.members;
     return members.find((member) => member.access === CrewMemberAccess.OWNER);
   }
+}
+
+export class InsertCrewDto extends PartialType(
+  OmitType(Crew, [
+    'id',
+    'guild',
+    'team',
+    'members',
+    'tags',
+    'tickets',
+    'logs',
+    'shared',
+    'createdAt',
+    'deletedAt',
+    'getCrewTag',
+    'getCrewOwner',
+  ] as const),
+) {}
+export class SelectCrewIdDto extends PartialType(PickType(Crew, ['id'] as const)) {}
+export class SelectCrewChannelDto extends PartialType(PickType(Crew, ['crewSf'] as const)) {}
+export class SelectCrewDto extends IntersectionType(SelectCrewIdDto, SelectCrewChannelDto) {}
+export class UpdateCrewDto extends PartialType(
+  PickType(Crew, ['hasMovePrompt', 'isPermanent', 'isSecureOnly'] as const),
+) {}
+export class DeleteCrewDto extends SelectCrewDto {
+  deletedBySf?: Snowflake;
+}
+export class ArchiveCrewDto extends DeleteCrewDto {
+  archiveSf?: Snowflake;
+  tag?: string;
 }

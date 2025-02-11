@@ -31,7 +31,7 @@ import { AccessService } from 'src/core/access/access.service';
 import { AccessRuleMode } from 'src/core/access/access-rule';
 import { AccessEntry, AccessRuleType, SelectAccessEntry } from 'src/core/access/access.entity';
 import { WarService } from 'src/game/war/war.service';
-import { ArchiveCrew, Crew, InsertCrew, SelectCrew, UpdateCrew } from './crew.entity';
+import { ArchiveCrewDto, Crew, InsertCrewDto, SelectCrewDto, UpdateCrewDto } from './crew.entity';
 import { CrewRepository } from './crew.repository';
 import { CrewMemberService } from './member/crew-member.service';
 import { CrewAuditPromptBuilder } from './crew-audit.prompt';
@@ -45,15 +45,15 @@ type RegisterCrewOptions = Partial<{
 
 export abstract class CrewService {
   abstract query(): CrewQueryBuilder;
-  abstract registerCrew(data: InsertCrew, options?: RegisterCrewOptions): Promise<Crew>;
+  abstract registerCrew(data: InsertCrewDto, options?: RegisterCrewOptions): Promise<Crew>;
   abstract deregisterCrew(
     channelRef: Snowflake,
     memberRef: Snowflake,
-    options?: ArchiveCrew,
+    options?: ArchiveCrewDto,
   ): Promise<Crew | undefined>;
-  abstract updateCrew(channelRef: Snowflake, update: UpdateCrew): Promise<UpdateResult>;
+  abstract updateCrew(channelRef: Snowflake, update: UpdateCrewDto): Promise<UpdateResult>;
   abstract sendIndividualStatus(
-    crewRef: SelectCrew,
+    crewRef: SelectCrewDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ): Promise<void>;
@@ -89,7 +89,7 @@ export class CrewServiceImpl extends CrewService {
     return new CrewQueryBuilder(this.crewRepo);
   }
 
-  async registerCrew(data: InsertCrew, options: RegisterCrewOptions = {}) {
+  async registerCrew(data: InsertCrewDto, options: RegisterCrewOptions = {}) {
     const teamRef: SelectTeam = { id: data.teamId };
     const team = await this.teamService.query().byTeam(teamRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(team.guild.guildSf);
@@ -279,7 +279,7 @@ export class CrewServiceImpl extends CrewService {
   public async deregisterCrew(
     channelRef: Snowflake,
     memberRef: Snowflake,
-    options: ArchiveCrew = {},
+    options: ArchiveCrewDto = {},
   ) {
     const crew = await this.query().byCrew({ crewSf: channelRef }).withTickets().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
@@ -426,7 +426,7 @@ export class CrewServiceImpl extends CrewService {
     }
   }
 
-  public async updateCrew(channelRef: Snowflake, update: UpdateCrew) {
+  public async updateCrew(channelRef: Snowflake, update: UpdateCrewDto) {
     try {
       return await this.crewRepo.update({ crewSf: channelRef }, update);
     } catch (err) {
@@ -435,7 +435,7 @@ export class CrewServiceImpl extends CrewService {
   }
 
   public async sendIndividualStatus(
-    crewRef: SelectCrew,
+    crewRef: SelectCrewDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {

@@ -1,8 +1,8 @@
 import { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { SelectCrew } from './crew.entity';
+import { SelectCrewDto } from './crew.entity';
 
 export class CrewDeleteModalBuilder extends ModalBuilder {
-  addForm(crewRef: SelectCrew) {
+  addForm(crewRef: SelectCrewDto) {
     const reason = new TextInputBuilder()
       .setCustomId('crew/delete/reason')
       .setLabel('Reason')

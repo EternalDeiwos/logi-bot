@@ -11,7 +11,7 @@ import { ExternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
-import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
+import { Crew, SelectCrewDto } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberRepository } from './crew-member.repository';
 import { SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
@@ -42,7 +42,7 @@ export abstract class CrewMemberService {
   abstract removeCrewMember(channelRef: Snowflake, memberRef: Snowflake): Promise<DeleteResult>;
 
   abstract reconcileCrewLeaderRole(guildRef: SelectGuildDto, memberRef: Snowflake): Promise<void>;
-  abstract reconcileCrewMembership(crewRef: SelectCrew): Promise<void>;
+  abstract reconcileCrewMembership(crewRef: SelectCrewDto): Promise<void>;
   abstract reconcileIndividualMembership(
     guildRef: SelectGuildDto,
     memberRef: Snowflake,
@@ -207,7 +207,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     }
   }
 
-  async reconcileCrewMembership(crewRef: SelectCrew) {
+  async reconcileCrewMembership(crewRef: SelectCrewDto) {
     const crew = await this.crewService.query().byCrew(crewRef).withMembers().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);

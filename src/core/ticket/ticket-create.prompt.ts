@@ -6,7 +6,7 @@ import {
   StringSelectMenuBuilder,
 } from 'discord.js';
 import { BasePromptBuilder } from 'src/bot/prompt';
-import { Crew, SelectCrewChannel } from 'src/core/crew/crew.entity';
+import { Crew, SelectCrewChannelDto } from 'src/core/crew/crew.entity';
 
 export const ticketPromptDescription = (multi = false) =>
   `${multi ? 'Select a crew that will receive your ticket' : 'Create a ticket by clicking the button below'}. Please be patient for a member to discuss the ticket with you. If you are unsure of how to fill in a ticket then ask for help in any channel.`;
@@ -68,7 +68,7 @@ export class TicketCreatePromptBuilder extends BasePromptBuilder {
     return this.add({ embeds: [embed] });
   }
 
-  addCreateButton(crewRef: SelectCrewChannel) {
+  addCreateButton(crewRef: SelectCrewChannelDto) {
     const create = new ButtonBuilder()
       .setCustomId(`ticket/start/${crewRef.crewSf}`)
       .setLabel('Create Ticket')
