@@ -13,7 +13,6 @@ import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
-import { CrewJoinPromptBuilder } from 'src/core/crew/crew-join.prompt';
 import { CrewMemberRepository } from './crew-member.repository';
 import { SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
 import { CrewMemberQueryBuilder } from './crew-member.query';
@@ -41,23 +40,6 @@ export abstract class CrewMemberService {
   abstract removeCrewMember(crew: Crew, memberRef: Snowflake): Promise<DeleteResult>;
   abstract removeCrewMember(channelRef: Snowflake, member: GuildMember): Promise<DeleteResult>;
   abstract removeCrewMember(channelRef: Snowflake, memberRef: Snowflake): Promise<DeleteResult>;
-
-  abstract requireCrewAccess(
-    channelRef: Snowflake,
-    memberRef: Snowflake,
-    checkAdmin?: boolean,
-  ): Promise<boolean>;
-  abstract requireCrewAccess(
-    channelRef: Snowflake,
-    memberRef: Snowflake,
-    access?: CrewMemberAccess,
-  ): Promise<boolean>;
-  abstract requireCrewAccess(
-    channelRef: Snowflake,
-    memberRef: Snowflake,
-    access?: CrewMemberAccess,
-    checkAdmin?: boolean,
-  ): Promise<boolean>;
 
   abstract reconcileCrewLeaderRole(guildRef: SelectGuildDto, memberRef: Snowflake): Promise<void>;
   abstract reconcileCrewMembership(crewRef: SelectCrew): Promise<void>;
@@ -194,35 +176,6 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     await this.reconcileCrewLeaderRole({ id: crew.guildId }, memberRef as Snowflake);
 
     return result;
-  }
-
-  async requireCrewAccess(
-    channelRef: Snowflake,
-    memberRef: Snowflake,
-    access?: CrewMemberAccess | boolean,
-    checkAdmin = true,
-  ): Promise<boolean> {
-    // Resolve multiple signatures
-    if (typeof access === 'boolean') {
-      checkAdmin = access;
-      access = CrewMemberAccess.MEMBER;
-    }
-
-    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
-    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
-    const member = await discordGuild.members.fetch(memberRef);
-
-    const crewMember = await this.query()
-      .byCrew({ crewSf: channelRef })
-      .byMember(memberRef)
-      .getOne();
-
-    return (
-      (checkAdmin &&
-        (member.permissions.has(PermissionsBitField.Flags.Administrator) ||
-          member.roles.highest.permissions.has(PermissionsBitField.Flags.Administrator))) ||
-      (crewMember && crewMember.access <= access)
-    );
   }
 
   async reconcileCrewLeaderRole(guildRef: SelectGuildDto, memberRef: Snowflake) {

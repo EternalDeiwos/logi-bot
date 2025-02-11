@@ -38,6 +38,8 @@ import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
 import { TeamService } from 'src/core/team/team.service';
 import { TeamSelectAutocompleteInterceptor } from 'src/core/team/team-select.interceptor';
+import { AccessDecisionBuilder } from 'src/core/access/access-decision.builder';
+import { AccessService } from 'src/core/access/access.service';
 import { CrewService } from './crew.service';
 import { CrewRepository } from './crew.repository';
 import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
@@ -49,8 +51,6 @@ import { Crew } from './crew.entity';
 import { CrewDeletePromptBuilder } from './crew-delete.prompt';
 import { CrewDeleteModalBuilder } from './crew-delete.modal';
 import { CrewLogModalBuilder } from './crew-log.modal';
-import { channel } from 'diagnostics_channel';
-import { GuildAction } from '../guild/guild-access.entity';
 
 export class CreateCrewCommandParams {
   @StringOption({
@@ -215,6 +215,7 @@ export class CrewCommand {
     private readonly memberService: CrewMemberService,
     private readonly shareService: CrewShareService,
     private readonly logService: CrewLogService,
+    private readonly accessService: AccessService,
   ) {}
 
   @UseInterceptors(TeamSelectAutocompleteInterceptor)
@@ -270,17 +271,23 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SetFlagCommandParams,
   ) {
-    const crewRef = data.crew || interaction.channelId;
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
-    if (!(await this.memberService.requireCrewAccess(crewRef, memberRef, CrewMemberAccess.ADMIN))) {
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
+    ) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew administrator can perform this action',
       ).asDisplayable();
     }
 
-    await this.crewService.updateCrew(crewRef, {
+    await this.crewService.updateCrew(crewSf, {
       hasMovePrompt: data.value,
     });
 
@@ -299,17 +306,23 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SetFlagCommandParams,
   ) {
-    const crewRef = data.crew || interaction.channelId;
-    const memberRef = interaction?.member?.user?.id ?? interaction?.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
-    if (!(await this.memberService.requireCrewAccess(crewRef, memberRef, CrewMemberAccess.ADMIN))) {
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
+    ) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew administrator can perform this action',
       ).asDisplayable();
     }
 
-    await this.crewService.updateCrew(crewRef, {
+    await this.crewService.updateCrew(crewSf, {
       isPermanent: data.value,
     });
 
@@ -328,17 +341,23 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SetFlagCommandParams,
   ) {
-    const crewRef = data.crew || interaction.channelId;
-    const memberRef = interaction?.member?.user?.id ?? interaction?.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
-    if (!(await this.memberService.requireCrewAccess(crewRef, memberRef, CrewMemberAccess.ADMIN))) {
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
+    ) {
       throw new AuthError(
         'FORBIDDEN',
         'Only a crew administrator can perform this action',
       ).asDisplayable();
     }
 
-    await this.crewService.updateCrew(crewRef, {
+    await this.crewService.updateCrew(crewSf, {
       isSecureOnly: data.value,
     });
 
@@ -499,11 +518,15 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    const channelRef = data.crew || interaction.channelId;
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
     if (
-      !(await this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.OWNER))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.OWNER })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -511,7 +534,7 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+    const crew = await this.crewService.query().byCrew({ crewSf }).getOneOrFail();
     const targetMember = await this.memberService
       .query()
       .byCrewMember({ crewId: crew.id, memberSf: data.member.id })
@@ -533,7 +556,7 @@ export class CrewCommand {
 
     const oldOwners = await this.memberService
       .query()
-      .byCrew({ crewSf: channelRef })
+      .byCrew({ crewSf })
       .byAccess(CrewMemberAccess.OWNER)
       .getMany();
 
@@ -565,16 +588,23 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    const channelRef = data.crew || interaction.channelId;
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
     if (
-      !(await this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.ADMIN))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
     ) {
-      throw new AuthError('FORBIDDEN', 'You are not a member of this team').asDisplayable();
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew administrator can perform this action',
+      ).asDisplayable();
     }
 
-    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+    const crew = await this.crewService.query().byCrew({ crewSf }).getOneOrFail();
     const targetMember = await this.memberService
       .query()
       .byCrewMember({ crewId: crew.id, memberSf: data.member.id })
@@ -606,20 +636,23 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    const channelRef = data.crew || interaction.channelId;
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
     if (
-      !(await this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.ADMIN))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
     ) {
-      throw new AuthError('FORBIDDEN', 'You are not a member of this team').asDisplayable();
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew administrator can perform this action',
+      ).asDisplayable();
     }
 
-    await this.memberService.registerCrewMember(
-      channelRef,
-      data.member.id,
-      CrewMemberAccess.MEMBER,
-    );
+    await this.memberService.registerCrewMember(crewSf, data.member.id, CrewMemberAccess.MEMBER);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew member registered')],
@@ -636,11 +669,15 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewMemberCommandParams,
   ) {
-    const channelRef = data.crew || interaction.channelId;
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
     if (
-      !(await this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.ADMIN))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -648,7 +685,7 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.memberService.removeCrewMember(channelRef, data.member.id);
+    await this.memberService.removeCrewMember(crewSf, data.member.id);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew member removed')],
@@ -667,9 +704,10 @@ export class CrewCommand {
   ) {
     await interaction.deferReply({ ephemeral: true });
 
-    const channelRef = data.crew || interaction.channelId;
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
+    const crew = await this.crewService.query().byCrew({ crewSf }).getOneOrFail();
 
     if (crew.guild.guildSf !== interaction.guildId) {
       throw new AuthError(
@@ -679,7 +717,11 @@ export class CrewCommand {
     }
 
     if (
-      !(await this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.ADMIN))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -687,7 +729,7 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.crewService.deregisterCrew(channelRef, memberRef, {
+    await this.crewService.deregisterCrew(crewSf, memberRef, {
       tag: data.tag,
       archiveSf: data.archive?.id,
     });
@@ -851,16 +893,15 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const channelRef = data.crew || interaction.channelId;
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
     if (
-      !(await this.memberService.requireCrewAccess(
-        channelRef,
-        memberRef,
-        CrewMemberAccess.ADMIN,
-        false,
-      ))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -868,7 +909,7 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    const modal = new CrewLogModalBuilder().addForm({ crewSf: channelRef });
+    const modal = new CrewLogModalBuilder().addForm({ crewSf });
     return interaction.showModal(modal);
   }
 
@@ -879,17 +920,17 @@ export class CrewCommand {
   }
 
   @Modal('crew/log/:crew')
-  async onCrewLog(@Context() [interaction]: ModalContext, @ModalParam('crew') crewRef: Snowflake) {
+  async onCrewLog(@Context() [interaction]: ModalContext, @ModalParam('crew') crewSf: Snowflake) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const content = interaction.fields.getTextInputValue('crew/log/content');
+    const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      !(await this.memberService.requireCrewAccess(
-        crewRef,
-        memberRef,
-        CrewMemberAccess.ADMIN,
-        false,
-      ))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -897,7 +938,7 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    const result = await this.logService.addCrewLog(crewRef, memberRef, { content });
+    const result = await this.logService.addCrewLog(crewSf, memberRef, { content });
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Log added')],
@@ -914,11 +955,16 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: ShareCrewCommandParams,
   ) {
-    const channelRef = data.crew || interaction.channelId;
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
     if (
-      !(await this.memberService.requireCrewAccess(channelRef, memberRef, CrewMemberAccess.ADMIN))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -926,7 +972,7 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+    const crew = await this.crewService.query().byCrew({ crewSf }).getOneOrFail();
     const result = await this.shareService.shareCrew({
       guildId: data.guild,
       crewId: crew.id,
@@ -948,16 +994,15 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const channelRef = data.crew || interaction.channelId;
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crewSf = data.crew || interaction.channelId;
 
     if (
-      !(await this.memberService.requireCrewAccess(
-        channelRef,
-        memberRef,
-        CrewMemberAccess.ADMIN,
-        false,
-      ))
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { crewSf }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -965,7 +1010,7 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.memberService.reconcileCrewMembership({ crewSf: channelRef });
+    await this.memberService.reconcileCrewMembership({ crewSf });
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew cleaning scheduled')],
