@@ -16,7 +16,6 @@ import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberRepository } from './crew-member.repository';
 import { CrewMember, SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
 import { CrewMemberQueryBuilder } from './crew-member.query';
-import { CrewJoinPromptBuilder } from '../crew-join.prompt';
 
 export abstract class CrewMemberService {
   abstract query(): CrewMemberQueryBuilder;
@@ -143,13 +142,6 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     ) {
       await member.roles.add(crew.guild.config.crewLeaderRole);
       this.logger.log(`${member.displayName} added to crew leaders in ${crew.guild.name}`);
-    }
-
-    const prompt = new CrewJoinPromptBuilder().addJoinMessage(crew, member);
-    const channel = await member.guild.channels.fetch(crew.crewSf);
-
-    if (channel && channel.isTextBased()) {
-      await channel.send(prompt.build());
     }
 
     return result;
