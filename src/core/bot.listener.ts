@@ -6,6 +6,7 @@ import { TicketService } from 'src/core/ticket/ticket.service';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { GuildService } from 'src/core/guild/guild.service';
+import { CrewJoinPromptBuilder } from './crew/crew-join.prompt';
 import { TicketInfoPromptBuilder } from './ticket/ticket-info.prompt';
 import { Team } from './team/team.entity';
 
@@ -165,6 +166,13 @@ export class BotEventListener {
     try {
       const roleCrew = await this.crewService.query().byRole(role.id).getOneOrFail();
       await this.memberService.registerCrewMember(roleCrew.crewSf, member.id);
+
+      const prompt = new CrewJoinPromptBuilder().addJoinMessage(roleCrew, member);
+      const channel = await member.guild.channels.fetch(roleCrew.crewSf);
+
+      if (channel && channel.isTextBased()) {
+        await channel.send(prompt.build());
+      }
     } catch {
       this.logger.debug(`Role ${role.name} is not a crew role`);
     }
