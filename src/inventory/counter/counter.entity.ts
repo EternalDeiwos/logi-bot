@@ -1,3 +1,4 @@
+import { PickType } from '@nestjs/swagger';
 import { Snowflake } from 'discord.js';
 import { Expose, Transform, Type } from 'class-transformer';
 import {
@@ -302,4 +303,15 @@ export class CurrentCounter {
   @Expose()
   @Column({ type: 'timestamptz', name: 'entry_created_at' })
   updatedAt: Date;
+}
+
+export class SelectCounterDto extends PickType(Counter, ['id'] as const) {}
+export class InsertCounterDto extends PickType(Counter, [
+  'name',
+  'kind',
+  'guildId',
+  'crewId',
+  'createdBy',
+] as const) {
+  catalogId?: Counter['catalogId'];
 }

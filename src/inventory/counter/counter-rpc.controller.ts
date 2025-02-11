@@ -12,7 +12,7 @@ import { AuthGuard } from 'src/core/api/auth.guard';
 import { Auth } from 'src/core/api/auth.decorator';
 import { APITokenPayload } from 'src/core/api/api.service';
 import { CounterService } from './counter.service';
-import { InsertCounterAccessDto } from './dto/insert-counter-access.dto';
+import { InsertCounterAccessDto } from './counter-access.entity';
 
 @ApiTags('counter')
 @ApiBearerAuth()

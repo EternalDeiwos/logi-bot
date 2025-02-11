@@ -2,11 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DeleteResult, InsertResult, UpdateResult } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { WarService } from 'src/game/war/war.service';
-import { InsertCounterAccessDto } from './dto/insert-counter-access.dto';
-import { InsertCounterEntryDto } from './dto/insert-counter-entry.dto';
-import { InsertCounterDto } from './dto/insert-counter.dto';
-import { SelectCounterDto } from './dto/select-counter.dto';
-import { SelectCounterAccess } from './counter-access.entity';
+import { InsertCounterEntryDto } from './counter-entry.entity';
+import { SelectCounterDto, InsertCounterDto } from './counter.entity';
+import { SelectCounterAccessDto, InsertCounterAccessDto } from './counter-access.entity';
 import { CounterQueryBuilder } from './counter.query';
 import { CounterEntryQueryBuilder } from './counter-entry.query';
 import { CounterRepository, CurrentCounterRepository } from './counter.repository';
@@ -21,7 +19,7 @@ export abstract class CounterService {
   abstract updateCounter(data: InsertCounterEntryDto[]): Promise<InsertResult>;
   abstract grantAccess(data: InsertCounterAccessDto): Promise<InsertResult>;
   abstract revokeAccess(
-    accessRef: SelectCounterAccess | SelectCounterAccess[],
+    accessRef: SelectCounterAccessDto | SelectCounterAccessDto[],
   ): Promise<UpdateResult>;
   abstract deleteCounter(
     logRef: SelectCounterDto | SelectCounterDto[],
@@ -59,7 +57,7 @@ export class CounterServiceImpl extends CounterService {
     const result = await this.counterRepo.insert(counter);
 
     if (result?.identifiers) {
-      const [{ id }] = result.identifiers as SelectCounterAccess[];
+      const [{ id }] = result.identifiers as SelectCounterAccessDto[];
       const rule = await this.crewService.getOrCreateDefaultCrewAccessRule(crew);
       await this.grantAccess({
         counterId: id,
@@ -79,7 +77,7 @@ export class CounterServiceImpl extends CounterService {
     return await this.accessRepo.insert(data);
   }
 
-  async revokeAccess(accessRef: SelectCounterAccess | SelectCounterAccess[]) {
+  async revokeAccess(accessRef: SelectCounterAccessDto | SelectCounterAccessDto[]) {
     if (!Array.isArray(accessRef)) {
       accessRef = [accessRef];
     }

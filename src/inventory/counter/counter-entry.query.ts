@@ -2,7 +2,7 @@ import { Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectPoi } from 'src/game/poi/poi.entity';
 import { CounterEntry } from 'src/inventory/counter/counter-entry.entity';
-import { SelectCounterEntryDto } from './dto/select-counter-entry.dto';
+import { SelectCounterEntryDto } from './counter-entry.entity';
 
 export class CounterEntryQueryBuilder extends CommonQueryBuilder<CounterEntry> {
   constructor(repo: Repository<CounterEntry>) {

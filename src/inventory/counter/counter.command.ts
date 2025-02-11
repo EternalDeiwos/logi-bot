@@ -26,7 +26,7 @@ import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
 import { CounterCreateAutocompleteInterceptor } from './counter-create.interceptor';
 import { CounterSelectAutocompleteInterceptor } from './counter-select.interceptor';
-import { InsertCounterEntryDto } from './dto/insert-counter-entry.dto';
+import { InsertCounterEntryDto } from './counter-entry.entity';
 import { CounterUpdateModalBuilder } from './ui/counter-update.modal';
 import { CounterKind, CurrentCounter } from './counter.entity';
 import { CounterService } from './counter.service';

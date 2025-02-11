@@ -4,7 +4,7 @@ import { GuildManager, Snowflake } from 'discord.js';
 import { ConsumeMessage } from 'amqplib';
 import { DiscordAPIInteraction } from 'src/types';
 import { CounterService } from './counter.service';
-import { InsertCounterEntryDto } from './dto/insert-counter-entry.dto';
+import { InsertCounterEntryDto } from './counter-entry.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { CurrentCounter } from './counter.entity';
 import { CounterStaticUpdatePromptBuilder } from './ui/counter-static.prompt';
