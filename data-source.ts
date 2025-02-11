@@ -26,6 +26,8 @@ import { StockpileDiff } from 'src/inventory/stockpile/stockpile-diff.entity';
 import { Counter, CurrentCounter } from 'src/inventory/counter/counter.entity';
 import { CounterEntry } from 'src/inventory/counter/counter-entry.entity';
 import { CounterAccess } from 'src/inventory/counter/counter-access.entity';
+import { GuildSetting } from 'src/core/guild/guild-setting.entity';
+import { GuildAccess } from 'src/core/guild/guild-access.entity';
 import * as migrations from 'src/database/migrations';
 
 export const AppDataSource = new DataSource({
@@ -46,6 +48,7 @@ export const AppDataSource = new DataSource({
     Ticket,
     CrewLog,
     Guild,
+    GuildSetting,
     CrewShare,
     War,
     Region,
@@ -68,6 +71,7 @@ export const AppDataSource = new DataSource({
     CounterEntry,
     CounterAccess,
     CurrentCounter,
+    GuildAccess,
   ],
   subscribers: [],
   migrations,

@@ -1,4 +1,4 @@
-import { Injectable, Logger, UseFilters } from '@nestjs/common';
+import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
 import {
   ChannelOption,
   Context,
@@ -8,14 +8,23 @@ import {
   StringOption,
   Subcommand,
 } from 'necord';
+import { QueryFailedError } from 'typeorm';
 import { ChannelType, GuildChannel, PermissionsBitField, Role } from 'discord.js';
 import { AuthError, ValidationError } from 'src/errors';
+import { AccessMode } from 'src/types';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
-import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
+import { EchoCommand } from 'src/core/echo.command-group';
+import { AccessService } from 'src/core/access/access.service';
+import { AccessDecision } from 'src/core/access/access-decision';
+import { AccessDecisionBuilder } from 'src/core/access/access-decision.builder';
 import { GuildService } from './guild.service';
 import { GuildConfig } from './guild.entity';
+import { GuildSettingName } from './guild-setting.entity';
+import { GuildGrantAccessAutocompleteInterceptor } from './guild-grant-access.interceptor';
+import { GuildSettingAutocompleteInterceptor } from './guild-setting.interceptor';
+import { GuildAction } from './guild-access.entity';
 
 export class EditGuildCommandParams {
   @StringOption({
@@ -43,43 +52,83 @@ export class SelectGuildCommandParams {
   guild: string;
 }
 
-export class SetCategoryCommandParams {
+export class SettingCategoryCommandParams {
+  @StringOption({
+    name: 'setting',
+    description: 'Select a setting',
+    autocomplete: true,
+    required: true,
+  })
+  setting: GuildSettingName;
+
   @ChannelOption({
     name: 'category',
-    description: 'A category to place new channels',
+    description: 'A category',
     channel_types: [ChannelType.GuildCategory],
     required: true,
   })
   category: GuildChannel;
 }
 
-export class SetRoleCommandParams {
+export class SettingRoleCommandParams {
+  @StringOption({
+    name: 'setting',
+    description: 'Select a setting',
+    autocomplete: true,
+    required: true,
+  })
+  setting: GuildSettingName;
+
   @RoleOption({
     name: 'role',
-    description: 'A role to be granted access',
+    description: 'A role',
     required: true,
   })
   role: Role;
 }
 
-export class SetLogChannelCommandParams {
+export class SettingChannelCommandParams {
+  @StringOption({
+    name: 'setting',
+    description: 'Select a setting',
+    autocomplete: true,
+    required: true,
+  })
+  setting: GuildSettingName;
+
   @ChannelOption({
-    name: 'log',
-    description: 'A channel where all log messages will be displayed.',
+    name: 'channel',
+    description: 'A channel',
     channel_types: [ChannelType.GuildText],
     required: true,
   })
-  log: GuildChannel;
+  channel: GuildChannel;
 }
 
-export class SetAuditChannelCommandParams {
-  @ChannelOption({
-    name: 'audit',
-    description: 'A channel where crew control messages will be displayed.',
-    channel_types: [ChannelType.GuildText],
+export class GrantGuildAccessCommandParams {
+  @StringOption({
+    name: 'action',
+    description: 'Select an action',
+    autocomplete: true,
     required: true,
   })
-  audit: GuildChannel;
+  action: GuildAction;
+
+  @StringOption({
+    name: 'rule',
+    description: 'Select a rule',
+    autocomplete: true,
+    required: true,
+  })
+  ruleId: string;
+
+  @StringOption({
+    name: 'access',
+    description: 'Level of access',
+    autocomplete: true,
+    required: false,
+  })
+  access: string;
 }
 
 @Injectable()
@@ -94,6 +143,7 @@ export class GuildCommand {
   constructor(
     private readonly botService: BotService,
     private readonly guildService: GuildService,
+    private readonly accessService: AccessService,
   ) {}
 
   @Subcommand({
@@ -131,132 +181,151 @@ export class GuildCommand {
     [interaction]: SlashCommandContext,
     value: GuildConfig[K],
   ) {
-    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only a guild administrator can perform this action',
-      ).asDisplayable();
+    const guild = await this.guildService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .withAccessRules()
+      .getOneOrFail();
+
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      !guild.access
+        .filter(
+          (access) =>
+            access.action === GuildAction.GUILD_SETTING_MANAGE && access.access <= AccessMode.WRITE,
+        )
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
+    ) {
+      throw new AuthError('FORBIDDEN', 'You do not have access');
     }
 
-    await this.guildService.setConfig({ guildSf: interaction.guildId }, key, value);
+    await this.guildService.setConfig(
+      { guildId: guild.id, updatedBy: interaction.user.id },
+      { [key]: value },
+    );
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Configuration updated')],
     });
   }
 
+  @UseInterceptors(GuildSettingAutocompleteInterceptor)
   @Subcommand({
-    name: 'set_crew_leader_role',
-    description: 'Specify a role to be assigned to crew owners. Guild Admin only',
+    name: 'set_role',
+    description: 'Update guild settings (role)',
     dmPermission: false,
   })
-  async onGuildSetCrewLeaderRole(
+  async onGuildSettingRole(
     @Context() context: SlashCommandContext,
-    @Options() { role }: SetRoleCommandParams,
+    @Options() { setting, role }: SettingRoleCommandParams,
   ) {
     if (!role) {
       throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
     }
 
-    return this.setConfig('crewLeaderRole', context, role.id);
+    return this.setConfig(setting, context, role.id);
   }
 
+  @UseInterceptors(GuildSettingAutocompleteInterceptor)
   @Subcommand({
-    name: 'set_crew_creator',
-    description: 'Set the role who can create crews. Guild Admin only',
+    name: 'set_channel',
+    description: 'Update guild settings (channel)',
     dmPermission: false,
   })
-  async onGuildSetCrewCreatorRole(
+  async onGuildSettingChannel(
     @Context() context: SlashCommandContext,
-    @Options() { role }: SetRoleCommandParams,
+    @Options() { setting, channel }: SettingChannelCommandParams,
   ) {
-    if (!role) {
-      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
+    if (!channel) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid channel').asDisplayable();
     }
 
-    return this.setConfig('crewCreatorRole', context, role.id);
+    return this.setConfig(setting, context, channel.id);
   }
 
+  @UseInterceptors(GuildSettingAutocompleteInterceptor)
   @Subcommand({
-    name: 'set_crew_viewer',
-    description: 'Set the role to be given access to new crews. Guild Admin only',
+    name: 'set_category',
+    description: 'Update guild settings (category)',
     dmPermission: false,
   })
-  async onGuildSetCrewViewerRole(
+  async onGuildSettingCategory(
     @Context() context: SlashCommandContext,
-    @Options() { role }: SetRoleCommandParams,
-  ) {
-    if (!role) {
-      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
-    }
-
-    return this.setConfig('crewViewerRole', context, role.id);
-  }
-
-  @Subcommand({
-    name: 'set_log',
-    description: 'Set the global log channel for this guild. Guild Admin only',
-    dmPermission: false,
-  })
-  async onGuildSetLogChannel(
-    @Context() context: SlashCommandContext,
-    @Options() { log }: SetLogChannelCommandParams,
-  ) {
-    if (!log) {
-      throw new ValidationError('VALIDATION_FAILED', 'Log channel not provided').asDisplayable();
-    }
-
-    return this.setConfig('globalLogChannel', context, log.id);
-  }
-
-  @Subcommand({
-    name: 'set_audit',
-    description: 'Set the audit channel for this guild. Guild Admin only',
-    dmPermission: false,
-  })
-  async onGuildSetAuditChannel(
-    @Context() context: SlashCommandContext,
-    @Options() { audit }: SetAuditChannelCommandParams,
-  ) {
-    if (!audit) {
-      throw new ValidationError('VALIDATION_FAILED', 'Audit channel not provided').asDisplayable();
-    }
-
-    return this.setConfig('crewAuditChannel', context, audit.id);
-  }
-
-  @Subcommand({
-    name: 'set_voice_category',
-    description: 'Set the category where voice channels will be created. Guild Admin only',
-    dmPermission: false,
-  })
-  async onGuildSetVoiceCategory(
-    @Context() context: SlashCommandContext,
-    @Options() { category }: SetCategoryCommandParams,
+    @Options() { setting, category }: SettingCategoryCommandParams,
   ) {
     if (!category) {
-      throw new ValidationError('VALIDATION_FAILED', 'Category not provided').asDisplayable();
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid category').asDisplayable();
     }
 
-    return this.setConfig('globalVoiceCategory', context, category.id);
+    return this.setConfig(setting, context, category.id);
   }
 
+  @UseInterceptors(GuildGrantAccessAutocompleteInterceptor)
   @Subcommand({
-    name: 'set_stockpile_log',
-    description: 'Set the log channel for stockpile updates. Guild Admin only',
+    name: 'grant',
+    description: 'Grant guild-level privileges to bot features',
     dmPermission: false,
   })
-  async onGuildSetStockpileUpdatesChannel(
-    @Context() context: SlashCommandContext,
-    @Options() { log }: SetLogChannelCommandParams,
+  async onGrantGuildAccess(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() options: GrantGuildAccessCommandParams,
   ) {
-    if (!log) {
-      throw new ValidationError(
-        'VALIDATION_FAILED',
-        'Stockpile log channel not provided',
-      ).asDisplayable();
+    const guild = await this.guildService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .withAccessRules()
+      .getOneOrFail();
+
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError('FORBIDDEN', 'Only guild admins can use this command').asDisplayable();
     }
 
-    return this.setConfig('stockpileLogChannel', context, log.id);
+    const rule = await this.accessService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .byEntry({ id: options.ruleId })
+      .getOneOrFail();
+
+    if (!rule) {
+      throw new ValidationError('NOT_FOUND', 'Rule does not exist').asDisplayable();
+    }
+
+    const access = Object.entries(AccessMode).find(
+      ([k, v]) => k === options.access,
+    )[1] as AccessMode;
+
+    const action = Object.entries(GuildAction).find(
+      ([k, v]) => k === options.action,
+    )[1] as GuildAction;
+
+    try {
+      await this.guildService.grantAccess({
+        guildId: guild.id,
+        ruleId: options.ruleId,
+        action,
+        access,
+        createdBy: interaction.user.id,
+      });
+    } catch (err) {
+      if (err instanceof QueryFailedError && err.driverError.code === '23505') {
+        throw new ValidationError(
+          'VALIDATION_FAILED',
+          `Rule '${rule.description}' already exists for ${guild.name}`,
+          [err],
+        ).asDisplayable();
+      }
+    }
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Access granted')],
+    });
   }
 }

@@ -50,6 +50,7 @@ import { CrewDeletePromptBuilder } from './crew-delete.prompt';
 import { CrewDeleteModalBuilder } from './crew-delete.modal';
 import { CrewLogModalBuilder } from './crew-log.modal';
 import { channel } from 'diagnostics_channel';
+import { GuildAction } from '../guild/guild-access.entity';
 
 export class CreateCrewCommandParams {
   @StringOption({
@@ -234,13 +235,10 @@ export class CrewCommand {
     const guild = await this.guildService
       .query()
       .byGuild({ guildSf: interaction.guildId })
+      .withAccessRules()
       .getOneOrFail();
 
-    if (
-      guild.config?.crewCreatorRole &&
-      !interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator) &&
-      !member.roles.cache.has(guild.config.crewCreatorRole)
-    ) {
+    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
       throw new AuthError('FORBIDDEN', 'Not allowed to create crews').asDisplayable();
     }
 
@@ -903,34 +901,6 @@ export class CrewCommand {
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Log added')],
-    });
-  }
-
-  @UseInterceptors(CrewSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'set_triage',
-    description: 'Set the crew that will receive tickets by default. Guild Admin only',
-    dmPermission: false,
-  })
-  async onGuildSetTriageCrew(
-    @Context() [interaction]: SlashCommandContext,
-    @Options() { crew }: SelectCrewCommandParams,
-  ) {
-    if (!crew) {
-      throw new ValidationError('VALIDATION_FAILED', 'Invalid role').asDisplayable();
-    }
-
-    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only a guild administrator can perform this action',
-      ).asDisplayable();
-    }
-
-    await this.guildService.setConfig({ guildSf: interaction.guildId }, 'ticketTriageCrew', crew);
-
-    await this.botService.replyOrFollowUp(interaction, {
-      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Configuration updated')],
     });
   }
 

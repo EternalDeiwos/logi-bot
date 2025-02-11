@@ -54,7 +54,7 @@ export class CounterUpdateConsumer {
     const member = await discordGuild.members.fetch(interaction.user);
     const prompt = new CounterStaticUpdatePromptBuilder().addUpdateControls(counters[0].crewId);
 
-    const channels = new Set<Snowflake>([guild.config?.globalLogChannel]);
+    const channels = new Set<Snowflake>([guild.getConfig()['guild.log_channel']]);
     for (const counter of counters) {
       counter.guild = guild;
       prompt.addCounter(counter, {

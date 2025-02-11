@@ -1,7 +1,7 @@
 import { Brackets, Repository } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { Crew, SelectCrew } from './crew.entity';
 
 const searchWhere = (crewAlias: string = 'crew') => {
@@ -69,7 +69,7 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
-  byGuildAndShared(guildRef: SelectGuild) {
+  byGuildAndShared(guildRef: SelectGuildDto) {
     this.qb.leftJoin('crew.shared', 'shared').leftJoinAndSelect('shared.crew', 'shared_crew');
 
     if (guildRef.id) {
@@ -90,13 +90,13 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
-  searchByGuild(guildRef: SelectGuild, query: string) {
+  searchByGuild(guildRef: SelectGuildDto, query: string) {
     this.byGuild(guildRef);
     this.qb.andWhere(searchWhere(), { query: `%${query}%` });
     return this;
   }
 
-  searchByGuildWithShared(guildRef: SelectGuild, query: string) {
+  searchByGuildWithShared(guildRef: SelectGuildDto, query: string) {
     this.qb
       .leftJoin('crew.shared', 'shared')
       .leftJoinAndSelect('shared.crew', 'shared_crew')

@@ -6,12 +6,12 @@ import { InternalError, ValidationError } from 'src/errors';
 import { Crew } from 'src/core/crew/crew.entity';
 import { SelectTeam } from 'src/core/team/team.entity';
 import { TeamService } from 'src/core/team/team.service';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { ForumTagTemplate } from './tag-template.entity';
 import { TagTemplateRepository } from './tag-template.repository';
 import { TagRepository } from './tag.repository';
-import { ForumTag, SelectTag } from './tag.entity';
+import { SelectTag } from './tag.entity';
 import { TagQueryBuilder } from './tag.query';
 import { TemplateQueryBuilder } from './tag-template.query';
 
@@ -29,10 +29,13 @@ export enum TicketTag {
 export abstract class TagService {
   abstract queryTag(): TagQueryBuilder;
   abstract queryTemplate(): TemplateQueryBuilder;
-  abstract createTicketTags(guildRef: SelectGuild, memberRef: Snowflake): Promise<InsertResult[]>;
+  abstract createTicketTags(
+    guildRef: SelectGuildDto,
+    memberRef: Snowflake,
+  ): Promise<InsertResult[]>;
   abstract createTagForCrew(crew: Crew): Promise<any>;
   abstract createTag(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     memberRef: Snowflake,
     name: string,
     moderated?: boolean,
@@ -40,7 +43,7 @@ export abstract class TagService {
   abstract addTags(teamRef: SelectTeam, templates: ForumTagTemplate[]): Promise<void>;
   abstract deleteTags(tagRef: SelectTag | SelectTag[]): Promise<DeleteResult>;
   abstract deleteTagsByTemplate(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     templates?: (ForumTagTemplate | string)[],
   ): Promise<any>;
   abstract deleteTagTemplates(
@@ -71,7 +74,7 @@ export class TagServiceImpl extends TagService {
     return new TemplateQueryBuilder(this.templateRepo);
   }
 
-  async createTicketTags(guildRef: SelectGuild, memberRef: Snowflake) {
+  async createTicketTags(guildRef: SelectGuildDto, memberRef: Snowflake) {
     const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
 
     const triage = {
@@ -143,7 +146,7 @@ export class TagServiceImpl extends TagService {
     });
   }
 
-  async createTag(guildRef: SelectGuild, memberRef: Snowflake, name: string, moderated = false) {
+  async createTag(guildRef: SelectGuildDto, memberRef: Snowflake, name: string, moderated = false) {
     const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
 
     return await this.templateRepo.upsert(
@@ -216,7 +219,7 @@ export class TagServiceImpl extends TagService {
     return await this.tagRepo.delete(tags);
   }
 
-  async deleteTagsByTemplate(guildRef: SelectGuild, templates?: (ForumTagTemplate | string)[]) {
+  async deleteTagsByTemplate(guildRef: SelectGuildDto, templates?: (ForumTagTemplate | string)[]) {
     const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(guild.guildSf);
 

@@ -22,7 +22,7 @@ import {
 } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { DiscordService } from 'src/bot/discord.service';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { TeamService } from 'src/core/team/team.service';
 import { SelectTeam } from 'src/core/team/team.entity';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
@@ -58,7 +58,7 @@ export abstract class CrewService {
     memberRef: Snowflake,
   ): Promise<void>;
   abstract sendAllStatus(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ): Promise<void>;
@@ -77,10 +77,10 @@ export class CrewServiceImpl extends CrewService {
     private readonly teamService: TeamService,
     private readonly tagService: TagService,
     @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
-    private readonly memberService: CrewMemberService,
+    @Inject(forwardRef(() => CrewMemberService)) private readonly memberService: CrewMemberService,
     private readonly crewRepo: CrewRepository,
     private readonly warService: WarService,
-    private readonly accessService: AccessService,
+    @Inject(forwardRef(() => AccessService)) private readonly accessService: AccessService,
   ) {
     super();
   }
@@ -183,16 +183,9 @@ export class CrewServiceImpl extends CrewService {
       });
     }
 
-    if (team.guild?.config?.crewViewerRole) {
+    if (team.guild?.getConfig()?.['crew.viewer_role']) {
       permissionOverwrites.push({
-        id: team.guild.config.crewViewerRole,
-        allow: [PermissionsBitField.Flags.ViewChannel],
-      });
-    }
-
-    if (team.guild?.config?.crewCreatorRole) {
-      permissionOverwrites.push({
-        id: team.guild.config.crewCreatorRole,
+        id: team.guild.getConfig()?.['crew.viewer_role'],
         allow: [PermissionsBitField.Flags.ViewChannel],
       });
     }
@@ -218,8 +211,8 @@ export class CrewServiceImpl extends CrewService {
     );
 
     if (options.createVoice) {
-      const parent = team.guild.config.globalVoiceCategory
-        ? team.guild.config.globalVoiceCategory
+      const parent = team.guild.getConfig()['guild.voice_category']
+        ? team.guild.getConfig()['guild.voice_category']
         : team.categorySf;
       const voiceChannel = await this.discordService.ensureChannel(
         team.guild.guildSf,
@@ -235,9 +228,11 @@ export class CrewServiceImpl extends CrewService {
     }
 
     // Create audit prompt
-    if (team.guild?.config?.crewAuditChannel) {
+    if (team.guild?.getConfig()['crew.audit_channel']) {
       try {
-        const audit = await discordGuild.channels.fetch(team.guild.config.crewAuditChannel);
+        const audit = await discordGuild.channels.fetch(
+          team.guild.getConfig()['crew.audit_channel'],
+        );
 
         if (audit.isTextBased()) {
           const prompt = new CrewAuditPromptBuilder()
@@ -362,8 +357,8 @@ export class CrewServiceImpl extends CrewService {
       { deletedAt: new Date(), deletedBy: memberRef },
     );
 
-    if (crew.guild?.config?.crewAuditChannel && crew.auditMessageSf) {
-      const audit = await discordGuild.channels.fetch(crew.guild.config.crewAuditChannel);
+    if (crew.guild?.getConfig()['crew.audit_channel'] && crew.auditMessageSf) {
+      const audit = await discordGuild.channels.fetch(crew.guild.getConfig()['crew.audit_channel']);
 
       if (audit.isTextBased()) {
         try {
@@ -480,7 +475,7 @@ export class CrewServiceImpl extends CrewService {
   }
 
   public async sendAllStatus(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {

@@ -120,7 +120,7 @@ export class StockpileServiceImpl extends StockpileService {
     const result = await this.logRepo.update(logRef, { processedAt: new Date() });
     const log = await this.queryLog().byLog(logRef).withCrew().withGuild().getOneOrFail();
 
-    if (log.guild.config.stockpileLogChannel) {
+    if (log.guild.getConfig()['stockpile.log_channel']) {
       const guild = await this.guildManager.fetch(log.guild.guildSf);
       const member = await guild.members.fetch(log.createdBy);
 
@@ -150,7 +150,7 @@ export class StockpileServiceImpl extends StockpileService {
         });
       }
 
-      const logChannel = await guild.channels.fetch(log.guild.config.stockpileLogChannel);
+      const logChannel = await guild.channels.fetch(log.guild.getConfig()['stockpile.log_channel']);
       const options = prompt.build();
 
       if (options.embeds?.length && logChannel.isSendable()) {

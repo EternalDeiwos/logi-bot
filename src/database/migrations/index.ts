@@ -13,3 +13,4 @@ export * from './1733999849199-dbo-synthetic-ids';
 export * from './1734003735697-dbo-drop-natural-references';
 export * from './1735305176001-stockpile-entry-current-war';
 export * from './1737842330473-counters';
+export * from './1739095517317-guild-access';

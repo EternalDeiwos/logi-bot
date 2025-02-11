@@ -2,7 +2,7 @@ import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { DeleteResult, InsertResult } from 'typeorm';
 import { TagService } from 'src/core/tag/tag.service';
 import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { TeamRepository } from './team.repository';
 import { InsertTeam, SelectTeam, Team } from './team.entity';
 import { TeamQueryBuilder } from './team.query';
@@ -11,7 +11,7 @@ export abstract class TeamService {
   abstract query(): TeamQueryBuilder;
   abstract registerTeam(team: InsertTeam): Promise<InsertResult>;
   abstract deleteTeam(team: SelectTeam): Promise<DeleteResult>;
-  abstract reconcileGuildForumTags(guild: SelectGuild): Promise<void>;
+  abstract reconcileGuildForumTags(guild: SelectGuildDto): Promise<void>;
   abstract reconcileTeamForumTags(
     teamRef: SelectTeam,
     templates: ForumTagTemplate[],
@@ -43,7 +43,7 @@ export class TeamServiceImpl extends TeamService {
     return await this.teamRepo.updateReturning(teamRef, { deletedAt: new Date() });
   }
 
-  async reconcileGuildForumTags(guildRef: SelectGuild) {
+  async reconcileGuildForumTags(guildRef: SelectGuildDto) {
     const templates = await this.tagService
       .queryTemplate()
       .byGuild(guildRef)

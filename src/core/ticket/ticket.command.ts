@@ -167,7 +167,7 @@ export class TicketCommand {
         .query()
         .byGuild({ guildSf: interaction.guildId })
         .getOneOrFail();
-      channelRef = guild.config.ticketTriageCrew;
+      channelRef = guild.getConfig()['guild.triage_crew_sf'];
     }
 
     const modal = new TicketCreateModalBuilder().addForm(

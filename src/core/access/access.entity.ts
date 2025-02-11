@@ -1,3 +1,4 @@
+import { OmitType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -82,3 +83,13 @@ export class AccessEntry {
   @Column({ type: 'int8', name: 'deleted_by_sf', nullable: true })
   deletedBy: Snowflake;
 }
+
+export class InsertAccessEntryDto extends OmitType(AccessEntry, [
+  'id',
+  'guild',
+  'guildId',
+  'updatedAt',
+  'updatedBy',
+  'deletedAt',
+  'deletedBy',
+] as const) {}

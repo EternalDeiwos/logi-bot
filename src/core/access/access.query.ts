@@ -1,6 +1,6 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { AccessEntry, SelectAccessEntry } from './access.entity';
 import { SelectCrew } from '../crew/crew.entity';
 
@@ -58,7 +58,7 @@ export class AccessEntryQueryBuilder extends CommonQueryBuilder<AccessEntry> {
     return this;
   }
 
-  byGuild(guildRef: SelectGuild | SelectGuild[]) {
+  byGuild(guildRef: SelectGuildDto | SelectGuildDto[]) {
     if (!Array.isArray(guildRef)) {
       guildRef = [guildRef];
     }

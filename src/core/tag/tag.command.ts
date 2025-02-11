@@ -14,7 +14,7 @@ import { EchoCommand } from 'src/core/echo.command-group';
 import { SuccessEmbed } from 'src/bot/embed';
 import { BotService } from 'src/bot/bot.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { TeamService } from 'src/core/team/team.service';
 import { TagService } from './tag.service';
@@ -93,7 +93,7 @@ export class TagCommand {
       ).asDisplayable();
     }
 
-    const guildRef: SelectGuild = { guildSf: interaction.guildId };
+    const guildRef: SelectGuildDto = { guildSf: interaction.guildId };
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const result = await this.tagService.createTicketTags(guildRef, memberRef);
     await this.teamService.reconcileGuildForumTags(guildRef);

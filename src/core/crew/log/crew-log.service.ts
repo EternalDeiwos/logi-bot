@@ -57,10 +57,10 @@ export class CrewLogServiceImpl extends CrewLogService {
       prompt.clone<CrewLogPromptBuilder>().addCrewMention(crew).build(),
     );
 
-    if (crew.guild?.config?.globalLogChannel) {
+    if (crew.guild?.getConfig()['guild.log_channel']) {
       let logChannel: GuildBasedChannel;
       try {
-        logChannel = await discordGuild.channels.fetch(crew.guild.config.globalLogChannel);
+        logChannel = await discordGuild.channels.fetch(crew.guild.getConfig()['guild.log_channel']);
         if (logChannel && logChannel.isTextBased()) {
           await logChannel.send(prompt.build());
         }

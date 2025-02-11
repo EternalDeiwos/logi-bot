@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BotModule } from 'src/bot/bot.module';
 import { RMQModule } from 'src/rmq/rmq.module';
@@ -42,7 +42,7 @@ import { AccessModule } from './access/access.module';
   imports: [
     RMQModule,
     BotModule,
-    GuildModule,
+    forwardRef(() => GuildModule),
     ApiModule,
     AccessModule,
     TypeOrmModule.forFeature([

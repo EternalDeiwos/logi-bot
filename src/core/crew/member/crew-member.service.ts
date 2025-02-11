@@ -9,7 +9,7 @@ import {
 } from 'discord.js';
 import { ExternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { Crew, SelectCrew } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
@@ -33,7 +33,7 @@ export abstract class CrewMemberService {
   ): Promise<UpdateResult>;
 
   abstract removeGuildMemberCrews(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     memberRef: Snowflake,
   ): Promise<UpdateResult>;
 
@@ -59,10 +59,10 @@ export abstract class CrewMemberService {
     checkAdmin?: boolean,
   ): Promise<boolean>;
 
-  abstract reconcileCrewLeaderRole(guildRef: SelectGuild, memberRef: Snowflake): Promise<void>;
+  abstract reconcileCrewLeaderRole(guildRef: SelectGuildDto, memberRef: Snowflake): Promise<void>;
   abstract reconcileCrewMembership(crewRef: SelectCrew): Promise<void>;
   abstract reconcileIndividualMembership(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     memberRef: Snowflake,
   ): Promise<void>;
 }
@@ -111,10 +111,10 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
     if (
       access === CrewMemberAccess.OWNER &&
-      crew.guild.config?.crewLeaderRole &&
-      !member.roles.cache.has(crew.guild.config.crewLeaderRole)
+      crew.guild.getConfig()['crew.leader_role'] &&
+      !member.roles.cache.has(crew.guild.getConfig()['crew.leader_role'])
     ) {
-      await member.roles.add(crew.guild.config.crewLeaderRole);
+      await member.roles.add(crew.guild.getConfig()['crew.leader_role']);
       this.logger.log(`${member.displayName} added to crew leaders in ${crew.guild.name}`);
     }
 
@@ -139,7 +139,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     return result;
   }
 
-  async removeGuildMemberCrews(guildRef: SelectGuild, memberRef: Snowflake) {
+  async removeGuildMemberCrews(guildRef: SelectGuildDto, memberRef: Snowflake) {
     guildRef = guildRef.id
       ? guildRef
       : await this.guildService.query().byGuild(guildRef).getOneOrFail();
@@ -225,10 +225,10 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     );
   }
 
-  async reconcileCrewLeaderRole(guildRef: SelectGuild, memberRef: Snowflake) {
+  async reconcileCrewLeaderRole(guildRef: SelectGuildDto, memberRef: Snowflake) {
     const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
 
-    if (!guild.config?.crewLeaderRole) {
+    if (!guild.getConfig()['crew.leader_role']) {
       this.logger.debug('Crew leader not set', JSON.stringify(guild));
       return; // NOOP if not set
     }
@@ -243,11 +243,11 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       .getCount();
 
     this.logger.debug(`Leadership for ${member.displayName}: ${count}`);
-    if (count && !member.roles.cache.has(guild.config.crewLeaderRole)) {
-      await member.roles.add(guild.config.crewLeaderRole);
+    if (count && !member.roles.cache.has(guild.getConfig()['crew.leader_role'])) {
+      await member.roles.add(guild.getConfig()['crew.leader_role']);
       this.logger.log(`${member.displayName} added to crew leaders in ${guild.name}`);
-    } else if (!count && member.roles.cache.has(guild.config.crewLeaderRole)) {
-      await member.roles.remove(guild.config.crewLeaderRole);
+    } else if (!count && member.roles.cache.has(guild.getConfig()['crew.leader_role'])) {
+      await member.roles.remove(guild.getConfig()['crew.leader_role']);
       this.logger.log(`${member.displayName} removed from crew leaders in ${guild.name}`);
     } else {
       this.logger.debug(`No leadership change for ${member.displayName} in ${guild.name}`);
@@ -282,9 +282,9 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       }
 
       if (
-        crew.guild?.config?.crewViewerRole &&
+        crew.guild?.getConfig()['crew.viewer_role'] &&
         crew.isSecureOnly &&
-        !member.roles.cache.has(crew.guild?.config?.crewViewerRole) &&
+        !member.roles.cache.has(crew.guild?.getConfig()['crew.viewer_role']) &&
         crewMember.access >= CrewMemberAccess.MEMBER
       ) {
         await this.removeCrewMember(crewMember.crew, member);
@@ -293,7 +293,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     }
   }
 
-  async reconcileIndividualMembership(guildRef: SelectGuild, memberRef: Snowflake) {
+  async reconcileIndividualMembership(guildRef: SelectGuildDto, memberRef: Snowflake) {
     const guild = await this.guildService.query().byGuild(guildRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(guild.guildSf);
     let member: GuildMember;
@@ -338,9 +338,9 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       }
 
       if (
-        crewMember.crew?.guild?.config?.crewViewerRole &&
+        crewMember.crew?.guild?.getConfig()['crew.viewer_role'] &&
         crewMember.crew?.isSecureOnly &&
-        !member.roles.cache.has(crewMember.crew?.guild?.config?.crewViewerRole) &&
+        !member.roles.cache.has(crewMember.crew?.guild?.getConfig()['crew.viewer_role']) &&
         crewMember.access >= CrewMemberAccess.MEMBER
       ) {
         await this.removeCrewMember(crewMember.crew, member);

@@ -6,7 +6,7 @@ import { AuthError, InternalError, ValidationError } from 'src/errors';
 import { DiscordService } from 'src/bot/discord.service';
 import { GuildService } from 'src/core/guild/guild.service';
 import { TagService, TicketTag } from 'src/core/tag/tag.service';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { Team } from 'src/core/team/team.entity';
 import { CrewInfoPromptBuilder } from 'src/core/crew/crew-info.prompt';
 import { CrewService } from 'src/core/crew/crew.service';
@@ -90,7 +90,7 @@ export abstract class TicketService {
   ): Promise<void>;
 
   abstract sendAllStatus(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ): Promise<void>;
@@ -389,7 +389,7 @@ export class TicketServiceImpl extends TicketService {
   }
 
   public async sendAllStatus(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {

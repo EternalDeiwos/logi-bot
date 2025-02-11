@@ -108,13 +108,10 @@ export class Stockpile {
   @Column({ default: '000000' })
   code: string;
 
-  @Expose()
-  @Type(() => StockpileEntry)
-  @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => StockpileEntry, (entry) => entry.stockpile)
   items: StockpileEntry[];
 
-  @Expose()
+  @Expose({ name: 'items' })
   @Type(() => CurrentStockpileEntry)
   @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => CurrentStockpileEntry, (entry) => entry.stockpile)
