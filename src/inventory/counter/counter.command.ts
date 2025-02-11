@@ -20,15 +20,13 @@ import { DeltaCommand } from 'src/inventory/inventory.command-group';
 import { BotService } from 'src/bot/bot.service';
 import { CrewService } from 'src/core/crew/crew.service';
 import { AccessDecision } from 'src/core/access/access-decision';
+import { AccessDecisionBuilder } from 'src/core/access/access-decision.builder';
 import { AccessService } from 'src/core/access/access.service';
-import { AccessRuleType } from 'src/core/access/access.entity';
-import { AccessRuleMode } from 'src/core/access/access-rule';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
 import { CounterCreateAutocompleteInterceptor } from './counter-create.interceptor';
 import { CounterSelectAutocompleteInterceptor } from './counter-select.interceptor';
 import { InsertCounterEntryDto } from './dto/insert-counter-entry.dto';
-import { SelectCounterAccess } from './counter-access.entity';
 import { CounterUpdateModalBuilder } from './ui/counter-update.modal';
 import { CounterKind, CurrentCounter } from './counter.entity';
 import { CounterService } from './counter.service';
@@ -133,18 +131,11 @@ export class CounterCommand {
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecision(AccessRuleType.PERMIT, {
-        mode: AccessRuleMode.ANY,
-        spec: [
-          {
-            crew: { id: crew.id },
-            crewRole: CrewMemberAccess.ADMIN,
-          },
-          {
-            guildAdmin: true,
-          },
-        ],
-      }).deny(...accessArgs)
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -200,18 +191,11 @@ export class CounterCommand {
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecision(AccessRuleType.PERMIT, {
-        mode: AccessRuleMode.ANY,
-        spec: [
-          {
-            crew: { id: crew.id },
-            crewRole: CrewMemberAccess.ADMIN,
-          },
-          {
-            guildAdmin: true,
-          },
-        ],
-      }).deny(...accessArgs)
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -337,18 +321,11 @@ export class CounterCommand {
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecision(AccessRuleType.PERMIT, {
-        mode: AccessRuleMode.ANY,
-        spec: [
-          {
-            crew: { id: counter.crew.id },
-            crewRole: CrewMemberAccess.ADMIN,
-          },
-          {
-            guildAdmin: true,
-          },
-        ],
-      }).deny(...accessArgs)
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: counter.crew.id }, crewRole: CrewMemberAccess.ADMIN })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -394,17 +371,11 @@ export class CounterCommand {
 
     for (const counter of counters) {
       if (
-        new AccessDecision(AccessRuleType.PERMIT, {
-          mode: AccessRuleMode.ANY,
-          spec: [
-            {
-              crew: { id: counter.crew.id },
-            },
-            {
-              guildAdmin: true,
-            },
-          ],
-        }).permit(...accessArgs)
+        new AccessDecisionBuilder()
+          .addRule({ crew: { id: counter.crew.id } })
+          .addRule({ guildAdmin: true })
+          .build()
+          .permit(...accessArgs)
       ) {
         prompt.addCounter(counter);
       }

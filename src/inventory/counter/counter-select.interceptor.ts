@@ -1,13 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AutocompleteInteraction } from 'discord.js';
 import { AutocompleteInterceptor } from 'necord';
-import { AccessDecision } from 'src/core/access/access-decision';
+import { AccessDecisionBuilder } from 'src/core/access/access-decision.builder';
 import { AccessService } from 'src/core/access/access.service';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CounterService } from './counter.service';
 import { CounterKind } from './counter.entity';
-import { AccessRuleType } from 'src/core/access/access.entity';
-import { AccessRuleMode } from 'src/core/access/access-rule';
 
 @Injectable()
 export class CounterSelectAutocompleteInterceptor extends AutocompleteInterceptor {
@@ -37,17 +35,11 @@ export class CounterSelectAutocompleteInterceptor extends AutocompleteIntercepto
 
       const accessArgs = await this.accessService.getTestArgs(interaction);
       const accessibleCounters = results.filter((counter) =>
-        new AccessDecision(AccessRuleType.PERMIT, {
-          mode: AccessRuleMode.ANY,
-          spec: [
-            {
-              crew: { id: counter.crewId },
-            },
-            {
-              guildAdmin: true,
-            },
-          ],
-        }).permit(...accessArgs),
+        new AccessDecisionBuilder()
+          .addRule({ crew: { id: counter.crewId } })
+          .addRule({ guildAdmin: true })
+          .build()
+          .permit(...accessArgs),
       );
 
       return interaction.respond(
