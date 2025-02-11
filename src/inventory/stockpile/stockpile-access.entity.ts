@@ -1,3 +1,4 @@
+import { OmitType, PickType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import { Snowflake } from 'discord.js';
 import {
@@ -9,18 +10,12 @@ import {
   JoinColumn,
   PrimaryColumn,
   CreateDateColumn,
-  DeepPartial,
   DeleteDateColumn,
   Unique,
 } from 'typeorm';
 import { AccessMode } from 'src/types';
 import { AccessEntry } from 'src/core/access/access.entity';
 import { Stockpile } from './stockpile.entity';
-
-export type SelectStockpileAccess = DeepPartial<Pick<StockpileAccess, 'id'>>;
-export type InsertStockpileAccess = DeepPartial<
-  Omit<StockpileAccess, 'id' | 'stockpile' | 'rule' | 'guild' | 'updatedAt' | 'createdAt'>
->;
 
 @Entity('stockpile_access')
 @Unique('uk_rule_stockpile_deleted_at', ['ruleId', 'stockpileId', 'deletedAt'])
@@ -78,3 +73,12 @@ export class StockpileAccess {
   @Expose()
   deletedAt: Date;
 }
+
+export class SelectStockpileAccessDto extends PickType(StockpileAccess, ['id'] as const) {}
+export class InsertStockpileAccessDto extends OmitType(StockpileAccess, [
+  'id',
+  'stockpile',
+  'rule',
+  'createdAt',
+  'deletedAt',
+] as const) {}

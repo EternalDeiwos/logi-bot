@@ -32,8 +32,8 @@ import { Auth } from 'src/core/api/auth.decorator';
 import { GuildService } from 'src/core/guild/guild.service';
 import { APITokenPayload } from 'src/core/api/api.service';
 import { StockpileService } from './stockpile.service';
-import { InsertStockpileLogDto } from './dto/insert-stockpile-log.dto';
-import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
+import { InsertStockpileLogDto } from './stockpile-log.entity';
+import { SelectStockpileLogDto, StockpileLog } from './stockpile-log.entity';
 
 @ApiTags('stockpile-log')
 @ApiBearerAuth()
@@ -118,7 +118,7 @@ export class StockpileLogController {
     });
 
     if (result.identifiers.length) {
-      const [{ id }] = result.identifiers as SelectStockpileLog[];
+      const [{ id }] = result.identifiers as SelectStockpileLogDto[];
 
       const payload = {
         interaction: {

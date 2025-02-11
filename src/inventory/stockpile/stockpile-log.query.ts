@@ -1,14 +1,14 @@
 import { Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectPoi } from 'src/game/poi/poi.entity';
-import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
+import { SelectStockpileLogDto, StockpileLog } from './stockpile-log.entity';
 
 export class StockpileLogQueryBuilder extends CommonQueryBuilder<StockpileLog> {
   constructor(repo: Repository<StockpileLog>) {
     super(repo, 'log');
   }
 
-  byLog(logRef: SelectStockpileLog | SelectStockpileLog[]) {
+  byLog(logRef: SelectStockpileLogDto | SelectStockpileLogDto[]) {
     if (!Array.isArray(logRef)) {
       logRef = [logRef];
     }

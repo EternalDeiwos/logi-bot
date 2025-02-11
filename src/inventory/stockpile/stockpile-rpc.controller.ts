@@ -12,7 +12,7 @@ import { AuthGuard } from 'src/core/api/auth.guard';
 import { Auth } from 'src/core/api/auth.decorator';
 import { APITokenPayload } from 'src/core/api/api.service';
 import { StockpileService } from './stockpile.service';
-import { InsertStockpileAccessDto } from './dto/insert-stockpile-access.dto';
+import { InsertStockpileAccessDto } from './stockpile-access.entity';
 
 @ApiTags('stockpile')
 @ApiBearerAuth()

@@ -14,11 +14,11 @@ import {
 } from './stockpile-entry.repository';
 import { StockpileAccessRepository } from './stockpile-access.repository';
 import { StockpileQueryBuilder } from './stockpile.query';
-import { InsertStockpileLog, SelectStockpileLog } from './stockpile-log.entity';
+import { InsertStockpileLogDto, SelectStockpileLogDto } from './stockpile-log.entity';
 import { StockpileLogQueryBuilder } from './stockpile-log.query';
 import { InsertStockpileEntry } from './stockpile-entry.entity';
 import { StockpileEntryQueryBuilder } from './stockpile-entry.query';
-import { InsertStockpileAccess, SelectStockpileAccess } from './stockpile-access.entity';
+import { InsertStockpileAccessDto, SelectStockpileAccessDto } from './stockpile-access.entity';
 import { StockpileLogDiffQueryBuilder } from './stockpile-diff.query';
 import { StockpileDiffRepository } from './stockpile-diff.repository';
 import { StockpileDiffPromptBuilder } from './stockpile-diff.prompt';
@@ -31,19 +31,19 @@ export abstract class StockpileService {
   abstract queryEntries(): StockpileEntryQueryBuilder;
   abstract queryDiff(): StockpileLogDiffQueryBuilder;
   abstract registerStockpile(data: InsertStockpile): Promise<void>;
-  abstract registerLog(data: InsertStockpileLog): Promise<InsertResult>;
+  abstract registerLog(data: InsertStockpileLogDto): Promise<InsertResult>;
   abstract updateStockpile(data: InsertStockpileEntry[]): Promise<InsertResult>;
-  abstract completeLogProcessing(logRef: SelectStockpileLog): Promise<UpdateResult>;
-  abstract grantAccess(data: InsertStockpileAccess): Promise<InsertResult>;
+  abstract completeLogProcessing(logRef: SelectStockpileLogDto): Promise<UpdateResult>;
+  abstract grantAccess(data: InsertStockpileAccessDto): Promise<InsertResult>;
   abstract revokeAccess(
-    accessRef: SelectStockpileAccess | SelectStockpileAccess[],
+    accessRef: SelectStockpileAccessDto | SelectStockpileAccessDto[],
   ): Promise<UpdateResult>;
   abstract deleteStockpile(
     logRef: SelectStockpile | SelectStockpile[],
     deletedBy: Snowflake,
   ): Promise<DeleteResult>;
   abstract deleteLog(
-    logRef: SelectStockpileLog | SelectStockpileLog[],
+    logRef: SelectStockpileLogDto | SelectStockpileLogDto[],
     deletedBy: Snowflake,
   ): Promise<DeleteResult>;
 }
@@ -106,7 +106,7 @@ export class StockpileServiceImpl extends StockpileService {
     await this.stockpileRepo.insert(stockpile);
   }
 
-  async registerLog(data: InsertStockpileLog) {
+  async registerLog(data: InsertStockpileLogDto) {
     const war = await this.warService.query().byCurrent().getOneOrFail();
     const log = this.logRepo.create({ ...data, warNumber: war.warNumber });
     return this.logRepo.insert(log);
@@ -116,7 +116,7 @@ export class StockpileServiceImpl extends StockpileService {
     return await this.entryRepo.insert(data);
   }
 
-  async completeLogProcessing(logRef: SelectStockpileLog) {
+  async completeLogProcessing(logRef: SelectStockpileLogDto) {
     const result = await this.logRepo.update(logRef, { processedAt: new Date() });
     const log = await this.queryLog().byLog(logRef).withCrew().withGuild().getOneOrFail();
 
@@ -167,11 +167,11 @@ export class StockpileServiceImpl extends StockpileService {
     return result;
   }
 
-  async grantAccess(data: InsertStockpileAccess) {
+  async grantAccess(data: InsertStockpileAccessDto) {
     return await this.accessRepo.insert(data);
   }
 
-  async revokeAccess(accessRef: SelectStockpileAccess | SelectStockpileAccess[]) {
+  async revokeAccess(accessRef: SelectStockpileAccessDto | SelectStockpileAccessDto[]) {
     if (!Array.isArray(accessRef)) {
       accessRef = [accessRef];
     }
@@ -197,7 +197,7 @@ export class StockpileServiceImpl extends StockpileService {
       .execute();
   }
 
-  async deleteLog(logRef: SelectStockpileLog | SelectStockpileLog[], deletedBy: Snowflake) {
+  async deleteLog(logRef: SelectStockpileLogDto | SelectStockpileLogDto[], deletedBy: Snowflake) {
     if (!Array.isArray(logRef)) {
       logRef = [logRef];
     }

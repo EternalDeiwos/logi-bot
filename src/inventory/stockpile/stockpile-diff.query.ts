@@ -2,7 +2,7 @@ import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
 import { StockpileDiff } from './stockpile-diff.entity';
 import { SelectStockpile } from './stockpile.entity';
-import { SelectStockpileLog } from './stockpile-log.entity';
+import { SelectStockpileLogDto } from './stockpile-log.entity';
 import { StockpileLogHistory } from './stockpile-history.entity';
 
 export class StockpileLogDiffQueryBuilder extends CommonQueryBuilder<StockpileDiff> {
@@ -44,7 +44,7 @@ export class StockpileLogDiffQueryBuilder extends CommonQueryBuilder<StockpileDi
     return this;
   }
 
-  byCurrentLog(logRef: SelectStockpileLog | SelectStockpileLog[]) {
+  byCurrentLog(logRef: SelectStockpileLogDto | SelectStockpileLogDto[]) {
     if (!Array.isArray(logRef)) {
       logRef = [logRef];
     }
@@ -56,7 +56,7 @@ export class StockpileLogDiffQueryBuilder extends CommonQueryBuilder<StockpileDi
     return this;
   }
 
-  byPreviousLog(logRef: SelectStockpileLog | SelectStockpileLog[]) {
+  byPreviousLog(logRef: SelectStockpileLogDto | SelectStockpileLogDto[]) {
     if (!Array.isArray(logRef)) {
       logRef = [logRef];
     }

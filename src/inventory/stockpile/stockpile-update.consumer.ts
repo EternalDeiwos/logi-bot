@@ -7,7 +7,7 @@ import { AccessMode, DiscordAPIInteraction } from 'src/types';
 import { CatalogService } from 'src/game/catalog/catalog.service';
 import { AccessService } from 'src/core/access/access.service';
 import { AccessDecision } from 'src/core/access/access-decision';
-import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
+import { SelectStockpileLogDto, StockpileLog } from './stockpile-log.entity';
 import { InsertStockpileEntry, StockpileReportRecord } from './stockpile-entry.entity';
 import { StockpileService } from './stockpile.service';
 import { Stockpile } from './stockpile.entity';
@@ -34,7 +34,7 @@ export class StockpileUpdateConsumer {
     },
   })
   public async processStockpileUpdate(
-    payload: SelectStockpileLog & { interaction: DiscordAPIInteraction },
+    payload: SelectStockpileLogDto & { interaction: DiscordAPIInteraction },
     msg: ConsumeMessage,
   ) {
     const { interaction } = payload;

@@ -7,7 +7,7 @@ import {
   SelectCatalog,
 } from 'src/game/catalog/catalog.entity';
 import { SelectStockpile } from './stockpile.entity';
-import { SelectStockpileLog } from './stockpile-log.entity';
+import { SelectStockpileLogDto } from './stockpile-log.entity';
 import { CurrentStockpileEntry } from './stockpile-entry.entity';
 
 type SelectCatalogId = Pick<SelectCatalog, 'id'>;
@@ -98,7 +98,7 @@ export class StockpileEntryQueryBuilder extends CommonQueryBuilder<CurrentStockp
     return this;
   }
 
-  byLog(logRef: SelectStockpileLog | SelectStockpileLog[]) {
+  byLog(logRef: SelectStockpileLogDto | SelectStockpileLogDto[]) {
     if (!Array.isArray(logRef)) {
       logRef = [logRef];
     }

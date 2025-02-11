@@ -1,3 +1,4 @@
+import { ApiProperty, PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -8,7 +9,6 @@ import {
   PrimaryColumn,
   CreateDateColumn,
   DeleteDateColumn,
-  DeepPartial,
   OneToMany,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
@@ -19,22 +19,6 @@ import { ExpandedPoi, Poi } from 'src/game/poi/poi.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 import { StockpileEntry } from './stockpile-entry.entity';
 import { StockpileDiff } from './stockpile-diff.entity';
-
-export type SelectStockpileLog = DeepPartial<Pick<StockpileLog, 'id'>>;
-export type InsertStockpileLog = DeepPartial<
-  Omit<
-    StockpileLog,
-    | 'id'
-    | 'war'
-    | 'location'
-    | 'guild'
-    | 'crew'
-    | 'processedAt'
-    | 'deletedAt'
-    | 'deletedBy'
-    | 'createdAt'
-  >
->;
 
 @Entity()
 export class StockpileLog {
@@ -154,4 +138,29 @@ export class StockpileLog {
   @Expose()
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
+}
+
+export class SelectStockpileLogDto extends PickType(StockpileLog, ['id'] as const) {}
+export class InsertStockpileLogDto extends PickType(StockpileLog, [
+  'crewId',
+  'guildId',
+  'locationId',
+  'message',
+  'raw',
+  'createdBy',
+] as const) {
+  @ApiProperty({
+    name: 'crewSf',
+    description: 'Channel id of the responsible crew',
+    type: 'string',
+  })
+  crewSf?: string;
+
+  @ApiProperty({
+    name: 'report',
+    description: 'Foxhole Inventory Report TSV',
+    type: 'string',
+    format: 'binary',
+  })
+  report?: Express.Multer.File;
 }

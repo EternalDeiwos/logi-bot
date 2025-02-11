@@ -22,7 +22,7 @@ import { CrewService } from 'src/core/crew/crew.service';
 import { AccessDecision } from 'src/core/access/access-decision';
 import { AccessService } from 'src/core/access/access.service';
 import { StockpileService } from './stockpile.service';
-import { SelectStockpileLog } from './stockpile-log.entity';
+import { SelectStockpileLogDto } from './stockpile-log.entity';
 import { StockpileUpdateAutocompleteInterceptor } from './stockpile-update.interceptor';
 import { StockpileSearchAutocompleteInterceptor } from './stockpile-search.interceptor';
 import { StockpileContentPromptBuilder } from './stockpile-content.prompt';
@@ -275,7 +275,7 @@ export class StockpileCommand {
     });
 
     if (result.identifiers.length) {
-      const [{ id }] = result.identifiers as SelectStockpileLog[];
+      const [{ id }] = result.identifiers as SelectStockpileLogDto[];
 
       await this.botService.publish(interaction, 'stockpile', 'log.process', {
         id,
