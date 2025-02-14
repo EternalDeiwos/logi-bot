@@ -14,7 +14,7 @@ import { GuildService } from 'src/core/guild/guild.service';
 import { Crew, SelectCrewDto } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberRepository } from './crew-member.repository';
-import { SelectCrewMember, UpdateCrewMember } from './crew-member.entity';
+import { SelectCrewMemberDto, UpdateCrewMemberDto } from './crew-member.entity';
 import { CrewMemberQueryBuilder } from './crew-member.query';
 
 export abstract class CrewMemberService {
@@ -27,8 +27,8 @@ export abstract class CrewMemberService {
   ): Promise<InsertResult>;
 
   abstract updateCrewMember(
-    crewMember: SelectCrewMember,
-    data: UpdateCrewMember,
+    crewMember: SelectCrewMemberDto,
+    data: UpdateCrewMemberDto,
   ): Promise<UpdateResult>;
 
   abstract removeGuildMemberCrews(
@@ -103,7 +103,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     return result;
   }
 
-  async updateCrewMember(crewMember: SelectCrewMember, data: UpdateCrewMember) {
+  async updateCrewMember(crewMember: SelectCrewMemberDto, data: UpdateCrewMemberDto) {
     const result = await this.memberRepo.updateReturning(
       {
         crewId: Equal(crewMember.crewId),

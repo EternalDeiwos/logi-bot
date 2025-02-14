@@ -1,6 +1,6 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectCatalog } from 'src/game/catalog/catalog.entity';
+import { SelectCatalogDto } from 'src/game/catalog/catalog.entity';
 import { WarQueryBuilder } from 'src/game/war/war.query';
 import { CounterKind, CurrentCounter, SelectCounterDto } from './counter.entity';
 
@@ -28,7 +28,7 @@ export class CounterQueryBuilder extends CommonQueryBuilder<CurrentCounter> {
     return this;
   }
 
-  byCatalog(catalogRef: SelectCatalog | SelectCatalog[]) {
+  byCatalog(catalogRef: SelectCatalogDto | SelectCatalogDto[]) {
     if (!Array.isArray(catalogRef)) {
       catalogRef = [catalogRef];
     }

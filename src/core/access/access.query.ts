@@ -1,7 +1,7 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
-import { AccessEntry, SelectAccessEntry } from './access.entity';
+import { AccessEntry, SelectAccessEntryDto } from './access.entity';
 import { SelectCrewDto } from '../crew/crew.entity';
 
 const searchWhere = (alias: string = 'entry') => {
@@ -14,7 +14,7 @@ export class AccessEntryQueryBuilder extends CommonQueryBuilder<AccessEntry> {
     this.qb.leftJoinAndSelect('entry.guild', 'guild');
   }
 
-  byEntry(entryRef: SelectAccessEntry | SelectAccessEntry[]) {
+  byEntry(entryRef: SelectAccessEntryDto | SelectAccessEntryDto[]) {
     if (!Array.isArray(entryRef)) {
       entryRef = [entryRef];
     }

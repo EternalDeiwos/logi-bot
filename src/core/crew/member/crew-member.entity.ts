@@ -1,3 +1,4 @@
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import { Snowflake } from 'discord.js';
 import {
   Entity,
@@ -8,7 +9,6 @@ import {
   JoinColumn,
   RelationId,
   CreateDateColumn,
-  DeepPartial,
   DeleteDateColumn,
   Unique,
 } from 'typeorm';
@@ -16,12 +16,6 @@ import { Expose } from 'class-transformer';
 import { CrewMemberAccess, SkipAccessControlOptions } from 'src/types';
 import { Crew } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
-
-export type InsertCrewMember = DeepPartial<
-  Omit<CrewMember, 'id' | 'crew' | 'guild' | 'createdAt' | 'deletedAt' | 'requireAccess'>
->;
-export type SelectCrewMember = DeepPartial<Pick<CrewMember, 'memberSf' | 'crewId'>>;
-export type UpdateCrewMember = DeepPartial<Pick<CrewMember, 'name' | 'access'>>;
 
 @Entity('crew_member')
 @Unique('uk_crew_member_user_deleted_at', ['crewId', 'memberSf', 'deletedAt'])
@@ -94,3 +88,13 @@ export class CrewMember {
     return options.skipAccessControl || this.access <= access;
   }
 }
+
+export class InsertCrewMemberDto extends PartialType(
+  OmitType(CrewMember, ['id', 'crew', 'guild', 'createdAt', 'deletedAt', 'requireAccess'] as const),
+) {}
+export class SelectCrewMemberDto extends PartialType(
+  PickType(CrewMember, ['memberSf', 'crewId'] as const),
+) {}
+export class UpdateCrewMemberDto extends PartialType(
+  PickType(CrewMember, ['name', 'access'] as const),
+) {}

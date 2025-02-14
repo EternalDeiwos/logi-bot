@@ -1,7 +1,7 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectPoi } from 'src/game/poi/poi.entity';
-import { SelectCatalog } from 'src/game/catalog/catalog.entity';
+import { SelectPoiDto } from 'src/game/poi/poi.entity';
+import { SelectCatalogDto } from 'src/game/catalog/catalog.entity';
 import { WarQueryBuilder } from 'src/game/war/war.query';
 import { SelectStockpile, Stockpile } from './stockpile.entity';
 
@@ -17,7 +17,7 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
     super(repo, 'stockpile');
   }
 
-  byLocation(poiRef: SelectPoi | SelectPoi[]) {
+  byLocation(poiRef: SelectPoiDto | SelectPoiDto[]) {
     if (!Array.isArray(poiRef)) {
       poiRef = [poiRef];
     }
@@ -39,7 +39,7 @@ export class StockpileQueryBuilder extends CommonQueryBuilder<Stockpile> {
     return this;
   }
 
-  byContents(catalogRef: SelectCatalog | SelectCatalog[]) {
+  byContents(catalogRef: SelectCatalogDto | SelectCatalogDto[]) {
     if (!Array.isArray(catalogRef)) {
       catalogRef = [catalogRef];
     }

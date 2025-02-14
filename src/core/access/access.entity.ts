@@ -1,4 +1,4 @@
-import { OmitType } from '@nestjs/swagger';
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -8,7 +8,6 @@ import {
   ManyToOne,
   JoinColumn,
   DeleteDateColumn,
-  DeepPartial,
   UpdateDateColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
@@ -20,13 +19,6 @@ export enum AccessRuleType {
   PERMIT = 'permit',
   DENY = 'deny',
 }
-
-export type InsertAccessEntry = DeepPartial<
-  Omit<AccessEntry, 'guild' | 'updatedAt' | 'deletedAt' | 'deletedBy'>
->;
-export type SelectAccessEntry = DeepPartial<Pick<AccessEntry, 'id'>>;
-export type UpdateAccessEntry = DeepPartial<Pick<AccessEntry, 'rule' | 'updatedBy'>>;
-export type DeleteAccessEntry = SelectAccessEntry & { deletedBySf?: Snowflake };
 
 @Entity({ name: 'access_rule' })
 export class AccessEntry {
@@ -84,12 +76,13 @@ export class AccessEntry {
   deletedBy: Snowflake;
 }
 
-export class InsertAccessEntryDto extends OmitType(AccessEntry, [
-  'id',
-  'guild',
-  'guildId',
-  'updatedAt',
-  'updatedBy',
-  'deletedAt',
-  'deletedBy',
-] as const) {}
+export class InsertAccessEntryDto extends PartialType(
+  OmitType(AccessEntry, ['id', 'guild', 'updatedAt', 'deletedAt', 'deletedBy'] as const),
+) {}
+export class SelectAccessEntryDto extends PartialType(PickType(AccessEntry, ['id'] as const)) {}
+export class UpdateAccessEntryDto extends PartialType(
+  PickType(AccessEntry, ['rule', 'updatedBy'] as const),
+) {}
+export class DeleteAccessEntryDto extends PartialType(
+  PickType(AccessEntry, ['id', 'deletedBy'] as const),
+) {}

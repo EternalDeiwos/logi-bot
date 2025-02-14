@@ -1,16 +1,16 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectPoi } from 'src/game/poi/poi.entity';
+import { SelectPoiDto } from 'src/game/poi/poi.entity';
 import {
   CatalogCategory,
   CatalogCategoryNameMap,
-  SelectCatalog,
+  SelectCatalogDto,
 } from 'src/game/catalog/catalog.entity';
 import { SelectStockpile } from './stockpile.entity';
 import { SelectStockpileLogDto } from './stockpile-log.entity';
 import { CurrentStockpileEntry } from './stockpile-entry.entity';
 
-type SelectCatalogId = Pick<SelectCatalog, 'id'>;
+type SelectCatalogId = Pick<SelectCatalogDto, 'id'>;
 
 const searchWhere = (alias: string = 'catalog') => {
   return new Brackets((qb) =>
@@ -49,7 +49,7 @@ export class StockpileEntryQueryBuilder extends CommonQueryBuilder<CurrentStockp
     return this;
   }
 
-  byIndividualCatalog(catalogRef: SelectCatalog | SelectCatalog[]) {
+  byIndividualCatalog(catalogRef: SelectCatalogDto | SelectCatalogDto[]) {
     if (!Array.isArray(catalogRef)) {
       catalogRef = [catalogRef];
     }
@@ -88,7 +88,7 @@ export class StockpileEntryQueryBuilder extends CommonQueryBuilder<CurrentStockp
     return this;
   }
 
-  byLocation(poiRef: SelectPoi | SelectPoi[]) {
+  byLocation(poiRef: SelectPoiDto | SelectPoiDto[]) {
     if (!Array.isArray(poiRef)) {
       poiRef = [poiRef];
     }

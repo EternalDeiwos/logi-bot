@@ -1,7 +1,7 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
 import { PoiMarkerType } from 'src/game/poi/poi.entity';
-import { CurrentRegion, SelectRegion } from './region.entity';
+import { CurrentRegion, SelectRegionDto } from './region.entity';
 
 const searchWhere = (alias: string = 'region') => {
   return new Brackets((qb) =>
@@ -17,7 +17,7 @@ export class RegionQueryBuilder extends CommonQueryBuilder<CurrentRegion> {
     super(repo, 'region');
   }
 
-  byRegion(regionRef: SelectRegion | SelectRegion[]) {
+  byRegion(regionRef: SelectRegionDto | SelectRegionDto[]) {
     if (!Array.isArray(regionRef)) {
       regionRef = [regionRef];
     }

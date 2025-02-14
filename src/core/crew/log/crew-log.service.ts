@@ -5,7 +5,7 @@ import { InternalError } from 'src/errors';
 import { CrewService } from 'src/core/crew/crew.service';
 import { WarService } from 'src/game/war/war.service';
 import { CrewLogRepository } from './crew-log.repository';
-import { InsertCrewLog } from './crew-log.entity';
+import { InsertCrewLogDto } from './crew-log.entity';
 import { CrewLogPromptBuilder } from './crew-log.prompt';
 
 export abstract class CrewLogService {
@@ -19,7 +19,7 @@ export abstract class CrewLogService {
   abstract addCrewLog(
     channelRef: Snowflake,
     memberRef: Snowflake,
-    data: InsertCrewLog,
+    data: InsertCrewLogDto,
   ): Promise<InsertResult>;
 }
 
@@ -36,7 +36,7 @@ export class CrewLogServiceImpl extends CrewLogService {
     super();
   }
 
-  async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLog) {
+  async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLogDto) {
     const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);

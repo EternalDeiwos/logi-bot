@@ -1,3 +1,4 @@
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -69,6 +70,6 @@ export class Guild {
 }
 
 export class InsertGuildDto extends PartialType(
-  OmitType(Guild, ['createdAt', 'deletedAt', 'shared', 'access', 'settings']),
+  OmitType(Guild, ['createdAt', 'deletedAt', 'shared', 'access', 'settings'] as const),
 ) {}
-export class SelectGuildDto extends PartialType(PickType(Guild, ['id', 'guildSf'])) {}
+export class SelectGuildDto extends PartialType(PickType(Guild, ['id', 'guildSf'] as const)) {}

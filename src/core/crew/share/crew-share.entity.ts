@@ -1,3 +1,4 @@
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -8,16 +9,10 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Unique,
-  DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
-
-export type InsertCrewShare = DeepPartial<
-  Omit<CrewShare, 'crew' | 'guild' | 'createdAt' | 'deletedAt'>
->;
-export type SelectCrewShare = DeepPartial<Pick<CrewShare, 'guildId' | 'crewId'>>;
 
 @Entity('crew_share')
 @Unique('uk_share_target_guild_crew_deleted_at', ['guildId', 'crewId', 'deletedAt'])
@@ -63,3 +58,10 @@ export class CrewShare {
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
 }
+
+export class InsertCrewShareDto extends PartialType(
+  OmitType(CrewShare, ['crew', 'guild', 'createdAt', 'deletedAt'] as const),
+) {}
+export class SelectCrewShareDto extends PartialType(
+  PickType(CrewShare, ['guildId', 'crewId'] as const),
+) {}

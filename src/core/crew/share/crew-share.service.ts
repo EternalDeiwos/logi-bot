@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InsertResult } from 'typeorm';
 import { CrewShareRepository } from './crew-share.repository';
-import { InsertCrewShare } from './crew-share.entity';
+import { InsertCrewShareDto } from './crew-share.entity';
 
 export abstract class CrewShareService {
-  abstract shareCrew(share: InsertCrewShare): Promise<InsertResult>;
+  abstract shareCrew(share: InsertCrewShareDto): Promise<InsertResult>;
 }
 
 @Injectable()
@@ -15,7 +15,7 @@ export class CrewShareServiceImpl extends CrewShareService {
     super();
   }
 
-  async shareCrew(share: InsertCrewShare) {
+  async shareCrew(share: InsertCrewShareDto) {
     return await this.shareRepo.upsert(share, ['guildId', 'crewId']);
   }
 }

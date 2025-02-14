@@ -1,7 +1,7 @@
 import { Brackets, Repository } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
-import { CrewMember, SelectCrewMember } from './crew-member.entity';
+import { CrewMember, SelectCrewMemberDto } from './crew-member.entity';
 import { CrewMemberAccess } from 'src/types';
 
 export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
@@ -13,7 +13,7 @@ export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
       .andWhere('crew.deleted_at IS NULL');
   }
 
-  byCrewMember(memberRef: SelectCrewMember) {
+  byCrewMember(memberRef: SelectCrewMemberDto) {
     this.qb.andWhere(
       new Brackets((qb) =>
         qb.where('member.member_sf=:memberSf AND member.crew_id=:crewId', memberRef),

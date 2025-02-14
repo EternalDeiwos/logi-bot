@@ -16,7 +16,7 @@ import { StockpileAccessRepository } from './stockpile-access.repository';
 import { StockpileQueryBuilder } from './stockpile.query';
 import { InsertStockpileLogDto, SelectStockpileLogDto } from './stockpile-log.entity';
 import { StockpileLogQueryBuilder } from './stockpile-log.query';
-import { InsertStockpileEntry } from './stockpile-entry.entity';
+import { InsertStockpileEntryDto } from './stockpile-entry.entity';
 import { StockpileEntryQueryBuilder } from './stockpile-entry.query';
 import { InsertStockpileAccessDto, SelectStockpileAccessDto } from './stockpile-access.entity';
 import { StockpileLogDiffQueryBuilder } from './stockpile-diff.query';
@@ -32,7 +32,7 @@ export abstract class StockpileService {
   abstract queryDiff(): StockpileLogDiffQueryBuilder;
   abstract registerStockpile(data: InsertStockpile): Promise<void>;
   abstract registerLog(data: InsertStockpileLogDto): Promise<InsertResult>;
-  abstract updateStockpile(data: InsertStockpileEntry[]): Promise<InsertResult>;
+  abstract updateStockpile(data: InsertStockpileEntryDto[]): Promise<InsertResult>;
   abstract completeLogProcessing(logRef: SelectStockpileLogDto): Promise<UpdateResult>;
   abstract grantAccess(data: InsertStockpileAccessDto): Promise<InsertResult>;
   abstract revokeAccess(
@@ -112,7 +112,7 @@ export class StockpileServiceImpl extends StockpileService {
     return this.logRepo.insert(log);
   }
 
-  async updateStockpile(data: InsertStockpileEntry[]) {
+  async updateStockpile(data: InsertStockpileEntryDto[]) {
     return await this.entryRepo.insert(data);
   }
 

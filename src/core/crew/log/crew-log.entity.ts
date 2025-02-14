@@ -1,3 +1,4 @@
+import { OmitType, PartialType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -7,17 +8,12 @@ import {
   ManyToOne,
   JoinColumn,
   DeleteDateColumn,
-  DeepPartial,
   PrimaryColumn,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Expose, Transform } from 'class-transformer';
 import { Crew } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
-
-export type InsertCrewLog = DeepPartial<
-  Omit<CrewLog, 'createdAt' | 'deletedAt' | 'crew' | 'guild'>
->;
 
 @Entity('crew_log')
 export class CrewLog {
@@ -79,3 +75,7 @@ export class CrewLog {
   @Expose()
   deletedAt: Date;
 }
+
+export class InsertCrewLogDto extends PartialType(
+  OmitType(CrewLog, ['createdAt', 'deletedAt', 'crew', 'guild'] as const),
+) {}
