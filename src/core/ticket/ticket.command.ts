@@ -20,6 +20,7 @@ import {
 } from 'necord';
 import { Message, Snowflake } from 'discord.js';
 import { AuthError, InternalError } from 'src/errors';
+import { TicketTag } from 'src/types';
 import { BotService, CommandInteraction } from 'src/bot/bot.service';
 import { SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
@@ -28,11 +29,10 @@ import { GuildService } from 'src/core/guild/guild.service';
 import { CrewService } from 'src/core/crew/crew.service';
 import { AccessService } from 'src/core/access/access.service';
 import { AccessDecisionBuilder } from 'src/core/access/access-decision.builder';
-import { TicketTag } from 'src/core/tag/tag.service';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
 import { CrewSelectAutocompleteInterceptor } from 'src/core/crew/crew-select.interceptor';
 import { TicketService } from './ticket.service';
-import { SelectTicket } from './ticket.entity';
+import { SelectTicketDto } from './ticket.entity';
 import { TicketCreatePromptBuilder } from './ticket-create.prompt';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
 import { TicketCreateModalBuilder } from './ticket-create.modal';
@@ -308,7 +308,7 @@ export class TicketCommand {
     dmPermission: false,
   })
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
-    const ticketRef: SelectTicket = { threadSf: interaction.channelId };
+    const ticketRef: SelectTicketDto = { threadSf: interaction.channelId };
     const ticket = await this.ticketService.query().withCrew().byTicket(ticketRef).getOneOrFail();
 
     const accessArgs = await this.accessService.getTestArgs(interaction);

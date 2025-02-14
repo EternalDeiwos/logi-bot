@@ -1,17 +1,15 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { uniq } from 'lodash';
 import { InsertResult } from 'typeorm';
 import { GuildManager, PermissionsBitField, Snowflake } from 'discord.js';
 import { AuthError, InternalError, ValidationError } from 'src/errors';
+import { TicketTag } from 'src/types';
 import { DiscordService } from 'src/bot/discord.service';
 import { GuildService } from 'src/core/guild/guild.service';
-import { TagService, TicketTag } from 'src/core/tag/tag.service';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
-import { Team } from 'src/core/team/team.entity';
 import { CrewInfoPromptBuilder } from 'src/core/crew/crew-info.prompt';
 import { CrewService } from 'src/core/crew/crew.service';
 import { SelectCrewChannelDto } from 'src/core/crew/crew.entity';
-import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
+import { InsertTicketDto, SelectTicketDto, Ticket } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
 import { TicketUpdatePromptBuilder } from './ticket-update.prompt';
@@ -80,11 +78,11 @@ export abstract class TicketService {
   abstract query(): TicketQueryBuilder;
   abstract createTicket(
     crewRef: SelectCrewChannelDto,
-    ticket?: InsertTicket,
+    ticket?: InsertTicketDto,
   ): Promise<InsertResult>;
-  abstract moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket);
-  abstract deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake);
-  abstract updateTicket(ticket: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket>;
+  abstract moveTicket(ticketRef: SelectTicketDto, ticketOverride: InsertTicketDto);
+  abstract deleteTicket(ticketRef: SelectTicketDto, memberRef: Snowflake);
+  abstract updateTicket(ticket: InsertTicketDto, tag: TicketTag, reason?: string): Promise<Ticket>;
 
   abstract sendIndividualStatus(
     crewRef: SelectCrewChannelDto,
@@ -108,7 +106,6 @@ export class TicketServiceImpl extends TicketService {
     private readonly discordService: DiscordService,
     private readonly guildService: GuildService,
     @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
-    private readonly tagService: TagService,
     private readonly ticketRepo: TicketRepository,
   ) {
     super();
@@ -118,14 +115,8 @@ export class TicketServiceImpl extends TicketService {
     return new TicketQueryBuilder(this.ticketRepo);
   }
 
-  async createTicket(crewRef: SelectCrewChannelDto, ticket?: InsertTicket) {
-    const crew = await this.crewService
-      .query()
-      .byCrew(crewRef)
-      .withTeam()
-      .withTeamTags()
-      .withTeamTagsTemplate()
-      .getOneOrFail();
+  async createTicket(crewRef: SelectCrewChannelDto, ticket?: InsertTicketDto) {
+    const crew = await this.crewService.query().byCrew(crewRef).withTeam().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const forum = await discordGuild.channels.fetch(crew.team.forumSf);
 
@@ -140,21 +131,6 @@ export class TicketServiceImpl extends TicketService {
     if (!ticket.updatedBy) {
       ticket.updatedBy = ticket.createdBy;
     }
-
-    const triageTag = crew.team?.tags?.find((tag) => tag.name === TicketTag.TRIAGE);
-    const crewTag = crew.team?.tags?.find((tag) => tag.name === crew.shortName);
-    const appliedTags: string[] = [];
-
-    if (triageTag) {
-      appliedTags.push(triageTag.tagSf);
-    }
-
-    if (crewTag) {
-      appliedTags.push(crewTag.tagSf);
-    }
-
-    const defaultTags = Team.getDefaultTags(crew.team?.tags);
-    appliedTags.push(...defaultTags);
 
     const prompt = new TicketInfoPromptBuilder().addTicketMessage(ticket, crew);
 
@@ -175,7 +151,6 @@ export class TicketServiceImpl extends TicketService {
     const thread = await forum.threads.create({
       name: ticket.name,
       message: prompt.build(),
-      appliedTags,
     });
 
     const result = await this.ticketRepo.insert({
@@ -187,7 +162,7 @@ export class TicketServiceImpl extends TicketService {
     return result;
   }
 
-  async moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket) {
+  async moveTicket(ticketRef: SelectTicketDto, ticketOverride: InsertTicketDto) {
     const ticket = await this.query().withDeleted().byTicket(ticketRef).getOneOrFail();
     const targetCrew = await this.crewService
       .query()
@@ -207,7 +182,7 @@ export class TicketServiceImpl extends TicketService {
     await this.updateTicket({ ...ticketRef, updatedBy: ticketOverride.updatedBy }, TicketTag.MOVED);
   }
 
-  async deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake) {
+  async deleteTicket(ticketRef: SelectTicketDto, memberRef: Snowflake) {
     const ticket = await this.ticketRepo.findOneOrFail({
       where: ticketRef,
       withDeleted: true,
@@ -237,7 +212,7 @@ export class TicketServiceImpl extends TicketService {
     return result;
   }
 
-  async updateTicket(data: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket> {
+  async updateTicket(data: InsertTicketDto, tag: TicketTag, reason?: string): Promise<Ticket> {
     if (!data.updatedBy) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Ticket updates must provide updatedBy');
     }
@@ -264,10 +239,6 @@ export class TicketServiceImpl extends TicketService {
       { ...data, updatedAt: new Date() },
     );
 
-    const tags = await this.tagService.queryTag().byTeam({ id: ticket.crew.teamId }).getMany();
-    const tagSnowflakeMap = Team.getSnowflakeMap(tags);
-    const tagsRemovedSf = tagsRemoved[tag].map((tagName) => tagSnowflakeMap[tagName]);
-    const tagAdd = tagSnowflakeMap[tag];
     const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(
       member,
       ticket,
@@ -317,17 +288,6 @@ export class TicketServiceImpl extends TicketService {
             .build(),
         );
         break;
-    }
-
-    try {
-      await thread.setAppliedTags(
-        uniq([...thread.appliedTags.filter((tag) => !tagsRemovedSf.includes(tag)), tagAdd]),
-      );
-    } catch (err) {
-      this.logger.error(
-        `Failed to apply tags to ${ticket.name} in ${discordGuild.name}: ${err.message}`,
-        err.stack,
-      );
     }
 
     if (

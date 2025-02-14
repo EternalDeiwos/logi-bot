@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CommonRepository } from 'src/database/util';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
-import { SelectTicket, Ticket } from './ticket.entity';
+import { SelectTicketDto, Ticket } from './ticket.entity';
 
 @Injectable()
 export class TicketRepository extends CommonRepository<Ticket> {
@@ -10,7 +10,7 @@ export class TicketRepository extends CommonRepository<Ticket> {
     super(Ticket, dataSource.createEntityManager());
   }
 
-  async getOriginalGuild(ticketRef: SelectTicket): Promise<SelectGuildDto> {
+  async getOriginalGuild(ticketRef: SelectTicketDto): Promise<SelectGuildDto> {
     const [{ guild_id: guildId }] = await this.query(
       `
       WITH RECURSIVE ticket_tree (id, guild_id, previous_ticket_id) AS (

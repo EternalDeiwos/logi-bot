@@ -4,7 +4,6 @@ import {
   GuildManager,
   Snowflake,
   PermissionsBitField,
-  GuildForumTagData,
   RoleCreateOptions,
   Role,
   GuildChannel,
@@ -14,8 +13,7 @@ import {
   MessageCreateOptions,
   Message,
 } from 'discord.js';
-import { chunk, uniqBy } from 'lodash';
-import { SelectTag } from 'src/core/tag/tag.entity';
+import { chunk } from 'lodash';
 import { ExternalError, InternalError } from 'src/errors';
 
 export const MAX_EMBEDS = 8;
@@ -57,18 +55,6 @@ export abstract class DiscordService {
     channelSf: Snowflake,
     options: MessageCreateOptions,
   ): Promise<[GuildBasedChannel, Message<true>[]]>;
-
-  abstract ensureForumTags(
-    guildSf: Snowflake,
-    forumSf: Snowflake,
-    tags: GuildForumTagData[],
-  ): Promise<GuildForumTagData[]>;
-
-  abstract deleteForumTags(
-    guildSf: Snowflake,
-    forumSf: Snowflake,
-    tags: SelectTag[],
-  ): Promise<GuildForumTagData[]>;
 
   abstract deleteChannel(guildSf: Snowflake, channelSf: Snowflake): Promise<void>;
   abstract deleteRole(guildSf: Snowflake, roleSf: Snowflake): Promise<void>;
@@ -220,70 +206,6 @@ export class DiscordServiceImpl extends DiscordService {
     );
 
     return [channel, messages];
-  }
-
-  public async ensureForumTags(guildSf: Snowflake, forumSf: Snowflake, tags: GuildForumTagData[]) {
-    const guild = await this.guildManager.fetch(guildSf);
-    const forum = await guild.channels.fetch(forumSf);
-
-    if (!forum.isThreadOnly()) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', `Forum ${forum} is not a forum`);
-    }
-
-    const bot = await guild.members.fetchMe();
-
-    if (!bot.permissionsIn(forumSf).has(PermissionsBitField.Flags.ManageChannels, true)) {
-      throw new ExternalError(
-        'INSUFFICIENT_PRIVILEGES',
-        'Bot requires additional privileges',
-        new PermissionsBitField(PermissionsBitField.Flags.ManageChannels).toArray(),
-      );
-    }
-
-    const updatedForum = await forum.setAvailableTags(
-      uniqBy([...forum.availableTags.concat(), ...tags], 'name'),
-    );
-
-    return updatedForum.availableTags.reduce((accumulator, tag) => {
-      if (tags.findIndex((template) => tag.name === template.name) > -1) {
-        accumulator.push(tag);
-      }
-      return accumulator;
-    }, [] as GuildForumTagData[]);
-  }
-
-  public async deleteForumTags(guildSf: Snowflake, forumSf: Snowflake, tags: SelectTag[]) {
-    const guild = await this.guildManager.fetch(guildSf);
-    const forum = await guild.channels.fetch(forumSf);
-
-    if (!forum.isThreadOnly()) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', `Forum ${forum} is not a forum`);
-    }
-
-    const bot = await guild.members.fetchMe();
-
-    if (!bot.permissionsIn(forumSf).has(PermissionsBitField.Flags.ManageChannels, true)) {
-      throw new ExternalError(
-        'INSUFFICIENT_PRIVILEGES',
-        'Bot requires additional privileges',
-        new PermissionsBitField(PermissionsBitField.Flags.ManageChannels).toArray(),
-      );
-    }
-
-    const deleted: GuildForumTagData[] = [];
-    const keep: GuildForumTagData[] = [];
-
-    for (const tag of forum.availableTags) {
-      if (tags.findIndex((t) => t.tagSf === tag.id) > -1) {
-        deleted.push(tag);
-      } else {
-        keep.push(tag);
-      }
-    }
-
-    await forum.setAvailableTags(keep);
-
-    return deleted;
   }
 
   async deleteChannel(guildSf: Snowflake, channelSf: Snowflake) {

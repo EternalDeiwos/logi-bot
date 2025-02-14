@@ -14,7 +14,7 @@ import { BasePromptBuilder } from 'src/bot/prompt';
 import { PromptEmbed } from 'src/bot/embed';
 import { Crew, SelectCrewChannelDto } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
-import { InsertTicket, SelectTicket } from './ticket.entity';
+import { InsertTicketDto, SelectTicketDto } from './ticket.entity';
 
 const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
 Welcome to our ticket system ${userMention(member)}. The members of our ${roleMention(role)} crew will be along as soon as possible to review your request. In the meanwhile, please make sure that you review the following instructions:
@@ -43,7 +43,7 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
     return this.add({ embeds: [new PromptEmbed('PROMPT_GENERIC').setTitle(message)] });
   }
 
-  public addTicketMessage(ticket: InsertTicket, crew: Crew) {
+  public addTicketMessage(ticket: InsertTicketDto, crew: Crew) {
     const content = newTicketMessage(ticket.content, ticket.createdBy, crew.roleSf);
     const embed = new EmbedBuilder()
       .setColor(Colors.DarkGold)
@@ -76,7 +76,7 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
     return this.add({ embeds: [embed] });
   }
 
-  public addMoveSelector(ticketRef: SelectTicket, guildSf: Snowflake, targetCrews: Crew[]) {
+  public addMoveSelector(ticketRef: SelectTicketDto, guildSf: Snowflake, targetCrews: Crew[]) {
     const select = new StringSelectMenuBuilder()
       .setCustomId(`ticket/move/${ticketRef.threadSf}`)
       .setPlaceholder('Select a crew')
@@ -102,7 +102,7 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
     });
   }
 
-  public addTriageControls(ticketRef: SelectTicket, options?: TriageControlOptions) {
+  public addTriageControls(ticketRef: SelectTicketDto, options?: TriageControlOptions) {
     const accept = new ButtonBuilder()
       .setCustomId(`ticket/action/accept/${ticketRef.threadSf}`)
       .setLabel('Accept')
@@ -128,7 +128,7 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
     });
   }
 
-  public addLifecycleControls(ticketRef: SelectTicket, options?: LifecycleControlOptions) {
+  public addLifecycleControls(ticketRef: SelectTicketDto, options?: LifecycleControlOptions) {
     const inProgress = new ButtonBuilder()
       .setCustomId(`ticket/action/active/${ticketRef.threadSf}`)
       .setLabel('In Progress')

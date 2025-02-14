@@ -1,3 +1,4 @@
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -7,33 +8,14 @@ import {
   DeleteDateColumn,
   ManyToOne,
   JoinColumn,
-  DeepPartial,
   Unique,
   PrimaryColumn,
   RelationId,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Expose } from 'class-transformer';
-import { ForumTag } from 'src/core/tag/tag.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
-
-export type InsertTeam = DeepPartial<
-  Omit<
-    Team,
-    | 'createdAt'
-    | 'deletedAt'
-    | 'guild'
-    | 'tags'
-    | 'crews'
-    | 'resolveSnowflakeFromTag'
-    | 'resolveNameFromSnowflake'
-    | 'getTagMap'
-    | 'getSnowflakeMap'
-    | 'getDefaultTags'
-  >
->;
-export type SelectTeam = DeepPartial<Pick<Team, 'id'>>;
 
 @Entity()
 @Unique('uk_name_guild_id_team', ['name', 'guildId', 'deletedAt'])
@@ -81,9 +63,6 @@ export class Team {
   @Index('category_channel_sf_idx_team')
   categorySf: Snowflake;
 
-  @OneToMany(() => ForumTag, (tag) => tag.team)
-  tags: ForumTag[];
-
   @OneToMany(() => Crew, (crew) => crew.team)
   crews: Crew[];
 
@@ -94,33 +73,9 @@ export class Team {
   @Expose()
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
-
-  static getTagMap(tags: ForumTag[]) {
-    return tags.reduce(
-      (accumulator, tag) => {
-        accumulator[tag.tagSf] = tag.name;
-        return accumulator;
-      },
-      {} as Record<Snowflake, string>,
-    );
-  }
-
-  static getSnowflakeMap(tags: ForumTag[]) {
-    return tags.reduce(
-      (accumulator, tag) => {
-        accumulator[tag.name] = tag.tagSf;
-        return accumulator;
-      },
-      {} as Record<string, Snowflake>,
-    );
-  }
-
-  static getDefaultTags(tags: ForumTag[]) {
-    return tags.reduce((acc, tag) => {
-      if (tag.template.default) {
-        acc.push(tag.tagSf);
-      }
-      return acc;
-    }, [] as string[]);
-  }
 }
+
+export class InsertTeamDto extends PartialType(
+  OmitType(Team, ['createdAt', 'deletedAt', 'guild', 'crews'] as const),
+) {}
+export class SelectTeamDto extends PartialType(PickType(Team, ['id'] as const)) {}

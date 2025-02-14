@@ -2,8 +2,6 @@ import { DataSource } from 'typeorm';
 import { Team } from 'src/core/team/team.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 import { CrewMember } from 'src/core/crew/member/crew-member.entity';
-import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
-import { ForumTag } from 'src/core/tag/tag.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
 import { CrewLog } from 'src/core/crew/log/crew-log.entity';
 import { Guild } from 'src/core/guild/guild.entity';
@@ -43,8 +41,6 @@ export const AppDataSource = new DataSource({
     Team,
     Crew,
     CrewMember,
-    ForumTagTemplate,
-    ForumTag,
     Ticket,
     CrewLog,
     Guild,

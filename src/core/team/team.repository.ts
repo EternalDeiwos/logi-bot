@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CommonRepository } from 'src/database/util';
-import { Snowflake } from 'discord.js';
 import { Team } from './team.entity';
 
 @Injectable()
