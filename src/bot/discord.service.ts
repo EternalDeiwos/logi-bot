@@ -10,10 +10,15 @@ import {
   GuildChannel,
   GuildBasedChannel,
   Guild,
+  GuildMember,
+  MessageCreateOptions,
+  Message,
 } from 'discord.js';
-import _ from 'lodash';
+import { chunk, uniqBy } from 'lodash';
 import { SelectTag } from 'src/core/tag/tag.entity';
 import { ExternalError, InternalError } from 'src/errors';
+
+export const MAX_EMBEDS = 8;
 
 export abstract class DiscordService {
   abstract hasRole(
@@ -29,11 +34,29 @@ export abstract class DiscordService {
     options: RoleCreateOptions,
   ): Promise<Role>;
 
+  abstract assignRole(
+    guildSf: Snowflake,
+    roleSf: Snowflake,
+    memberSf: Snowflake,
+  ): Promise<GuildMember>;
+
+  abstract removeRole(
+    guildSf: Snowflake,
+    roleSf: Snowflake,
+    memberSf: Snowflake,
+  ): Promise<[GuildMember, Role]>;
+
   abstract ensureChannel(
     guildSf: Snowflake,
     channelSf: Snowflake | undefined,
     options: GuildChannelCreateOptions,
   ): Promise<GuildBasedChannel>;
+
+  abstract sendMessage(
+    guildSf: Snowflake,
+    channelSf: Snowflake,
+    options: MessageCreateOptions,
+  ): Promise<[GuildBasedChannel, Message<true>[]]>;
 
   abstract ensureForumTags(
     guildSf: Snowflake,
@@ -46,6 +69,14 @@ export abstract class DiscordService {
     forumSf: Snowflake,
     tags: SelectTag[],
   ): Promise<GuildForumTagData[]>;
+
+  abstract deleteChannel(guildSf: Snowflake, channelSf: Snowflake): Promise<void>;
+  abstract deleteRole(guildSf: Snowflake, roleSf: Snowflake): Promise<void>;
+  abstract deleteMessages(
+    guildSf: Snowflake,
+    channelSf: Snowflake,
+    messageSf: Snowflake | Snowflake[],
+  ): Promise<Snowflake[]>;
 
   abstract isChannelPrivate(channel: GuildBasedChannel): Promise<boolean>;
   abstract isChannelPrivate(guildRef: Snowflake, channelRef: Snowflake): Promise<boolean>;
@@ -109,6 +140,34 @@ export class DiscordServiceImpl extends DiscordService {
     return await guild.roles.create({ mentionable: true, ...options });
   }
 
+  public async assignRole(guildSf: Snowflake, roleSf: Snowflake, memberSf: Snowflake) {
+    const guild = await this.guildManager.fetch(guildSf);
+    const role = await guild.roles.fetch(roleSf);
+    const member = await guild.members.fetch(memberSf);
+
+    if (role.members.has(member.id)) {
+      return member;
+    } else {
+      return member.roles.add(role);
+    }
+  }
+
+  public async removeRole(
+    guildSf: Snowflake,
+    roleSf: Snowflake,
+    memberSf: Snowflake,
+  ): Promise<[GuildMember, Role]> {
+    const guild = await this.guildManager.fetch(guildSf);
+    const role = await guild.roles.fetch(roleSf);
+    const member = await guild.members.fetch(memberSf);
+
+    if (role.members.has(member.id)) {
+      return [await member.roles.remove(role), role];
+    } else {
+      return [member, role];
+    }
+  }
+
   public async ensureChannel(
     guildSf: Snowflake,
     channelSf: Snowflake | undefined,
@@ -125,21 +184,6 @@ export class DiscordServiceImpl extends DiscordService {
       }
     }
 
-    // const channels = await guild.channels.fetch();
-    // const maybeChannel = channels.find(
-    //   (channel) =>
-    //     channel.name.toLowerCase() === options.name.toLowerCase() &&
-    //     channel.parentId === options.parent,
-    // );
-
-    // if (maybeChannel) {
-    //   if (options.permissionOverwrites) {
-    //     await maybeChannel.permissionOverwrites.set(options.permissionOverwrites);
-    //   }
-
-    //   return maybeChannel;
-    // }
-
     const bot = await guild.members.fetchMe();
 
     if (!bot.permissions.has(PermissionsBitField.Flags.ManageChannels, true)) {
@@ -151,6 +195,31 @@ export class DiscordServiceImpl extends DiscordService {
     }
 
     return await guild.channels.create(options);
+  }
+
+  public async sendMessage(
+    guildSf: Snowflake,
+    channelSf: Snowflake,
+    options: MessageCreateOptions,
+  ): Promise<[GuildBasedChannel, Message<true>[]]> {
+    const discordGuild = await this.guildManager.fetch(guildSf);
+    const channel = await discordGuild.channels.fetch(channelSf);
+
+    if (!channel || !channel.isSendable()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
+    }
+
+    const { embeds, ...rest } = options;
+    const messages = await chunk(embeds, MAX_EMBEDS).reduce(
+      async (promise, embeds) => {
+        const messages = await promise;
+        messages.push(await channel.send({ ...rest, embeds }));
+        return messages;
+      },
+      Promise.resolve([] as Message<true>[]),
+    );
+
+    return [channel, messages];
   }
 
   public async ensureForumTags(guildSf: Snowflake, forumSf: Snowflake, tags: GuildForumTagData[]) {
@@ -172,7 +241,7 @@ export class DiscordServiceImpl extends DiscordService {
     }
 
     const updatedForum = await forum.setAvailableTags(
-      _.uniqBy([...forum.availableTags.concat(), ...tags], 'name'),
+      uniqBy([...forum.availableTags.concat(), ...tags], 'name'),
     );
 
     return updatedForum.availableTags.reduce((accumulator, tag) => {
@@ -215,6 +284,40 @@ export class DiscordServiceImpl extends DiscordService {
     await forum.setAvailableTags(keep);
 
     return deleted;
+  }
+
+  async deleteChannel(guildSf: Snowflake, channelSf: Snowflake) {
+    const guild = await this.guildManager.fetch(guildSf);
+    return guild.channels.delete(channelSf);
+  }
+
+  async deleteRole(guildSf: Snowflake, roleSf: Snowflake) {
+    const guild = await this.guildManager.fetch(guildSf);
+    return guild.roles.delete(roleSf);
+  }
+
+  async deleteMessages(
+    guildSf: Snowflake,
+    channelSf: Snowflake,
+    messageSf: Snowflake | Snowflake[],
+  ) {
+    if (!Array.isArray(messageSf)) {
+      messageSf = [messageSf];
+    }
+
+    const guild = await this.guildManager.fetch(guildSf);
+    const channel = await guild.channels.fetch(channelSf);
+
+    if (channel.isTextBased()) {
+      if (messageSf.length > 1) {
+        return Array.from((await channel.bulkDelete(messageSf, true)).keys());
+      } else if (messageSf.length) {
+        const [oneMessageSf] = messageSf;
+        await channel.messages.delete(oneMessageSf);
+        return [oneMessageSf];
+      }
+      return [];
+    }
   }
 
   async isChannelPrivate(

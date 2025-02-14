@@ -8,6 +8,7 @@ import { DiscordExceptionFilter } from './bot-exception.filter';
 import { BotService, BotServiceImpl } from './bot.service';
 import { DiscordService, DiscordServiceImpl } from './discord.service';
 import { EmojiService, EmojiServiceImpl } from './emoji.service';
+import { DiscordActionsConsumer } from './discord-actions.consumer';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { EmojiService, EmojiServiceImpl } from './emoji.service';
   ],
   providers: [
     DiscordExceptionFilter,
+    DiscordActionsConsumer,
     { provide: BotService, useClass: BotServiceImpl },
     { provide: DiscordService, useClass: DiscordServiceImpl },
     { provide: EmojiService, useClass: EmojiServiceImpl },
