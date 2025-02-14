@@ -9,9 +9,9 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { Expose } from 'class-transformer';
+import { AccessMode } from 'src/types';
 import { CrewShare } from 'src/core/crew/share/crew-share.entity';
-import { OmitType, PartialType, PickType } from '@nestjs/swagger';
-import { GuildAccess } from './guild-access.entity';
+import { GuildAccess, GuildAction } from './guild-access.entity';
 import { GuildSetting, GuildSettingName } from './guild-setting.entity';
 
 export type GuildConfig = Partial<Record<GuildSettingName, string>>;
@@ -66,6 +66,10 @@ export class Guild {
       config[current.name] = current.value;
       return config;
     }, {} as GuildConfig);
+  }
+
+  getAccessRulesForAction(action: GuildAction, access: AccessMode = AccessMode.READ) {
+    return this.access.filter((rule) => rule.action === action && rule.access <= access);
   }
 }
 

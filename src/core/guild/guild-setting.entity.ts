@@ -19,6 +19,7 @@ export enum GuildSettingName {
   GUILD_TRIAGE_CREW = 'guild.triage_crew_sf',
   GUILD_LOG_CHANNEL = 'guild.log_channel',
   STOCKPILE_LOG_CHANNEL = 'stockpile.log_channel',
+  COUNTER_LOG_CHANNEL = 'counter.log_channel',
   CREW_AUDIT_CHANNEL = 'crew.audit_channel',
   CREW_DETAULT_ROLE = 'crew.viewer_role',
   CREW_LEADER_ROLE = 'crew.leader_role',

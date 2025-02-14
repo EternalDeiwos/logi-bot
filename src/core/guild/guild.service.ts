@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InsertResult, UpdateResult } from 'typeorm';
-import { GuildConfig, InsertGuildDto, SelectGuildDto } from './guild.entity';
+import { GuildConfig, InsertGuildDto } from './guild.entity';
 import { GuildRepository } from './guild.repository';
 import { GuildQueryBuilder } from './guild.query';
 import { GuildAccessRepository } from './guild-access.repository';
