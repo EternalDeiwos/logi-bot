@@ -12,6 +12,8 @@ import {
   GuildMember,
   MessageCreateOptions,
   Message,
+  User,
+  Client,
 } from 'discord.js';
 import { chunk } from 'lodash';
 import { ExternalError, InternalError } from 'src/errors';
@@ -56,6 +58,11 @@ export abstract class DiscordService {
     options: MessageCreateOptions,
   ): Promise<[GuildBasedChannel, Message<true>[]]>;
 
+  abstract sendDM(
+    userSf: Snowflake,
+    options: MessageCreateOptions,
+  ): Promise<[User, Message<false>[]]>;
+
   abstract deleteChannel(guildSf: Snowflake, channelSf: Snowflake): Promise<void>;
   abstract deleteRole(guildSf: Snowflake, roleSf: Snowflake): Promise<void>;
   abstract deleteMessages(
@@ -72,7 +79,10 @@ export abstract class DiscordService {
 export class DiscordServiceImpl extends DiscordService {
   private readonly logger = new Logger(DiscordService.name);
 
-  constructor(private readonly guildManager: GuildManager) {
+  constructor(
+    private readonly client: Client,
+    private readonly guildManager: GuildManager,
+  ) {
     super();
   }
 
@@ -206,6 +216,30 @@ export class DiscordServiceImpl extends DiscordService {
     );
 
     return [channel, messages];
+  }
+
+  public async sendDM(
+    userSf: Snowflake,
+    options: MessageCreateOptions,
+  ): Promise<[User, Message<false>[]]> {
+    const user = await this.client.users.fetch(userSf);
+    const channel = await user.createDM();
+
+    if (!channel || !channel.isSendable()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
+    }
+
+    const { embeds, ...rest } = options;
+    const messages = await chunk(embeds, MAX_EMBEDS).reduce(
+      async (promise, embeds) => {
+        const messages = await promise;
+        messages.push(await channel.send({ ...rest, embeds }));
+        return messages;
+      },
+      Promise.resolve([] as Message<false>[]),
+    );
+
+    return [user, messages];
   }
 
   async deleteChannel(guildSf: Snowflake, channelSf: Snowflake) {

@@ -52,6 +52,23 @@ export class SelectGuildCommandParams {
   guild: string;
 }
 
+export class SettingTextCommandParams {
+  @StringOption({
+    name: 'setting',
+    description: 'Select a setting',
+    autocomplete: true,
+    required: true,
+  })
+  setting: GuildSettingName;
+
+  @StringOption({
+    name: 'value',
+    description: 'A value',
+    required: true,
+  })
+  value: string;
+}
+
 export class SettingCategoryCommandParams {
   @StringOption({
     name: 'setting',
@@ -259,6 +276,23 @@ export class GuildCommand {
     }
 
     return this.setConfig(setting, context, category.id);
+  }
+
+  @UseInterceptors(GuildSettingAutocompleteInterceptor)
+  @Subcommand({
+    name: 'set_text',
+    description: 'Update guild settings (text)',
+    dmPermission: false,
+  })
+  async onGuildSettingText(
+    @Context() context: SlashCommandContext,
+    @Options() { setting, value }: SettingTextCommandParams,
+  ) {
+    if (!value) {
+      throw new ValidationError('VALIDATION_FAILED', 'Invalid value').asDisplayable();
+    }
+
+    return this.setConfig(setting, context, value);
   }
 
   @UseInterceptors(GuildGrantAccessAutocompleteInterceptor)

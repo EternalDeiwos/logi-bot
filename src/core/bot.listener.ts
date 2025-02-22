@@ -102,7 +102,7 @@ export class BotEventListener {
   async onRoleAdded(@Context() [member, role]: ContextOf<'guildMemberRoleAdd'>) {
     try {
       const roleCrew = await this.crewService.query().byRole(role.id).getOneOrFail();
-      await this.memberService.registerCrewMember(roleCrew.crewSf, member.id);
+      await this.memberService.registerCrewMember({ id: roleCrew.id }, member.id);
 
       const prompt = new CrewJoinPromptBuilder().addJoinMessage(roleCrew, member);
       const channel = await member.guild.channels.fetch(roleCrew.crewSf);

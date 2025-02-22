@@ -15,92 +15,126 @@ export enum DiscordActionType {
   SEND_MESSAGE = 'message.send',
   // UPDATE_MESSAGE = 'message.update',
   DELETE_MESSAGES = 'message.delete',
+  SEND_DM = 'dm.send',
 }
 
 export enum DiscordActionTarget {
   GUILD = 'guild',
+  USER = 'user',
   TEAM = 'team',
   CREW = 'crew',
   CREW_MEMBER = 'crew_member',
 }
 
-type Target = {
-  field?: string;
-  target?:
+export type Target = {
+  target?: { field?: string } & (
     | { type: DiscordActionTarget.GUILD; guildSf: string }
+    | { type: DiscordActionTarget.USER; userSf: string }
     | { type: DiscordActionTarget.TEAM; teamId: string }
     | { type: DiscordActionTarget.CREW; crewId: string }
-    | { type: DiscordActionTarget.CREW_MEMBER; crewId: string; memberSf: string };
+    | { type: DiscordActionTarget.CREW_MEMBER; crewId: string; memberSf: string }
+  );
 };
 
-export type DiscordAction = Target & { guildSf: string } & (
-    | { type: DiscordActionType.ENSURE_ROLE; role: RoleCreateOptions & { id?: string } }
-    | {
-        type: DiscordActionType.ASSIGN_ROLE;
-        roleSf: string;
-        memberSf: string;
-      }
-    | {
-        type: DiscordActionType.REMOVE_ROLE;
-        roleSf: string;
-        memberSf: string;
-      }
-    | {
-        type: DiscordActionType.ENSURE_CHANNEL;
-        channel: GuildChannelCreateOptions & { id?: string };
-      }
-    | {
-        type: DiscordActionType.DELETE_CHANNEL;
-        channelSf: string;
-      }
-    | {
-        type: DiscordActionType.DELETE_ROLE;
-        roleSf: string;
-      }
-    | {
-        type: DiscordActionType.DELETE_MESSAGES;
-        channelSf: string;
-        messageSf: string | string[];
-      }
-    | {
-        type: DiscordActionType.SEND_MESSAGE;
-        channelSf: string;
-        message: MessageCreateOptions & { id?: string };
-      }
-  );
+export type DiscordAction = Target & DiscordActionParams;
+export type DiscordActionParams =
+  | {
+      type: DiscordActionType.ENSURE_ROLE;
+      guildSf: string;
+      role: RoleCreateOptions & { id?: string };
+    }
+  | {
+      type: DiscordActionType.ASSIGN_ROLE;
+      guildSf: string;
+      roleSf: string;
+      memberSf: string;
+    }
+  | {
+      type: DiscordActionType.REMOVE_ROLE;
+      guildSf: string;
+      roleSf: string;
+      memberSf: string;
+    }
+  | {
+      type: DiscordActionType.ENSURE_CHANNEL;
+      guildSf: string;
+      channel: GuildChannelCreateOptions & { id?: string };
+    }
+  | {
+      type: DiscordActionType.DELETE_CHANNEL;
+      guildSf: string;
+      channelSf: string;
+    }
+  | {
+      type: DiscordActionType.DELETE_ROLE;
+      guildSf: string;
+      roleSf: string;
+    }
+  | {
+      type: DiscordActionType.DELETE_MESSAGES;
+      guildSf: string;
+      channelSf: string;
+      messageSf: string | string[];
+    }
+  | {
+      type: DiscordActionType.SEND_MESSAGE;
+      guildSf: string;
+      channelSf: string;
+      message: MessageCreateOptions & { id?: string };
+    }
+  | {
+      type: DiscordActionType.SEND_DM;
+      userSf: string;
+      message: MessageCreateOptions;
+    };
 
-export type DiscordActionResponse = Target & { guildSf: string } & (
-    | { type: DiscordActionType.ENSURE_ROLE; roleSf: string }
+export type DiscordActionResponse<
+  A extends DiscordActionType = DiscordActionType,
+  T extends DiscordActionTarget = DiscordActionTarget,
+> = Target & { type: A; target: { type: T } } & (
+    | { type: DiscordActionType.ENSURE_ROLE; guildSf: string; roleSf: string }
     | {
         type: DiscordActionType.ASSIGN_ROLE;
+        guildSf: string;
         roleSf: string;
         memberSf: string;
       }
     | {
         type: DiscordActionType.REMOVE_ROLE;
+        guildSf: string;
         roleSf: string;
         memberSf: string;
       }
     | {
         type: DiscordActionType.ENSURE_CHANNEL;
+        guildSf: string;
         channelSf: string;
       }
     | {
         type: DiscordActionType.DELETE_CHANNEL;
+        guildSf: string;
         channelSf: string;
       }
     | {
         type: DiscordActionType.DELETE_ROLE;
+        guildSf: string;
         roleSf: string;
       }
     | {
         type: DiscordActionType.DELETE_MESSAGES;
+        guildSf: string;
         channelSf: string;
         messageSf: string[];
       }
     | {
         type: DiscordActionType.SEND_MESSAGE;
+        guildSf: string;
         channelSf: string;
+        messageSf: string[];
+      }
+    | {
+        type: DiscordActionType.SEND_DM;
+        userSf: string;
         messageSf: string[];
       }
   );
@@ -165,6 +199,9 @@ export class DiscordActionsConsumer {
       case DiscordActionType.SEND_MESSAGE:
         return this.sendMessage(payload);
 
+      case DiscordActionType.SEND_DM:
+        return this.sendDM(payload);
+
       default:
         this.logger.debug(`Failed to process discord action ${type}\n${JSON.stringify(rest)}`);
         this.logger.error(`Failed to process discord action ${type}`);
@@ -175,7 +212,7 @@ export class DiscordActionsConsumer {
     const { type, target, guildSf } = payload;
     const { id, ...options } = payload.role;
     this.logger.debug(
-      `Ensuring role ${options.name}` + target ? ` for target ${JSON.stringify(target)}` : '',
+      `Ensuring role ${options.name}` + (target ? ` for target ${JSON.stringify(target)}` : ''),
     );
     const role = await this.discordService.ensureRole(guildSf, id, options);
     this.logger.log(`Ensured role ${role.name} in ${role.guild.name}`);
@@ -204,9 +241,8 @@ export class DiscordActionsConsumer {
   ) {
     const { type, target, guildSf, roleSf, memberSf } = payload;
     this.logger.debug(
-      `Ensuring role ${roleSf} membership for ${memberSf}` + target
-        ? ` for target ${JSON.stringify(target)}`
-        : '',
+      `Ensuring role ${roleSf} membership for ${memberSf}` +
+        (target ? ` for target ${JSON.stringify(target)}` : ''),
     );
     const member = await this.discordService.assignRole(guildSf, roleSf, memberSf);
     this.logger.log(
@@ -222,9 +258,8 @@ export class DiscordActionsConsumer {
   ) {
     const { type, target, guildSf, roleSf, memberSf } = payload;
     this.logger.debug(
-      `Removing role ${roleSf} membership for ${memberSf}` + target
-        ? ` for target ${JSON.stringify(target)}`
-        : '',
+      `Removing role ${roleSf} membership for ${memberSf}` +
+        (target ? ` for target ${JSON.stringify(target)}` : ''),
     );
     const [member, role] = await this.discordService.removeRole(guildSf, roleSf, memberSf);
     this.logger.log(
@@ -240,9 +275,8 @@ export class DiscordActionsConsumer {
   ) {
     const { type, target, guildSf, channelSf } = payload;
     this.logger.debug(
-      `Deleting channel ${channelSf} in guild ${guildSf}` + target
-        ? ` for target ${JSON.stringify(target)}`
-        : '',
+      `Deleting channel ${channelSf} in guild ${guildSf}` +
+        (target ? ` for target ${JSON.stringify(target)}` : ''),
     );
     await this.discordService.deleteChannel(guildSf, channelSf);
     this.logger.log(`Deleted channel ${channelSf} in guild ${guildSf}`);
@@ -256,9 +290,8 @@ export class DiscordActionsConsumer {
   ) {
     const { type, target, guildSf, roleSf } = payload;
     this.logger.debug(
-      `Deleting channel ${roleSf} in guild ${guildSf}` + target
-        ? ` for target ${JSON.stringify(target)}`
-        : '',
+      `Deleting channel ${roleSf} in guild ${guildSf}` +
+        (target ? ` for target ${JSON.stringify(target)}` : ''),
     );
     await this.discordService.deleteChannel(guildSf, roleSf);
     this.logger.log(`Deleted channel ${roleSf} in guild ${guildSf}`);
@@ -273,9 +306,8 @@ export class DiscordActionsConsumer {
     const { type, target, guildSf, channelSf, messageSf } = payload;
 
     this.logger.debug(
-      `Deleting channel ${channelSf} in guild ${guildSf}` + target
-        ? ` for target ${JSON.stringify(target)}`
-        : '',
+      `Deleting channel ${channelSf} in guild ${guildSf}` +
+        (target ? ` for target ${JSON.stringify(target)}` : ''),
     );
     const deleted = await this.discordService.deleteMessages(guildSf, channelSf, messageSf);
     this.logger.log(`Deleted channel ${channelSf} in guild ${guildSf}`);
@@ -289,7 +321,8 @@ export class DiscordActionsConsumer {
   ) {
     const { type, target, guildSf, channelSf, message } = payload;
     this.logger.debug(
-      `Sending message in guild ${guildSf}` + target ? ` for target ${JSON.stringify(target)}` : '',
+      `Sending message in guild ${guildSf}` +
+        (target ? ` for target ${JSON.stringify(target)}` : ''),
     );
     const [channel, messages] = await this.discordService.sendMessage(guildSf, channelSf, message);
     this.logger.log(
@@ -300,6 +333,27 @@ export class DiscordActionsConsumer {
       target,
       guildSf,
       channelSf,
+      messageSf: messages.map((m) => m.id),
+    });
+  }
+
+  private async sendDM(
+    payload: {
+      type: DiscordActionType.SEND_DM;
+    } & DiscordAction,
+  ) {
+    const { type, target, userSf, message } = payload;
+    this.logger.debug(
+      `Sending message to user ${userSf}` + (target ? ` for target ${JSON.stringify(target)}` : ''),
+    );
+    const [user, messages] = await this.discordService.sendDM(userSf, message);
+    this.logger.log(
+      `Sent messages ${JSON.stringify(messages.map((m) => [m.id, m.embeds.length]))} to user ${user.displayName}`,
+    );
+    return await this.respond({
+      type,
+      target,
+      userSf,
       messageSf: messages.map((m) => m.id),
     });
   }

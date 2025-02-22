@@ -31,6 +31,7 @@ import { TicketCommand } from './ticket/ticket.command';
 import { TicketRepository } from './ticket/ticket.repository';
 import { TicketController } from './ticket/ticket.controller';
 import { AccessModule } from './access/access.module';
+import { CrewDiscordActionsResponseConsumer } from './crew/crew-discord-actions-response.consumer';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { AccessModule } from './access/access.module';
     CrewShareRepository,
     TicketCommand,
     TicketRepository,
+    CrewDiscordActionsResponseConsumer,
     { provide: TeamService, useClass: TeamServiceImpl },
     { provide: CrewService, useClass: CrewServiceImpl },
     { provide: CrewMemberService, useClass: CrewMemberServiceImpl },

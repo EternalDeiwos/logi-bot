@@ -30,16 +30,17 @@ import {
 } from 'discord.js';
 import { compact } from 'lodash';
 import { AuthError, DatabaseError, ValidationError } from 'src/errors';
-import { CrewMemberAccess } from 'src/types';
+import { AccessMode, CrewMemberAccess } from 'src/types';
 import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { BotService } from 'src/bot/bot.service';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
-import { TeamService } from 'src/core/team/team.service';
 import { TeamSelectAutocompleteInterceptor } from 'src/core/team/team-select.interceptor';
 import { AccessDecisionBuilder } from 'src/core/access/access-decision.builder';
 import { AccessService } from 'src/core/access/access.service';
+import { GuildAction } from 'src/core/guild/guild-access.entity';
+import { AccessDecision } from 'src/core/access/access-decision';
 import { CrewService } from './crew.service';
 import { CrewRepository } from './crew.repository';
 import { CrewSelectAutocompleteInterceptor } from './crew-select.interceptor';
@@ -47,7 +48,7 @@ import { CrewShareAutocompleteInterceptor } from './share/crew-share.interceptor
 import { CrewMemberService } from './member/crew-member.service';
 import { CrewShareService } from './share/crew-share.service';
 import { CrewLogService } from './log/crew-log.service';
-import { Crew } from './crew.entity';
+import { Crew, SelectCrewDto } from './crew.entity';
 import { CrewDeletePromptBuilder } from './crew-delete.prompt';
 import { CrewDeleteModalBuilder } from './crew-delete.modal';
 import { CrewLogModalBuilder } from './crew-log.modal';
@@ -68,6 +69,13 @@ export class CreateCrewCommandParams {
   })
   name: string;
 
+  @BooleanOption({
+    name: 'voice_channel',
+    description: 'Should the crew have a voice channel?',
+    required: true,
+  })
+  voice: boolean;
+
   @StringOption({
     name: 'short_name',
     description: 'A short name or abbreviation for smaller UI.',
@@ -81,13 +89,6 @@ export class CreateCrewCommandParams {
     required: false,
   })
   movePrompt: boolean = false;
-
-  @BooleanOption({
-    name: 'voice_channel',
-    description: 'Should the crew have a voice channel?',
-    required: false,
-  })
-  voice: boolean = false;
 }
 
 export class SelectCrewCommandParams {
@@ -209,7 +210,6 @@ export class CrewCommand {
     private readonly botService: BotService,
     private readonly guildManager: GuildManager,
     private readonly guildService: GuildService,
-    private readonly teamService: TeamService,
     private readonly crewRepo: CrewRepository,
     private readonly crewService: CrewService,
     private readonly memberService: CrewMemberService,
@@ -230,34 +230,55 @@ export class CrewCommand {
   ) {
     await interaction.deferReply({ ephemeral: true });
 
-    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const discordGuild = await this.guildManager.fetch(interaction.guildId);
-    const member = await discordGuild.members.fetch(interaction);
     const guild = await this.guildService
       .query()
       .byGuild({ guildSf: interaction.guildId })
       .withAccessRules()
       .getOneOrFail();
 
-    if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    const skipApproval =
+      guild
+        .getAccessRulesForAction(GuildAction.CREW_MANAGE, AccessMode.ADMIN)
+        .some((entry) => AccessDecision.fromEntry(entry.rule).permit(...accessArgs)) ||
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .build()
+        .permit(...accessArgs);
+    const isMember =
+      skipApproval ||
+      guild
+        .getAccessRulesForAction(GuildAction.CREW_MANAGE, AccessMode.WRITE)
+        .some((entry) => AccessDecision.fromEntry(entry.rule).permit(...accessArgs));
+
+    if (!isMember) {
       throw new AuthError('FORBIDDEN', 'Not allowed to create crews').asDisplayable();
     }
 
-    const crew = await this.crewService.registerCrew(
+    await this.crewService.registerCrew(
       {
         name: data.name,
         shortName: data.shortName,
         hasMovePrompt: data.movePrompt,
         teamId: data.team,
-        createdBy: memberRef,
+        createdBy: interaction.member?.user?.id ?? interaction.user?.id,
       },
-      { createVoice: data.voice },
+      { createVoice: data.voice, skipApproval },
     );
 
-    await this.teamService.reconcileGuildForumTags({ guildSf: interaction.guildId });
+    const embed = new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew registered');
+
+    if (skipApproval) {
+      embed.setTitle('Crew registered');
+    } else {
+      embed
+        .setTitle('Crew awaiting approval')
+        .setDescription('Your crew will be reviewed soon! Please be patient.');
+    }
 
     await this.botService.replyOrFollowUp(interaction, {
-      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew registered')],
+      embeds: [embed],
     });
   }
 
@@ -287,9 +308,12 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.crewService.updateCrew(crewSf, {
-      hasMovePrompt: data.value,
-    });
+    await this.crewService.updateCrew(
+      { crewSf },
+      {
+        hasMovePrompt: data.value,
+      },
+    );
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew updated')],
@@ -322,9 +346,12 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.crewService.updateCrew(crewSf, {
-      isPermanent: data.value,
-    });
+    await this.crewService.updateCrew(
+      { crewSf },
+      {
+        isPermanent: data.value,
+      },
+    );
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew updated')],
@@ -357,9 +384,12 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.crewService.updateCrew(crewSf, {
-      isSecureOnly: data.value,
-    });
+    await this.crewService.updateCrew(
+      { crewSf },
+      {
+        isSecureOnly: data.value,
+      },
+    );
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew updated')],
@@ -378,7 +408,9 @@ export class CrewCommand {
       throw new AuthError('FORBIDDEN', 'Forbidden');
     }
 
-    await this.memberService.registerCrewMember(channelRef, memberRef, CrewMemberAccess.MEMBER);
+    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+
+    await this.memberService.registerCrewMember(crew, memberRef, CrewMemberAccess.MEMBER);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Joined crew')],
@@ -428,11 +460,12 @@ export class CrewCommand {
       throw new AuthError('FORBIDDEN', 'Forbidden');
     }
 
-    await this.memberService.registerCrewMember(
-      crewRef || interaction.channelId,
-      memberRef,
-      CrewMemberAccess.MEMBER,
-    );
+    const crew = await this.crewService
+      .query()
+      .byCrew({ crewSf: crewRef || interaction.channelId })
+      .getOneOrFail();
+
+    await this.memberService.registerCrewMember(crew, memberRef, CrewMemberAccess.MEMBER);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Joined crew')],
@@ -652,7 +685,8 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.memberService.registerCrewMember(crewSf, data.member.id, CrewMemberAccess.MEMBER);
+    const crew = await this.crewService.query().byCrew({ crewSf }).getOneOrFail();
+    await this.memberService.registerCrewMember(crew, data.member.id, CrewMemberAccess.MEMBER);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew member registered')],
@@ -729,7 +763,7 @@ export class CrewCommand {
       ).asDisplayable();
     }
 
-    await this.crewService.deregisterCrew(crewSf, memberRef, {
+    await this.crewService.deregisterCrew({ id: crew.id }, memberRef, {
       tag: data.tag,
       archiveSf: data.archive?.id,
     });
@@ -773,7 +807,7 @@ export class CrewCommand {
       await Promise.all(
         crews.map(async (crew) => {
           try {
-            return await this.crewService.deregisterCrew(crew.crewSf, memberRef, {
+            return await this.crewService.deregisterCrew({ id: crew.id }, memberRef, {
               tag: data.tag,
               archiveSf: data.archive?.id,
             });
@@ -814,7 +848,7 @@ export class CrewCommand {
     @Context() [interaction]: ButtonContext,
     @ComponentParam('crew') crewRef: Snowflake,
   ) {
-    const modal = new CrewDeleteModalBuilder().addForm({ crewSf: crewRef });
+    const modal = new CrewDeleteModalBuilder().addForm({ id: crewRef });
     return interaction.showModal(modal);
   }
 
@@ -825,21 +859,16 @@ export class CrewCommand {
   ) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const reason = interaction.fields.getTextInputValue('crew/delete/reason');
-    const member = await this.memberService
-      .query()
-      .byMember(memberRef)
-      .byCrew({ crewSf: channelRef })
-      .byGuild({ guildSf: interaction.guildId })
-      .getOneOrFail();
+    const crewRef = SelectCrewDto.from(channelRef);
 
     // No access control because this is used by the audit prompt, access is controlled to the prompt itself.
-    const result = await this.crewService.deregisterCrew(channelRef, memberRef);
+    const result = await this.crewService.deregisterCrew(crewRef, memberRef);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew deleted')],
     });
 
-    const guildMember = await interaction.guild.members.fetch(member.memberSf);
+    const guildMember = await interaction.guild.members.fetch(memberRef);
 
     if (result) {
       await interaction.channel.send(

@@ -129,16 +129,6 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
-  withTeamTags() {
-    this.qb.leftJoinAndSelect('team.tags', 'team_tags');
-    return this;
-  }
-
-  withTeamTagsTemplate() {
-    this.qb.leftJoinAndSelect('team_tags.template', 'team_tags_template');
-    return this;
-  }
-
   withMembers() {
     this.qb.leftJoinAndSelect('crew.members', 'member');
     return this;
@@ -160,6 +150,16 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     this.qb
       .leftJoinAndSelect('crew.shared', 'shared')
       .leftJoinAndSelect('shared.guild', 'shared_guild');
+    return this;
+  }
+
+  withGuildSettings() {
+    this.qb.leftJoinAndSelect('guild.settings', 'settings');
+    return this;
+  }
+
+  withoutPending() {
+    this.qb.andWhere('crew.processed_at IS NOT NULL');
     return this;
   }
 }

@@ -9,8 +9,11 @@ import {
 } from 'discord.js';
 import { ExternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
+import { BotService } from 'src/bot/bot.service';
+import { DiscordActionTarget, DiscordActionType } from 'src/bot/discord-actions.consumer';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { GuildService } from 'src/core/guild/guild.service';
+import { GuildSettingName } from 'src/core/guild/guild-setting.entity';
 import { Crew, SelectCrewDto } from 'src/core/crew/crew.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberRepository } from './crew-member.repository';
@@ -21,7 +24,7 @@ export abstract class CrewMemberService {
   abstract query(): CrewMemberQueryBuilder;
 
   abstract registerCrewMember(
-    channelRef: Snowflake,
+    crewRef: SelectCrewDto,
     memberRef: Snowflake,
     access?: CrewMemberAccess,
   ): Promise<InsertResult>;
@@ -55,6 +58,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
   constructor(
     private readonly guildManager: GuildManager,
+    private readonly botService: BotService,
     private readonly guildService: GuildService,
     @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
     private readonly memberRepo: CrewMemberRepository,
@@ -67,21 +71,13 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   }
 
   async registerCrewMember(
-    channelRef: Snowflake,
+    crewRef: SelectCrewDto,
     memberRef: Snowflake,
     access?: CrewMemberAccess,
   ): Promise<InsertResult> {
-    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+    const crew = await this.crewService.query().byCrew(crewRef).withGuildSettings().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const member = await discordGuild.members.fetch(memberRef);
-
-    try {
-      await member.roles.add(crew.roleSf);
-    } catch (err) {
-      if (!member.roles.cache.has(crew.roleSf)) {
-        throw new ExternalError('DISCORD_API_ERROR', 'Failed to add member role', err);
-      }
-    }
 
     const result = await this.memberRepo.safeUpsert({
       memberSf: memberRef,
@@ -91,16 +87,43 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       crewId: crew.id,
     });
 
-    if (
-      access === CrewMemberAccess.OWNER &&
-      crew.guild.getConfig()['crew.leader_role'] &&
-      !member.roles.cache.has(crew.guild.getConfig()['crew.leader_role'])
-    ) {
-      await member.roles.add(crew.guild.getConfig()['crew.leader_role']);
-      this.logger.log(`${member.displayName} added to crew leaders in ${crew.guild.name}`);
+    if (crew.roleSf) {
+      await this.queueAssignCrewRole(crew, memberRef);
+    }
+
+    if (access === CrewMemberAccess.OWNER) {
+      await this.queueAssignCrewLeaderRole(crew, memberRef);
     }
 
     return result;
+  }
+
+  async queueAssignCrewRole(crew: Crew, memberSf: Snowflake) {
+    return this.botService.publishDiscordAction({
+      type: DiscordActionType.ASSIGN_ROLE,
+      guildSf: crew.guild.guildSf,
+      roleSf: crew.roleSf,
+      memberSf: memberSf,
+    });
+  }
+
+  async queueAssignCrewLeaderRole(crew: Crew, memberSf: Snowflake) {
+    const guildConfig = crew.guild.getConfig();
+
+    if (guildConfig[GuildSettingName.CREW_LEADER_ROLE]) {
+      return this.botService.publishDiscordAction({
+        type: DiscordActionType.ASSIGN_ROLE,
+        guildSf: crew.guild.guildSf,
+        roleSf: guildConfig[GuildSettingName.CREW_LEADER_ROLE],
+        memberSf: memberSf,
+        target: {
+          type: DiscordActionTarget.CREW_MEMBER,
+          crewId: crew.id,
+          memberSf: memberSf,
+          field: 'crewLeader',
+        },
+      });
+    }
   }
 
   async updateCrewMember(crewMember: SelectCrewMemberDto, data: UpdateCrewMemberDto) {
@@ -263,7 +286,12 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       );
     }
 
-    const members = await this.query().byGuild(guildRef).byMember(memberRef).getMany();
+    const members = await this.query()
+      .byGuild(guildRef)
+      .byMember(memberRef)
+      .withGuildSettings()
+      .withoutPending()
+      .getMany();
     for (const crewMember of members) {
       let channel: GuildBasedChannel | null;
       try {

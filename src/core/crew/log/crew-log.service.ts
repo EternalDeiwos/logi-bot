@@ -37,7 +37,11 @@ export class CrewLogServiceImpl extends CrewLogService {
   }
 
   async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLogDto) {
-    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+    const crew = await this.crewService
+      .query()
+      .byCrew({ crewSf: channelRef })
+      .withGuildSettings()
+      .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
     const war = await this.warService.query().byCurrent().getOneOrFail();

@@ -57,10 +57,20 @@ export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
     return this;
   }
 
+  withGuildSettings() {
+    this.qb.leftJoinAndSelect('guild.settings', 'settings');
+    return this;
+  }
+
   withTickets() {
     this.qb
       .leftJoinAndSelect('crew.tickets', 'ticket')
       .leftJoinAndSelect('ticket.previous', 'previous');
+    return this;
+  }
+
+  withoutPending() {
+    this.qb.andWhere('crew.processed_at IS NOT NULL');
     return this;
   }
 }
