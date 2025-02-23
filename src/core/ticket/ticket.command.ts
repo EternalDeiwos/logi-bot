@@ -118,9 +118,12 @@ export class TicketCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const modal = new TicketCreateModalBuilder().addForm({
-      crewSf: data.crew || interaction.channelId,
-    });
+    const modal = new TicketCreateModalBuilder().addForm(
+      {
+        crewSf: data.crew || interaction.channelId,
+      },
+      interaction.user.id,
+    );
     return interaction.showModal(modal);
   }
 
@@ -129,9 +132,12 @@ export class TicketCommand {
     @Context() [interaction]: ButtonContext,
     @ComponentParam('crew') channelRef: Snowflake,
   ) {
-    const modal = new TicketCreateModalBuilder().addForm({
-      crewSf: channelRef || interaction.channelId,
-    });
+    const modal = new TicketCreateModalBuilder().addForm(
+      {
+        crewSf: channelRef || interaction.channelId,
+      },
+      interaction.user.id,
+    );
     return interaction.showModal(modal);
   }
 
@@ -140,9 +146,12 @@ export class TicketCommand {
     @Context() [interaction]: StringSelectContext,
     @SelectedStrings() [selected]: string[],
   ) {
-    const modal = new TicketCreateModalBuilder().addForm({
-      crewSf: selected,
-    });
+    const modal = new TicketCreateModalBuilder().addForm(
+      {
+        crewSf: selected,
+      },
+      interaction.user.id,
+    );
     return interaction.showModal(modal);
   }
 
@@ -168,20 +177,17 @@ export class TicketCommand {
       channelRef = guild.getConfig()['guild.triage_crew_sf'];
     }
 
-    const modal = new TicketCreateModalBuilder().addForm(
-      { crewSf: channelRef },
-      {
-        what: {
-          value: TicketCreateModalBuilder.makeProxyTicketMessage(
-            message.content,
-            memberRef,
-            authorRef,
-            channelRef,
-            message.id,
-          ),
-        },
+    const modal = new TicketCreateModalBuilder().addForm({ crewSf: channelRef }, authorRef, {
+      what: {
+        value: TicketCreateModalBuilder.makeProxyTicketMessage(
+          message.content,
+          memberRef,
+          authorRef,
+          channelRef,
+          message.id,
+        ),
       },
-    );
+    });
     interaction.showModal(modal);
   }
 
@@ -221,10 +227,11 @@ export class TicketCommand {
     );
   }
 
-  @Modal('ticket/create/:crew')
+  @Modal('ticket/create/:crew/:author')
   async onTicketSubmit(
     @Context() [interaction]: ModalContext,
     @ModalParam('crew') crewRef: Snowflake,
+    @ModalParam('author') authorRef: Snowflake,
   ) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
 
@@ -247,7 +254,7 @@ export class TicketCommand {
       name: title,
       content,
       crewId: crew.id,
-      createdBy: memberRef,
+      createdBy: authorRef,
       updatedBy: memberRef,
     });
 

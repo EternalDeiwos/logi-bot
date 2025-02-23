@@ -33,7 +33,11 @@ ${
 `.trim();
   }
 
-  addForm(crewRef: SelectCrewChannelDto, { title, what, where, when }: TicketFormProperties = {}) {
+  addForm(
+    crewRef: SelectCrewChannelDto,
+    authorRef: Snowflake,
+    { title, what, where, when }: TicketFormProperties = {},
+  ) {
     const titleInput = new TextInputBuilder()
       .setCustomId('ticket/form/title')
       .setLabel((title?.emoji ? `${title.emoji} ` : '') + 'Title')
@@ -62,7 +66,7 @@ ${
       .setValue(when?.value || 'ASAP')
       .setStyle(TextInputStyle.Short);
 
-    return this.setCustomId(`ticket/create/${crewRef.crewSf}`)
+    return this.setCustomId(`ticket/create/${crewRef.crewSf}/${authorRef}`)
       .setTitle('Create a Ticket')
       .addComponents(
         [titleInput, whatInput, whereInput, whenInput].map((input) =>
