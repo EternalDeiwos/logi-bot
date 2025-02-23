@@ -1,3 +1,4 @@
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -9,17 +10,22 @@ import {
   JoinColumn,
   PrimaryColumn,
   UpdateDateColumn,
-  DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Expose, Transform } from 'class-transformer';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
-export type InsertTicket = DeepPartial<
-  Omit<Ticket, 'id' | 'crew' | 'previous' | 'guild' | 'updatedAt' | 'createdAt' | 'deletedAt'>
->;
-export type SelectTicket = DeepPartial<Pick<Ticket, 'threadSf' | 'id'>>;
+export enum TicketTag {
+  TRIAGE = 'Triage',
+  ACCEPTED = 'Accepted',
+  DECLINED = 'Declined',
+  REPEATABLE = 'Repeatable',
+  IN_PROGRESS = 'In Progress',
+  DONE = 'Done',
+  MOVED = 'Moved',
+  ABANDONED = 'Abandoned',
+}
 
 @Entity()
 export class Ticket {
@@ -71,7 +77,7 @@ export class Ticket {
   @Index('crew_id_idx_ticket')
   crewId: string;
 
-  @ManyToOne(() => Crew, (crew) => crew.tags, { onDelete: 'CASCADE', eager: true })
+  @ManyToOne(() => Crew, (crew) => crew.tickets, { onDelete: 'CASCADE', eager: true })
   @Expose()
   @Transform(({ value }) => (value ? value : null))
   @JoinColumn({
@@ -93,6 +99,10 @@ export class Ticket {
   @Column({ name: 'sort_order', default: '' })
   @Index('sort_order_idx_ticket')
   sortOrder: string;
+
+  @Expose()
+  @Column({ type: 'enum', enum: TicketTag, default: TicketTag.TRIAGE })
+  state: TicketTag;
 
   @Column({ type: 'timestamptz', name: 'processed_at', nullable: true })
   processedAt: Date;
@@ -117,3 +127,19 @@ export class Ticket {
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
 }
+
+export class InsertTicketDto extends PartialType(
+  OmitType(Ticket, [
+    'id',
+    'crew',
+    'previous',
+    'guild',
+    'updatedAt',
+    'createdAt',
+    'deletedAt',
+  ] as const),
+) {}
+export class SelectTicketDto extends PartialType(PickType(Ticket, ['id', 'threadSf'] as const)) {}
+export class UpdateTicketDto extends PartialType(
+  PickType(Ticket, ['updatedBy', 'state'] as const),
+) {}

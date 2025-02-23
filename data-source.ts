@@ -2,8 +2,6 @@ import { DataSource } from 'typeorm';
 import { Team } from 'src/core/team/team.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 import { CrewMember } from 'src/core/crew/member/crew-member.entity';
-import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
-import { ForumTag } from 'src/core/tag/tag.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
 import { CrewLog } from 'src/core/crew/log/crew-log.entity';
 import { Guild } from 'src/core/guild/guild.entity';
@@ -26,6 +24,8 @@ import { StockpileDiff } from 'src/inventory/stockpile/stockpile-diff.entity';
 import { Counter, CurrentCounter } from 'src/inventory/counter/counter.entity';
 import { CounterEntry } from 'src/inventory/counter/counter-entry.entity';
 import { CounterAccess } from 'src/inventory/counter/counter-access.entity';
+import { GuildSetting } from 'src/core/guild/guild-setting.entity';
+import { GuildAccess } from 'src/core/guild/guild-access.entity';
 import * as migrations from 'src/database/migrations';
 
 export const AppDataSource = new DataSource({
@@ -41,11 +41,10 @@ export const AppDataSource = new DataSource({
     Team,
     Crew,
     CrewMember,
-    ForumTagTemplate,
-    ForumTag,
     Ticket,
     CrewLog,
     Guild,
+    GuildSetting,
     CrewShare,
     War,
     Region,
@@ -68,6 +67,7 @@ export const AppDataSource = new DataSource({
     CounterEntry,
     CounterAccess,
     CurrentCounter,
+    GuildAccess,
   ],
   subscribers: [],
   migrations,

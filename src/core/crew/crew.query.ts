@@ -1,8 +1,8 @@
 import { Brackets, Repository } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectGuild } from 'src/core/guild/guild.entity';
-import { Crew, SelectCrew } from './crew.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
+import { Crew, SelectCrewDto } from './crew.entity';
 
 const searchWhere = (crewAlias: string = 'crew') => {
   return new Brackets((qb) =>
@@ -16,7 +16,7 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     this.qb.leftJoinAndSelect('crew.guild', 'guild');
   }
 
-  byCrew(crewRef: SelectCrew | SelectCrew[]) {
+  byCrew(crewRef: SelectCrewDto | SelectCrewDto[]) {
     if (!Array.isArray(crewRef)) {
       crewRef = [crewRef];
     }
@@ -69,7 +69,7 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
-  byGuildAndShared(guildRef: SelectGuild) {
+  byGuildAndShared(guildRef: SelectGuildDto) {
     this.qb.leftJoin('crew.shared', 'shared').leftJoinAndSelect('shared.crew', 'shared_crew');
 
     if (guildRef.id) {
@@ -90,13 +90,13 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
-  searchByGuild(guildRef: SelectGuild, query: string) {
+  searchByGuild(guildRef: SelectGuildDto, query: string) {
     this.byGuild(guildRef);
     this.qb.andWhere(searchWhere(), { query: `%${query}%` });
     return this;
   }
 
-  searchByGuildWithShared(guildRef: SelectGuild, query: string) {
+  searchByGuildWithShared(guildRef: SelectGuildDto, query: string) {
     this.qb
       .leftJoin('crew.shared', 'shared')
       .leftJoinAndSelect('shared.crew', 'shared_crew')
@@ -129,16 +129,6 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
-  withTeamTags() {
-    this.qb.leftJoinAndSelect('team.tags', 'team_tags');
-    return this;
-  }
-
-  withTeamTagsTemplate() {
-    this.qb.leftJoinAndSelect('team_tags.template', 'team_tags_template');
-    return this;
-  }
-
   withMembers() {
     this.qb.leftJoinAndSelect('crew.members', 'member');
     return this;
@@ -160,6 +150,16 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     this.qb
       .leftJoinAndSelect('crew.shared', 'shared')
       .leftJoinAndSelect('shared.guild', 'shared_guild');
+    return this;
+  }
+
+  withGuildSettings() {
+    this.qb.leftJoinAndSelect('guild.settings', 'settings');
+    return this;
+  }
+
+  withoutPending() {
+    this.qb.andWhere('crew.processed_at IS NOT NULL');
     return this;
   }
 }

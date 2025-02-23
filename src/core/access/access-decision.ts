@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { Snowflake } from 'discord.js';
 import { CrewMemberAccess } from 'src/types';
 import { CrewMember } from 'src/core/crew/member/crew-member.entity';
-import { SelectCrew } from 'src/core/crew/crew.entity';
+import { SelectCrewDto } from 'src/core/crew/crew.entity';
 import { AccessEntry, AccessRuleType } from './access.entity';
 import { AccessRule, AccessRuleMode } from './access-rule';
 import { AccessRuleInner } from './access-rule-inner';
@@ -75,7 +75,7 @@ export class AccessDecision {
   }
 
   private testCrew(
-    crewRef: SelectCrew,
+    crewRef: SelectCrewDto,
     memberSf: Snowflake,
     members: CrewMember[],
     crewRole: CrewMemberAccess,

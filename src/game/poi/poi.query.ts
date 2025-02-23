@@ -1,6 +1,6 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { ExpandedPoi, PoiMarkerType, SelectPoi } from './poi.entity';
+import { ExpandedPoi, PoiMarkerType, SelectPoiDto } from './poi.entity';
 
 const searchWhere = (alias: string = 'poi') => {
   return new Brackets((qb) =>
@@ -16,7 +16,7 @@ export class PoiQueryBuilder extends CommonQueryBuilder<ExpandedPoi> {
     super(repo, 'poi');
   }
 
-  byPoi(poiRef: SelectPoi | SelectPoi[]) {
+  byPoi(poiRef: SelectPoiDto | SelectPoiDto[]) {
     if (!Array.isArray(poiRef)) {
       poiRef = [poiRef];
     }

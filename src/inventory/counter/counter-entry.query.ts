@@ -1,8 +1,8 @@
 import { Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectPoi } from 'src/game/poi/poi.entity';
+import { SelectPoiDto } from 'src/game/poi/poi.entity';
 import { CounterEntry } from 'src/inventory/counter/counter-entry.entity';
-import { SelectCounterEntryDto } from './dto/select-counter-entry.dto';
+import { SelectCounterEntryDto } from './counter-entry.entity';
 
 export class CounterEntryQueryBuilder extends CommonQueryBuilder<CounterEntry> {
   constructor(repo: Repository<CounterEntry>) {
@@ -19,7 +19,7 @@ export class CounterEntryQueryBuilder extends CommonQueryBuilder<CounterEntry> {
     return this;
   }
 
-  byLocation(poiRef: SelectPoi | SelectPoi[]) {
+  byLocation(poiRef: SelectPoiDto | SelectPoiDto[]) {
     if (!Array.isArray(poiRef)) {
       poiRef = [poiRef];
     }

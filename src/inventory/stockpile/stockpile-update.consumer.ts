@@ -7,13 +7,13 @@ import { AccessMode, DiscordAPIInteraction } from 'src/types';
 import { CatalogService } from 'src/game/catalog/catalog.service';
 import { AccessService } from 'src/core/access/access.service';
 import { AccessDecision } from 'src/core/access/access-decision';
-import { SelectStockpileLog, StockpileLog } from './stockpile-log.entity';
-import { InsertStockpileEntry, StockpileReportRecord } from './stockpile-entry.entity';
+import { SelectStockpileLogDto, StockpileLog } from './stockpile-log.entity';
+import { InsertStockpileEntryDto, StockpileReportRecord } from './stockpile-entry.entity';
 import { StockpileService } from './stockpile.service';
 import { Stockpile } from './stockpile.entity';
 
 // groups[stockpile][itemCode]
-export type GroupedStockpileEntry = Record<string, Record<string, InsertStockpileEntry>>;
+export type GroupedStockpileEntry = Record<string, Record<string, InsertStockpileEntryDto>>;
 
 @Injectable()
 export class StockpileUpdateConsumer {
@@ -34,7 +34,7 @@ export class StockpileUpdateConsumer {
     },
   })
   public async processStockpileUpdate(
-    payload: SelectStockpileLog & { interaction: DiscordAPIInteraction },
+    payload: SelectStockpileLogDto & { interaction: DiscordAPIInteraction },
     msg: ConsumeMessage,
   ) {
     const { interaction } = payload;
@@ -92,8 +92,8 @@ export class StockpileUpdateConsumer {
     ];
   }
 
-  private reconcileGhosts(ghosts: Stockpile[], log: StockpileLog): InsertStockpileEntry[] {
-    const result: InsertStockpileEntry[] = [];
+  private reconcileGhosts(ghosts: Stockpile[], log: StockpileLog): InsertStockpileEntryDto[] {
+    const result: InsertStockpileEntryDto[] = [];
 
     for (const stockpile of ghosts) {
       for (const item of stockpile.currentItems) {
@@ -162,7 +162,7 @@ export class StockpileUpdateConsumer {
             warNumber: log.warNumber,
             catalogId: item.id,
             stockpileId: stockpile.id,
-          } as InsertStockpileEntry);
+          } as InsertStockpileEntryDto);
 
         if (record['Crated?'] === 'true') {
           if (isShippable) {
@@ -178,7 +178,7 @@ export class StockpileUpdateConsumer {
 
         return state;
       },
-      {} as Record<string, Record<string, InsertStockpileEntry>>,
+      {} as Record<string, Record<string, InsertStockpileEntryDto>>,
     );
   }
 }

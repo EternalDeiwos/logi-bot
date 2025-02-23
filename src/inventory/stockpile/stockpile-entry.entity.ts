@@ -1,3 +1,4 @@
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import { Snowflake } from 'discord.js';
 import {
@@ -10,7 +11,6 @@ import {
   ViewEntity,
   PrimaryColumn,
   CreateDateColumn,
-  DeepPartial,
 } from 'typeorm';
 import { War } from 'src/game/war/war.entity';
 import { Catalog, ExpandedCatalog } from 'src/game/catalog/catalog.entity';
@@ -30,11 +30,6 @@ export type StockpileReportRecord = {
   ['Description']: string;
   ['CodeName']: string;
 };
-
-export type SelectStockpileEntry = DeepPartial<Pick<StockpileEntry, 'id'>>;
-export type InsertStockpileEntry = DeepPartial<
-  Omit<StockpileEntry, 'id' | 'log' | 'stockpile' | 'catalog' | 'war' | 'guild' | 'createdAt'>
->;
 
 @Entity('stockpile_entry')
 export class StockpileEntry {
@@ -284,3 +279,18 @@ export class CurrentStockpileEntry {
     return counts.length ? counts.join(' + ') : 'None';
   }
 }
+
+export class InsertStockpileEntryDto extends PartialType(
+  OmitType(StockpileEntry, [
+    'id',
+    'log',
+    'stockpile',
+    'catalog',
+    'war',
+    'guild',
+    'createdAt',
+  ] as const),
+) {}
+export class SelectStockpileEntryDto extends PartialType(
+  PickType(StockpileEntry, ['id'] as const),
+) {}

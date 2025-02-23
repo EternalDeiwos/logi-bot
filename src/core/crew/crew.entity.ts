@@ -1,3 +1,4 @@
+import { OmitType, IntersectionType, PickType, PartialType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
@@ -10,43 +11,16 @@ import {
   JoinColumn,
   Unique,
   DeleteDateColumn,
-  DeepPartial,
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Expose, Transform, Type } from 'class-transformer';
 import { CrewMemberAccess } from 'src/types';
-import { ForumTagTemplate } from 'src/core/tag/tag-template.entity';
 import { Ticket } from 'src/core/ticket/ticket.entity';
 import { Team } from 'src/core/team/team.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { CrewMember } from './member/crew-member.entity';
 import { CrewLog } from './log/crew-log.entity';
 import { CrewShare } from './share/crew-share.entity';
-
-export type InsertCrew = DeepPartial<
-  Omit<
-    Crew,
-    | 'id'
-    | 'guild'
-    | 'team'
-    | 'members'
-    | 'tags'
-    | 'tickets'
-    | 'logs'
-    | 'shared'
-    | 'createdAt'
-    | 'deletedAt'
-    | 'isDeleted'
-    | 'getCrewTag'
-    | 'getCrewOwner'
-  >
->;
-export type SelectCrewId = DeepPartial<Pick<Crew, 'id'>>;
-export type SelectCrewChannel = DeepPartial<Pick<Crew, 'crewSf'>>;
-export type SelectCrew = SelectCrewId & SelectCrewChannel;
-export type UpdateCrew = DeepPartial<Pick<Crew, 'hasMovePrompt' | 'isPermanent' | 'isSecureOnly'>>;
-export type DeleteCrew = SelectCrew & { deletedBySf?: Snowflake };
-export type ArchiveCrew = DeleteCrew & { archiveSf?: Snowflake; tag?: string };
 
 @Entity()
 @Unique('uk_guild_name_deleted_at', ['guildId', 'shortName', 'deletedAt'])
@@ -68,9 +42,10 @@ export class Crew {
   @Column({
     type: 'int8',
     name: 'crew_channel_sf',
+    nullable: true,
   })
   @Index('crew_channel_sf_idx_crew')
-  crewSf: Snowflake;
+  crewSf?: Snowflake;
 
   @Expose()
   @Column({ type: 'int8', name: 'voice_channel_sf', nullable: true })
@@ -118,13 +93,13 @@ export class Crew {
   slug: string;
 
   @Expose()
-  @Column({ type: 'int8', name: 'role_sf' })
+  @Column({ type: 'int8', name: 'role_sf', nullable: true })
   @Index('role_sf_idx_crew')
-  roleSf: Snowflake;
+  roleSf?: Snowflake;
 
   @Column({ type: 'int8', name: 'audit_message_sf', nullable: true })
   @Index('audit_message_sf_idx_crew')
-  auditMessageSf: Snowflake;
+  auditMessageSf?: Snowflake;
 
   @Expose()
   @Column({
@@ -147,6 +122,23 @@ export class Crew {
   @Expose()
   @Column({
     type: 'boolean',
+    name: 'is_pruning',
+    default: false,
+    comment: 'Crew will not be pruned',
+  })
+  disableAutomaticPruning: boolean;
+
+  @Column({
+    type: 'boolean',
+    name: 'require_voice_channel',
+    default: false,
+    comment: 'Crew will be created with a voice channel',
+  })
+  requireVoice: boolean;
+
+  @Expose()
+  @Column({
+    type: 'boolean',
     name: 'secure_only',
     default: true,
     comment: 'Crew information to be displayed only in private channels',
@@ -158,9 +150,6 @@ export class Crew {
   @Transform(({ value }) => (value ? value : null))
   @OneToMany(() => CrewMember, (member) => member.crew)
   members: CrewMember[];
-
-  @OneToMany(() => ForumTagTemplate, (tag) => tag.crew)
-  tags: ForumTagTemplate[];
 
   @Expose()
   @Type(() => Ticket)
@@ -185,6 +174,10 @@ export class Crew {
   createdBy: Snowflake;
 
   @Expose()
+  @Column({ type: 'int8', name: 'approved_by_sf', nullable: true })
+  approvedBy: Snowflake;
+
+  @Expose()
   @Column({ type: 'int8', name: 'deleted_by_sf', nullable: true })
   deletedBy: Snowflake;
 
@@ -196,13 +189,53 @@ export class Crew {
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
 
-  async getCrewTag() {
-    const tags = await this.team.tags;
-    return tags.find((tag) => tag.name === this.shortName);
-  }
-
   async getCrewOwner() {
     const members = await this.members;
     return members.find((member) => member.access === CrewMemberAccess.OWNER);
   }
+}
+
+export class InsertCrewDto extends PartialType(
+  OmitType(Crew, [
+    'id',
+    'guild',
+    'team',
+    'members',
+    'tickets',
+    'logs',
+    'shared',
+    'createdAt',
+    'deletedAt',
+    'processedAt',
+    'getCrewOwner',
+  ] as const),
+) {}
+export class SelectCrewIdDto extends PartialType(PickType(Crew, ['id'] as const)) {}
+export class SelectCrewChannelDto extends PartialType(PickType(Crew, ['crewSf'] as const)) {}
+export class SelectCrewDto extends IntersectionType(SelectCrewIdDto, SelectCrewChannelDto) {
+  static from(id: string): SelectCrewDto {
+    return /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.test(id)
+      ? { id }
+      : { crewSf: id };
+  }
+}
+export class UpdateCrewDto extends PartialType(
+  PickType(Crew, [
+    'crewSf',
+    'roleSf',
+    'voiceSf',
+    'auditMessageSf',
+    'hasMovePrompt',
+    'isPermanent',
+    'isSecureOnly',
+    'disableAutomaticPruning',
+  ] as const),
+) {}
+export class DeleteCrewDto extends SelectCrewDto {
+  deletedBySf?: Snowflake;
+  reason?: string;
+}
+export class ArchiveCrewDto extends DeleteCrewDto {
+  archiveSf?: Snowflake;
+  tag?: string;
 }

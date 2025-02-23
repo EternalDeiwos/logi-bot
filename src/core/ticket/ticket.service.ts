@@ -1,17 +1,15 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { uniq } from 'lodash';
-import { InsertResult } from 'typeorm';
+import { InsertResult, UpdateResult } from 'typeorm';
 import { GuildManager, PermissionsBitField, Snowflake } from 'discord.js';
 import { AuthError, InternalError, ValidationError } from 'src/errors';
+import { TicketTag } from 'src/types';
 import { DiscordService } from 'src/bot/discord.service';
 import { GuildService } from 'src/core/guild/guild.service';
-import { TagService, TicketTag } from 'src/core/tag/tag.service';
-import { SelectGuild } from 'src/core/guild/guild.entity';
-import { Team } from 'src/core/team/team.entity';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { CrewInfoPromptBuilder } from 'src/core/crew/crew-info.prompt';
 import { CrewService } from 'src/core/crew/crew.service';
-import { SelectCrewChannel } from 'src/core/crew/crew.entity';
-import { InsertTicket, SelectTicket, Ticket } from './ticket.entity';
+import { SelectCrewChannelDto } from 'src/core/crew/crew.entity';
+import { InsertTicketDto, SelectTicketDto, Ticket, UpdateTicketDto } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
 import { TicketUpdatePromptBuilder } from './ticket-update.prompt';
@@ -78,19 +76,26 @@ export const tagsRemoved: { [K in TicketTag]: TicketTag[] } = {
 
 export abstract class TicketService {
   abstract query(): TicketQueryBuilder;
-  abstract createTicket(crewRef: SelectCrewChannel, ticket?: InsertTicket): Promise<InsertResult>;
-  abstract moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket);
-  abstract deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake);
-  abstract updateTicket(ticket: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket>;
+  abstract createTicket(
+    crewRef: SelectCrewChannelDto,
+    ticket?: InsertTicketDto,
+  ): Promise<InsertResult>;
+  abstract moveTicket(ticketRef: SelectTicketDto, ticketOverride: InsertTicketDto);
+  abstract deleteTicket(ticketRef: SelectTicketDto, memberRef: Snowflake);
+  abstract updateTicket(
+    ticketRef: SelectTicketDto,
+    update: UpdateTicketDto,
+    reason?: string,
+  ): Promise<Ticket>;
 
   abstract sendIndividualStatus(
-    crewRef: SelectCrewChannel,
+    crewRef: SelectCrewChannelDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ): Promise<void>;
 
   abstract sendAllStatus(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ): Promise<void>;
@@ -105,7 +110,6 @@ export class TicketServiceImpl extends TicketService {
     private readonly discordService: DiscordService,
     private readonly guildService: GuildService,
     @Inject(forwardRef(() => CrewService)) private readonly crewService: CrewService,
-    private readonly tagService: TagService,
     private readonly ticketRepo: TicketRepository,
   ) {
     super();
@@ -115,14 +119,8 @@ export class TicketServiceImpl extends TicketService {
     return new TicketQueryBuilder(this.ticketRepo);
   }
 
-  async createTicket(crewRef: SelectCrewChannel, ticket?: InsertTicket) {
-    const crew = await this.crewService
-      .query()
-      .byCrew(crewRef)
-      .withTeam()
-      .withTeamTags()
-      .withTeamTagsTemplate()
-      .getOneOrFail();
+  async createTicket(crewRef: SelectCrewChannelDto, ticket?: InsertTicketDto) {
+    const crew = await this.crewService.query().byCrew(crewRef).withTeam().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const forum = await discordGuild.channels.fetch(crew.team.forumSf);
 
@@ -137,21 +135,6 @@ export class TicketServiceImpl extends TicketService {
     if (!ticket.updatedBy) {
       ticket.updatedBy = ticket.createdBy;
     }
-
-    const triageTag = crew.team?.tags?.find((tag) => tag.name === TicketTag.TRIAGE);
-    const crewTag = crew.team?.tags?.find((tag) => tag.name === crew.shortName);
-    const appliedTags: string[] = [];
-
-    if (triageTag) {
-      appliedTags.push(triageTag.tagSf);
-    }
-
-    if (crewTag) {
-      appliedTags.push(crewTag.tagSf);
-    }
-
-    const defaultTags = Team.getDefaultTags(crew.team?.tags);
-    appliedTags.push(...defaultTags);
 
     const prompt = new TicketInfoPromptBuilder().addTicketMessage(ticket, crew);
 
@@ -172,7 +155,6 @@ export class TicketServiceImpl extends TicketService {
     const thread = await forum.threads.create({
       name: ticket.name,
       message: prompt.build(),
-      appliedTags,
     });
 
     const result = await this.ticketRepo.insert({
@@ -184,7 +166,7 @@ export class TicketServiceImpl extends TicketService {
     return result;
   }
 
-  async moveTicket(ticketRef: SelectTicket, ticketOverride: InsertTicket) {
+  async moveTicket(ticketRef: SelectTicketDto, ticketOverride: InsertTicketDto) {
     const ticket = await this.query().withDeleted().byTicket(ticketRef).getOneOrFail();
     const targetCrew = await this.crewService
       .query()
@@ -201,10 +183,13 @@ export class TicketServiceImpl extends TicketService {
       },
     );
 
-    await this.updateTicket({ ...ticketRef, updatedBy: ticketOverride.updatedBy }, TicketTag.MOVED);
+    await this.updateTicket(ticketRef, {
+      updatedBy: ticketOverride.updatedBy,
+      state: TicketTag.MOVED,
+    });
   }
 
-  async deleteTicket(ticketRef: SelectTicket, memberRef: Snowflake) {
+  async deleteTicket(ticketRef: SelectTicketDto, memberRef: Snowflake) {
     const ticket = await this.ticketRepo.findOneOrFail({
       where: ticketRef,
       withDeleted: true,
@@ -234,20 +219,24 @@ export class TicketServiceImpl extends TicketService {
     return result;
   }
 
-  async updateTicket(data: InsertTicket, tag: TicketTag, reason?: string): Promise<Ticket> {
-    if (!data.updatedBy) {
+  async updateTicket(
+    ticketRef: SelectTicketDto,
+    update: UpdateTicketDto,
+    reason?: string,
+  ): Promise<Ticket> {
+    if (!update.updatedBy) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Ticket updates must provide updatedBy');
     }
 
     const ticket = await this.query()
       .withDeleted()
-      .byTicket({ threadSf: data.threadSf })
+      .byTicket(ticketRef)
       .withCrew()
       .withTeam()
       .getOneOrFail();
 
     const discordGuild = await this.guildManager.fetch(ticket.guild.guildSf);
-    const member = await discordGuild.members.fetch(data.updatedBy);
+    const member = await discordGuild.members.fetch(update.updatedBy);
     const forum = await discordGuild.channels.fetch(ticket.crew.team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
@@ -256,26 +245,22 @@ export class TicketServiceImpl extends TicketService {
 
     const thread = await forum.threads.fetch(ticket.threadSf);
 
-    const result = await this.ticketRepo.updateReturning(
-      { threadSf: data.threadSf },
-      { ...data, updatedAt: new Date() },
-    );
+    const result = await this.ticketRepo.updateReturning(ticketRef, {
+      ...update,
+      updatedAt: new Date(),
+    });
 
-    const tags = await this.tagService.queryTag().byTeam({ id: ticket.crew.teamId }).getMany();
-    const tagSnowflakeMap = Team.getSnowflakeMap(tags);
-    const tagsRemovedSf = tagsRemoved[tag].map((tagName) => tagSnowflakeMap[tagName]);
-    const tagAdd = tagSnowflakeMap[tag];
     const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(
       member,
       ticket,
-      tag,
+      update.state,
       reason,
     );
 
     await thread.send(prompt.build());
 
     const starterMessage = await thread.fetchStarterMessage();
-    switch (tag) {
+    switch (update.state) {
       case TicketTag.TRIAGE:
         await starterMessage.edit(
           new TicketInfoPromptBuilder()
@@ -297,6 +282,7 @@ export class TicketServiceImpl extends TicketService {
         await starterMessage.edit({
           components: [],
         });
+        await this.deleteTicket(ticketRef, update.updatedBy);
         break;
 
       case TicketTag.IN_PROGRESS:
@@ -316,20 +302,9 @@ export class TicketServiceImpl extends TicketService {
         break;
     }
 
-    try {
-      await thread.setAppliedTags(
-        uniq([...thread.appliedTags.filter((tag) => !tagsRemovedSf.includes(tag)), tagAdd]),
-      );
-    } catch (err) {
-      this.logger.error(
-        `Failed to apply tags to ${ticket.name} in ${discordGuild.name}: ${err.message}`,
-        err.stack,
-      );
-    }
-
     if (
       [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.IN_PROGRESS].includes(
-        tag,
+        update.state,
       ) &&
       member.id !== ticket.createdBy
     ) {
@@ -351,7 +326,7 @@ export class TicketServiceImpl extends TicketService {
   }
 
   public async sendIndividualStatus(
-    crewRef: SelectCrewChannel,
+    crewRef: SelectCrewChannelDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
@@ -389,7 +364,7 @@ export class TicketServiceImpl extends TicketService {
   }
 
   public async sendAllStatus(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {

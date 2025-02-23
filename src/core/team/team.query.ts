@@ -1,6 +1,6 @@
 import { Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectTeam, Team } from './team.entity';
+import { SelectTeamDto, Team } from './team.entity';
 
 export class TeamQueryBuilder extends CommonQueryBuilder<Team> {
   constructor(repo: Repository<Team>) {
@@ -8,18 +8,13 @@ export class TeamQueryBuilder extends CommonQueryBuilder<Team> {
     this.qb.leftJoinAndSelect('team.guild', 'guild');
   }
 
-  byTeam(teamRef: SelectTeam) {
+  byTeam(teamRef: SelectTeamDto) {
     this.qb.andWhere('team.id=:id', teamRef);
     return this;
   }
 
   search(query: string) {
     this.qb.andWhere('team.name ILIKE :query', { query: `%${query}%` });
-    return this;
-  }
-
-  withTags() {
-    this.qb.leftJoinAndSelect('team.tags', 'tag').leftJoinAndSelect('tag.template', 'template');
     return this;
   }
 

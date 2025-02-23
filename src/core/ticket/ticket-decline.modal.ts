@@ -1,8 +1,8 @@
 import { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { SelectTicket } from './ticket.entity';
+import { SelectTicketDto } from './ticket.entity';
 
 export class TicketDeclineModalBuilder extends ModalBuilder {
-  addForm(ticketRef: SelectTicket) {
+  addForm(ticketRef: SelectTicketDto) {
     const reason = new TextInputBuilder()
       .setCustomId('ticket/decline/reason')
       .setLabel('Reason')

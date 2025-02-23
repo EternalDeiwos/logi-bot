@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BotModule } from 'src/bot/bot.module';
 import { RMQModule } from 'src/rmq/rmq.module';
@@ -8,8 +8,6 @@ import { GuildModule } from './guild/guild.module';
 import { Team } from './team/team.entity';
 import { Crew } from './crew/crew.entity';
 import { CrewMember } from './crew/member/crew-member.entity';
-import { ForumTag } from './tag/tag.entity';
-import { ForumTagTemplate } from './tag/tag-template.entity';
 import { Ticket } from './ticket/ticket.entity';
 import { CrewLog } from './crew/log/crew-log.entity';
 import { Guild } from './guild/guild.entity';
@@ -28,34 +26,21 @@ import { CrewLogRepository } from './crew/log/crew-log.repository';
 import { CrewShareService, CrewShareServiceImpl } from './crew/share/crew-share.service';
 import { CrewShareRepository } from './crew/share/crew-share.repository';
 import { CrewController } from './crew/crew.controller';
-import { TagService, TagServiceImpl } from './tag/tag.service';
-import { TagCommand } from './tag/tag.command';
-import { TagRepository } from './tag/tag.repository';
-import { TagTemplateRepository } from './tag/tag-template.repository';
 import { TicketService, TicketServiceImpl } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
 import { TicketRepository } from './ticket/ticket.repository';
 import { TicketController } from './ticket/ticket.controller';
 import { AccessModule } from './access/access.module';
+import { CrewDiscordActionsResponseConsumer } from './crew/crew-discord-actions-response.consumer';
 
 @Module({
   imports: [
     RMQModule,
     BotModule,
-    GuildModule,
+    forwardRef(() => GuildModule),
     ApiModule,
     AccessModule,
-    TypeOrmModule.forFeature([
-      Team,
-      Crew,
-      CrewMember,
-      ForumTag,
-      ForumTagTemplate,
-      Ticket,
-      CrewLog,
-      Guild,
-      CrewShare,
-    ]),
+    TypeOrmModule.forFeature([Team, Crew, CrewMember, Ticket, CrewLog, Guild, CrewShare]),
     WarModule,
   ],
   providers: [
@@ -67,17 +52,14 @@ import { AccessModule } from './access/access.module';
     CrewMemberRepository,
     CrewLogRepository,
     CrewShareRepository,
-    TagCommand,
-    TagRepository,
-    TagTemplateRepository,
     TicketCommand,
     TicketRepository,
+    CrewDiscordActionsResponseConsumer,
     { provide: TeamService, useClass: TeamServiceImpl },
     { provide: CrewService, useClass: CrewServiceImpl },
     { provide: CrewMemberService, useClass: CrewMemberServiceImpl },
     { provide: CrewLogService, useClass: CrewLogServiceImpl },
     { provide: CrewShareService, useClass: CrewShareServiceImpl },
-    { provide: TagService, useClass: TagServiceImpl },
     { provide: TicketService, useClass: TicketServiceImpl },
   ],
   controllers: [CrewController, TicketController],
@@ -89,7 +71,6 @@ import { AccessModule } from './access/access.module';
     CrewMemberService,
     CrewLogService,
     CrewShareService,
-    TagService,
     TicketService,
   ],
 })

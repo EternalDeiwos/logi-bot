@@ -1,8 +1,8 @@
 import { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { SelectCrew } from './crew.entity';
+import { SelectCrewDto } from './crew.entity';
 
 export class CrewLogModalBuilder extends ModalBuilder {
-  addForm(crewRef: SelectCrew) {
+  addForm(crewRef: SelectCrewDto) {
     const log = new TextInputBuilder()
       .setCustomId('crew/log/content')
       .setLabel('Crew Status')

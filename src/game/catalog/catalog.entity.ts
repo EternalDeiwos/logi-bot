@@ -1,18 +1,7 @@
+import { PartialType, PickType } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
-import {
-  Entity,
-  Column,
-  Unique,
-  CreateDateColumn,
-  ViewEntity,
-  PrimaryColumn,
-  DeepPartial,
-} from 'typeorm';
+import { Entity, Column, Unique, CreateDateColumn, ViewEntity, PrimaryColumn } from 'typeorm';
 import { WarFaction } from 'src/game/war/war.entity';
-
-export type SelectCatalog = DeepPartial<
-  Pick<Catalog, 'id' | 'gameVersion' | 'catalogVersion' | 'name'>
->;
 
 export const CatalogCategoryNameMap = {
   ['EItemProfileType::Accessory']: 'Infantry Wearable',
@@ -242,3 +231,7 @@ export class ExpandedCatalog {
   @Expose()
   createdAt: Date;
 }
+
+export class SelectCatalogDto extends PartialType(
+  PickType(Catalog, ['id', 'gameVersion', 'catalogVersion', 'name'] as const),
+) {}

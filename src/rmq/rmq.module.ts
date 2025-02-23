@@ -25,6 +25,7 @@ import { ErrorTraceConsumer } from './error.consumer';
             {
               name: 'discord',
             },
+            { name: 'crew' },
             {
               name: 'stockpile',
             },

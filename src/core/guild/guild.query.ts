@@ -1,15 +1,16 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { Guild, SelectGuild } from 'src/core/guild/guild.entity';
+import { Guild, SelectGuildDto } from 'src/core/guild/guild.entity';
 
 export class GuildQueryBuilder extends CommonQueryBuilder<Guild> {
   private excludeDiscriminator = 0;
 
   constructor(repo: Repository<Guild>) {
     super(repo, 'guild');
+    this.qb.leftJoinAndSelect('guild.settings', 'setting');
   }
 
-  byGuild(guildRef: SelectGuild | SelectGuild[]) {
+  byGuild(guildRef: SelectGuildDto | SelectGuildDto[]) {
     if (!Array.isArray(guildRef)) {
       guildRef = [guildRef];
     }
@@ -44,7 +45,7 @@ export class GuildQueryBuilder extends CommonQueryBuilder<Guild> {
     return this;
   }
 
-  exclude(guildRef: SelectGuild | SelectGuild[]) {
+  exclude(guildRef: SelectGuildDto | SelectGuildDto[]) {
     if (Array.isArray(guildRef)) {
       guildRef.forEach((guildRef) => this.exclude(guildRef));
     } else {
@@ -56,6 +57,11 @@ export class GuildQueryBuilder extends CommonQueryBuilder<Guild> {
       }
     }
 
+    return this;
+  }
+
+  withAccessRules() {
+    this.qb.leftJoinAndSelect('guild.access', 'access').leftJoinAndSelect('access.rule', 'rule');
     return this;
   }
 

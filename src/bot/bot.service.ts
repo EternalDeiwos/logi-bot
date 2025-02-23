@@ -6,6 +6,7 @@ import { AutocompleteInteraction, Interaction, InteractionReplyOptions } from 'd
 import { ArrayOrElement, ConsumerResponsePayload, DiscordAPIInteraction } from 'src/types';
 import { ConsumerResponseError, BaseError } from 'src/errors';
 import { ErrorEmbed } from './embed';
+import { DiscordAction, DiscordActionType } from './discord-actions.consumer';
 
 export type CommandInteraction = Exclude<Interaction, AutocompleteInteraction>;
 export type Reply =
@@ -36,6 +37,11 @@ export abstract class BotService {
     exchange: string,
     routingKey: string,
     data?: T,
+  ): Promise<void>;
+
+  abstract publishDiscordAction<T extends DiscordActionType = DiscordActionType>(
+    action: DiscordAction & { type: T },
+    options?: Parameters<AmqpConnection['publish']>[3],
   ): Promise<void>;
 }
 
@@ -182,6 +188,22 @@ export class BotServiceImpl extends BotService {
       correlationId: interaction.id,
       expiration,
     });
+
+    if (!result) {
+      throw new BaseError('INTERNAL_SERVER_ERROR', 'Failed to publish message to queue', {
+        exchange,
+        routingKey,
+      });
+    }
+  }
+
+  public async publishDiscordAction(
+    action: DiscordAction,
+    options?: Parameters<AmqpConnection['publish']>[3],
+  ): Promise<void> {
+    const exchange = 'discord';
+    const routingKey = `action.${action.type}`;
+    const result = await this.rmq.publish(exchange, routingKey, action, options);
 
     if (!result) {
       throw new BaseError('INTERNAL_SERVER_ERROR', 'Failed to publish message to queue', {

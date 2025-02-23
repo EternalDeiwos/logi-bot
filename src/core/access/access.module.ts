@@ -14,7 +14,7 @@ import { AccessEntryController } from './access.controller';
   imports: [
     ApiModule,
     BotModule,
-    GuildModule,
+    forwardRef(() => GuildModule),
     forwardRef(() => CoreModule),
     TypeOrmModule.forFeature([AccessEntry]),
   ],

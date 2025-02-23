@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CommonRepository } from 'src/database/util';
-import { Team } from './team.entity';
+import { GuildAccess } from './guild-access.entity';
 
 @Injectable()
-export class TeamRepository extends CommonRepository<Team> {
+export class GuildAccessRepository extends CommonRepository<GuildAccess> {
   constructor(private readonly dataSource: DataSource) {
-    super(Team, dataSource.createEntityManager());
+    super(GuildAccess, dataSource.createEntityManager());
   }
 }

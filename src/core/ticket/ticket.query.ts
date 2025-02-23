@@ -1,6 +1,6 @@
 import { Brackets, Repository } from 'typeorm';
 import { CommonQueryBuilder } from 'src/database/util';
-import { SelectTicket, Ticket } from './ticket.entity';
+import { SelectTicketDto, Ticket } from './ticket.entity';
 
 export class TicketQueryBuilder extends CommonQueryBuilder<Ticket> {
   constructor(repo: Repository<Ticket>) {
@@ -11,7 +11,7 @@ export class TicketQueryBuilder extends CommonQueryBuilder<Ticket> {
       .leftJoinAndSelect('ticket.previous', 'previous');
   }
 
-  byTicket(ticketRef: SelectTicket | SelectTicket[]) {
+  byTicket(ticketRef: SelectTicketDto | SelectTicketDto[]) {
     if (!Array.isArray(ticketRef)) {
       ticketRef = [ticketRef];
     }
@@ -28,7 +28,7 @@ export class TicketQueryBuilder extends CommonQueryBuilder<Ticket> {
     this.qb.andWhere(
       new Brackets((qb) => {
         if (params.ids.length) {
-          qb.where(`${this.alias}.ticket_id IN (:...ids)`);
+          qb.where(`${this.alias}.id IN (:...ids)`);
         }
 
         if (params.threads.length) {

@@ -49,7 +49,7 @@ export class StockpileController {
       .query()
       .withGuild()
       .withPoi()
-      .withEntries()
+      .withCurrentEntries()
       .withAccessRules()
       .withoutNilEntries()
       .withCatalog()

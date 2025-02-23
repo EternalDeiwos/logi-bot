@@ -1,28 +1,20 @@
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import {
   Entity,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Unique,
-  DeepPartial,
   OneToMany,
   PrimaryColumn,
 } from 'typeorm';
 import { Expose } from 'class-transformer';
+import { AccessMode } from 'src/types';
 import { CrewShare } from 'src/core/crew/share/crew-share.entity';
+import { GuildAccess, GuildAction } from './guild-access.entity';
+import { GuildSetting, GuildSettingName } from './guild-setting.entity';
 
-export type InsertGuild = DeepPartial<Omit<Guild, 'createdAt' | 'deletedAt'>>;
-export type SelectGuild = DeepPartial<Pick<Guild, 'id' | 'guildSf'>>;
-export type GuildConfig = {
-  crewAuditChannel?: string;
-  globalLogChannel?: string;
-  globalVoiceCategory?: string;
-  ticketTriageCrew?: string;
-  crewCreatorRole?: string;
-  crewViewerRole?: string;
-  crewLeaderRole?: string;
-  stockpileLogChannel?: string;
-};
+export type GuildConfig = Partial<Record<GuildSettingName, string>>;
 
 @Entity()
 @Unique('uk_guild_sf_deleted_at', ['guildSf', 'deletedAt'])
@@ -50,11 +42,16 @@ export class Guild {
   @Column({ name: 'icon', nullable: true })
   icon?: string;
 
-  @Column({ type: 'jsonb', default: {} })
-  config: GuildConfig;
-
   @OneToMany(() => CrewShare, (share) => share.guild)
-  shared: Promise<CrewShare[]>;
+  shared: CrewShare[];
+
+  @Expose()
+  @OneToMany(() => GuildAccess, (access) => access.guild)
+  access: GuildAccess[];
+
+  @Expose()
+  @OneToMany(() => GuildSetting, (setting) => setting.guild)
+  settings: GuildSetting[];
 
   @Expose()
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
@@ -63,4 +60,20 @@ export class Guild {
   @Expose()
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt: Date;
+
+  getConfig() {
+    return this.settings.reduce((config, current) => {
+      config[current.name] = current.value;
+      return config;
+    }, {} as GuildConfig);
+  }
+
+  getAccessRulesForAction(action: GuildAction, access: AccessMode = AccessMode.READ) {
+    return this.access.filter((rule) => rule.action === action && rule.access <= access);
+  }
 }
+
+export class InsertGuildDto extends PartialType(
+  OmitType(Guild, ['createdAt', 'deletedAt', 'shared', 'access', 'settings'] as const),
+) {}
+export class SelectGuildDto extends PartialType(PickType(Guild, ['id', 'guildSf'] as const)) {}

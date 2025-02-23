@@ -3,11 +3,10 @@ import { GuildBasedChannel, GuildManager, Snowflake } from 'discord.js';
 import { InsertResult } from 'typeorm';
 import { InternalError } from 'src/errors';
 import { CrewService } from 'src/core/crew/crew.service';
-import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
-import { CrewLogRepository } from './crew-log.repository';
-import { InsertCrewLog } from './crew-log.entity';
-import { CrewLogPromptBuilder } from './crew-log.prompt';
 import { WarService } from 'src/game/war/war.service';
+import { CrewLogRepository } from './crew-log.repository';
+import { InsertCrewLogDto } from './crew-log.entity';
+import { CrewLogPromptBuilder } from './crew-log.prompt';
 
 export abstract class CrewLogService {
   /**
@@ -20,7 +19,7 @@ export abstract class CrewLogService {
   abstract addCrewLog(
     channelRef: Snowflake,
     memberRef: Snowflake,
-    data: InsertCrewLog,
+    data: InsertCrewLogDto,
   ): Promise<InsertResult>;
 }
 
@@ -31,15 +30,18 @@ export class CrewLogServiceImpl extends CrewLogService {
   constructor(
     private readonly guildManager: GuildManager,
     private readonly crewService: CrewService,
-    private readonly memberService: CrewMemberService,
     private readonly warService: WarService,
     private readonly logRepo: CrewLogRepository,
   ) {
     super();
   }
 
-  async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLog) {
-    const crew = await this.crewService.query().byCrew({ crewSf: channelRef }).getOneOrFail();
+  async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLogDto) {
+    const crew = await this.crewService
+      .query()
+      .byCrew({ crewSf: channelRef })
+      .withGuildSettings()
+      .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
     const war = await this.warService.query().byCurrent().getOneOrFail();
@@ -48,7 +50,7 @@ export class CrewLogServiceImpl extends CrewLogService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
-    const member = await this.memberService.resolveGuildMember(memberRef, channelRef);
+    const member = await discordGuild.members.fetch(memberRef);
     const createdAt = new Date();
 
     const prompt = new CrewLogPromptBuilder()
@@ -59,10 +61,10 @@ export class CrewLogServiceImpl extends CrewLogService {
       prompt.clone<CrewLogPromptBuilder>().addCrewMention(crew).build(),
     );
 
-    if (crew.guild?.config?.globalLogChannel) {
+    if (crew.guild?.getConfig()['guild.log_channel']) {
       let logChannel: GuildBasedChannel;
       try {
-        logChannel = await discordGuild.channels.fetch(crew.guild.config.globalLogChannel);
+        logChannel = await discordGuild.channels.fetch(crew.guild.getConfig()['guild.log_channel']);
         if (logChannel && logChannel.isTextBased()) {
           await logChannel.send(prompt.build());
         }

@@ -1,3 +1,4 @@
+import { PickType } from '@nestjs/swagger';
 import { Expose } from 'class-transformer';
 import { Snowflake } from 'discord.js';
 import {
@@ -10,7 +11,6 @@ import {
   PrimaryColumn,
   CreateDateColumn,
 } from 'typeorm';
-
 import { Counter } from './counter.entity';
 
 @Entity('counter_entry')
@@ -49,3 +49,10 @@ export class CounterEntry {
   @Expose()
   createdAt: Date;
 }
+
+export class SelectCounterEntryDto extends PickType(CounterEntry, ['id'] as const) {}
+export class InsertCounterEntryDto extends PickType(CounterEntry, [
+  'counterId',
+  'value',
+  'createdBy',
+] as const) {}

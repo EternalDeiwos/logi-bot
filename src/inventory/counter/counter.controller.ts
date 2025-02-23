@@ -18,10 +18,9 @@ import { AuthGuard } from 'src/core/api/auth.guard';
 import { Auth } from 'src/core/api/auth.decorator';
 import { APITokenPayload } from 'src/core/api/api.service';
 import { GuildService } from 'src/core/guild/guild.service';
-import { InsertCounterEntryDto } from './dto/insert-counter-entry.dto';
-import { InsertCounterDto } from './dto/insert-counter.dto';
+import { CurrentCounter, InsertCounterDto } from './counter.entity';
+import { InsertCounterEntryDto } from './counter-entry.entity';
 import { CounterService } from './counter.service';
-import { CurrentCounter } from './counter.entity';
 
 @ApiTags('counter')
 @ApiBearerAuth()

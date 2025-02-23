@@ -1,3 +1,4 @@
+import { PickType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import { Snowflake } from 'discord.js';
 import {
@@ -9,14 +10,11 @@ import {
   JoinColumn,
   PrimaryColumn,
   CreateDateColumn,
-  DeepPartial,
   DeleteDateColumn,
   Unique,
 } from 'typeorm';
 import { AccessEntry } from 'src/core/access/access.entity';
 import { Counter } from './counter.entity';
-
-export type SelectCounterAccess = DeepPartial<Pick<CounterAccess, 'id'>>;
 
 @Entity('counter_access')
 @Unique('uk_rule_counter_deleted_at', ['ruleId', 'counterId', 'deletedAt'])
@@ -70,3 +68,10 @@ export class CounterAccess {
   @Expose()
   deletedAt: Date;
 }
+
+export class SelectCounterAccessDto extends PickType(CounterAccess, ['id'] as const) {}
+export class InsertCounterAccessDto extends PickType(CounterAccess, [
+  'ruleId',
+  'counterId',
+  'createdBy',
+] as const) {}

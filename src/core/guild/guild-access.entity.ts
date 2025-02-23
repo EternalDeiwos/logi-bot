@@ -15,26 +15,36 @@ import {
 } from 'typeorm';
 import { AccessMode } from 'src/types';
 import { AccessEntry } from 'src/core/access/access.entity';
-import { Stockpile } from './stockpile.entity';
+import { Guild } from './guild.entity';
 
-@Entity('stockpile_access')
-@Unique('uk_rule_stockpile_deleted_at', ['ruleId', 'stockpileId', 'deletedAt'])
-export class StockpileAccess {
+export enum GuildAction {
+  GUILD_SETTING_MANAGE = 'guild.setting.manage',
+  CREW_MANAGE = 'crew.manage',
+  STOCKPILE_MANAGE = 'stockpile.manage',
+}
+
+@Entity('guild_access')
+@Unique('uk_access_rule_guild_deleted_at', ['ruleId', 'guildId', 'deletedAt'])
+export class GuildAccess {
   @PrimaryColumn({
     type: 'uuid',
     default: () => 'uuidv7()',
-    primaryKeyConstraintName: 'pk_stockpile_access_id',
+    primaryKeyConstraintName: 'pk_guild_access_id',
   })
   @Expose()
   id: string;
+
+  @Expose()
+  @Column({ type: 'enum', enum: GuildAction })
+  action: GuildAction;
 
   @Expose()
   @Column({ type: 'enum', enum: AccessMode, default: AccessMode.READ })
   access: AccessMode;
 
   @Column({ name: 'rule_id', type: 'uuid' })
-  @RelationId((entry: StockpileAccess) => entry.rule)
-  @Index('rule_id_idx_stockpile_access')
+  @RelationId((entry: GuildAccess) => entry.rule)
+  @Index('rule_id_idx_guild_access')
   ruleId: string;
 
   @ManyToOne(() => AccessEntry, { onDelete: 'RESTRICT' })
@@ -44,22 +54,22 @@ export class StockpileAccess {
   @JoinColumn({
     name: 'rule_id',
     referencedColumnName: 'id',
-    foreignKeyConstraintName: 'fk_stockpile_access_rule_id',
+    foreignKeyConstraintName: 'fk_guild_access_rule_id',
   })
   rule: AccessEntry;
 
-  @Column({ name: 'stockpile_id', type: 'uuid' })
-  @RelationId((entry: StockpileAccess) => entry.stockpile)
-  @Index('stockpile_id_idx_stockpile_access')
-  stockpileId: string;
+  @Column({ name: 'guild_id', type: 'uuid' })
+  @RelationId((entry: GuildAccess) => entry.guild)
+  @Index('guild_id_idx_guild_access')
+  guildId: string;
 
-  @ManyToOne(() => Stockpile, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Guild, { onDelete: 'CASCADE' })
   @JoinColumn({
-    name: 'stockpile_id',
+    name: 'guild_id',
     referencedColumnName: 'id',
-    foreignKeyConstraintName: 'fk_stockpile_access_stockpile_id',
+    foreignKeyConstraintName: 'fk_guild_access_guild_id',
   })
-  stockpile: Stockpile;
+  guild: Guild;
 
   @Column({ type: 'int8', name: 'created_by_sf' })
   @Expose()
@@ -74,11 +84,11 @@ export class StockpileAccess {
   deletedAt: Date;
 }
 
-export class SelectStockpileAccessDto extends PickType(StockpileAccess, ['id'] as const) {}
-export class InsertStockpileAccessDto extends OmitType(StockpileAccess, [
+export class InsertGuildAccessDto extends OmitType(GuildAccess, [
   'id',
-  'stockpile',
+  'guild',
   'rule',
-  'createdAt',
   'deletedAt',
-] as const) {}
+  'createdAt',
+]) {}
+export class SelectGuildAccessDto extends PickType(GuildAccess, ['id']) {}

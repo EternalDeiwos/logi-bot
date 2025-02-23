@@ -1,12 +1,11 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { UpdateResult } from 'typeorm';
+import { InsertResult, UpdateResult } from 'typeorm';
 import {
   CategoryChannel,
   ChannelType,
   Client,
   DiscordAPIError,
   GuildManager,
-  GuildTextBasedChannel,
   OverwriteResolvable,
   PermissionsBitField,
   Snowflake,
@@ -20,49 +19,54 @@ import {
   InternalError,
   ValidationError,
 } from 'src/errors';
-import { CrewMemberAccess } from 'src/types';
+import { CrewMemberAccess, TicketTag } from 'src/types';
 import { DiscordService } from 'src/bot/discord.service';
-import { SelectGuild } from 'src/core/guild/guild.entity';
+import { BotService } from 'src/bot/bot.service';
+import { DiscordActionTarget, DiscordActionType } from 'src/bot/discord-actions.consumer';
+import { SelectGuildDto } from 'src/core/guild/guild.entity';
+import { GuildSettingName } from 'src/core/guild/guild-setting.entity';
 import { TeamService } from 'src/core/team/team.service';
-import { SelectTeam } from 'src/core/team/team.entity';
-import { TagService, TicketTag } from 'src/core/tag/tag.service';
+import { SelectTeamDto } from 'src/core/team/team.entity';
 import { TicketService } from 'src/core/ticket/ticket.service';
 import { AccessService } from 'src/core/access/access.service';
 import { AccessRuleMode } from 'src/core/access/access-rule';
-import { AccessEntry, AccessRuleType, SelectAccessEntry } from 'src/core/access/access.entity';
 import { WarService } from 'src/game/war/war.service';
-import { ArchiveCrew, Crew, InsertCrew, SelectCrew, UpdateCrew } from './crew.entity';
+import { AccessEntry, AccessRuleType, SelectAccessEntryDto } from 'src/core/access/access.entity';
+import { ArchiveCrewDto, Crew, InsertCrewDto, SelectCrewDto, UpdateCrewDto } from './crew.entity';
 import { CrewRepository } from './crew.repository';
 import { CrewMemberService } from './member/crew-member.service';
 import { CrewAuditPromptBuilder } from './crew-audit.prompt';
 import { CrewInfoPromptBuilder } from './crew-info.prompt';
 import { CrewStatusPromptBuilder } from './crew-status.prompt';
 import { CrewQueryBuilder } from './crew.query';
+import { CrewMember } from './member/crew-member.entity';
 
 type RegisterCrewOptions = Partial<{
   createVoice: boolean;
+  skipApproval: boolean;
 }>;
 
 export abstract class CrewService {
   abstract query(): CrewQueryBuilder;
-  abstract registerCrew(data: InsertCrew, options?: RegisterCrewOptions): Promise<Crew>;
+  abstract registerCrew(data: InsertCrewDto, options?: RegisterCrewOptions): Promise<InsertResult>;
+  abstract reconcileCrew(crewRef: SelectCrewDto): Promise<void>;
   abstract deregisterCrew(
-    channelRef: Snowflake,
+    crewRef: SelectCrewDto,
     memberRef: Snowflake,
-    options?: ArchiveCrew,
+    options?: ArchiveCrewDto,
   ): Promise<Crew | undefined>;
-  abstract updateCrew(channelRef: Snowflake, update: UpdateCrew): Promise<UpdateResult>;
+  abstract updateCrew(crewRef: SelectCrewDto, update: UpdateCrewDto): Promise<UpdateResult>;
   abstract sendIndividualStatus(
-    crewRef: SelectCrew,
+    crewRef: SelectCrewDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ): Promise<void>;
   abstract sendAllStatus(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ): Promise<void>;
-  abstract crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel): Promise<void>;
+  abstract queueSendCrewInfo(crew: Crew): Promise<void>;
   abstract getOrCreateDefaultCrewAccessRule(crew: Crew): Promise<AccessEntry>;
 }
 
@@ -74,13 +78,13 @@ export class CrewServiceImpl extends CrewService {
     private readonly client: Client,
     private readonly guildManager: GuildManager,
     private readonly discordService: DiscordService,
+    private readonly botService: BotService,
     private readonly teamService: TeamService,
-    private readonly tagService: TagService,
     @Inject(forwardRef(() => TicketService)) private readonly ticketService: TicketService,
-    private readonly memberService: CrewMemberService,
+    @Inject(forwardRef(() => CrewMemberService)) private readonly memberService: CrewMemberService,
     private readonly crewRepo: CrewRepository,
     private readonly warService: WarService,
-    private readonly accessService: AccessService,
+    @Inject(forwardRef(() => AccessService)) private readonly accessService: AccessService,
   ) {
     super();
   }
@@ -89,8 +93,8 @@ export class CrewServiceImpl extends CrewService {
     return new CrewQueryBuilder(this.crewRepo);
   }
 
-  async registerCrew(data: InsertCrew, options: RegisterCrewOptions = {}) {
-    const teamRef: SelectTeam = { id: data.teamId };
+  async registerCrew(data: InsertCrewDto, options: RegisterCrewOptions = { skipApproval: false }) {
+    const teamRef: SelectTeamDto = { id: data.teamId };
     const team = await this.teamService.query().byTeam(teamRef).getOneOrFail();
     const discordGuild = await this.guildManager.fetch(team.guild.guildSf);
     const category = await discordGuild.channels.fetch(team.categorySf);
@@ -117,14 +121,6 @@ export class CrewServiceImpl extends CrewService {
       ).asDisplayable();
     }
 
-    const knownTags = Object.values(TicketTag).map((t) => t.toLowerCase());
-    if (knownTags.includes(data.shortName.toLowerCase())) {
-      throw new ValidationError(
-        'VALIDATION_FAILED',
-        `_${data.shortName}_ is a reserved name. Please choose something else.`,
-      ).asDisplayable();
-    }
-
     const usedRoles = await discordGuild.roles.fetch();
     if (usedRoles.find((role) => role.name.toLowerCase() === data.shortName.toLowerCase())) {
       throw new ValidationError(
@@ -133,35 +129,113 @@ export class CrewServiceImpl extends CrewService {
       ).asDisplayable();
     }
 
-    if (
-      await this.tagService
-        .queryTemplate()
-        .byGuild({ guildSf: discordGuild.id })
-        .search(data.shortName)
-        .getExists()
-    ) {
-      throw new ValidationError(
-        'VALIDATION_FAILED',
-        `A forum tag named _${data.shortName}_ already exists for this guild. Please choose something else.`,
-      ).asDisplayable();
+    if (!data.hasMovePrompt && data.hasMovePrompt !== false) {
+      data.hasMovePrompt = false;
     }
 
-    const role = await this.discordService.ensureRole(team.guild.guildSf, data.roleSf, {
-      name: data.shortName,
-    });
+    const crew = this.crewRepo.create(
+      Object.assign(data, {
+        guildId: team.guildId,
+        teamId: team.id,
+        requireVoice: options.createVoice,
+      }),
+    );
 
-    const prefixes = {
-      Colonial: '🟢',
-      Warden: '🔵',
-    };
+    if (options.skipApproval) {
+      crew.approvedBy = data.createdBy;
+    }
 
-    let prefix = '';
-    for (const [search, value] of Object.entries(prefixes)) {
-      if (category.name.toLowerCase().startsWith(search.toLowerCase())) {
-        prefix = value;
-        break;
+    const result = await this.crewRepo.insert(crew);
+    const {
+      identifiers: [crewRef],
+    } = result;
+
+    try {
+      await this.memberService.registerCrewMember(crewRef, crew.createdBy, CrewMemberAccess.OWNER);
+    } catch (err) {
+      this.logger.error(
+        `Crew was created successfully but failed to register crew member: ${err.message}`,
+        err.stack,
+      );
+    }
+
+    await this.reconcileCrew(crewRef);
+
+    return result;
+  }
+
+  public async reconcileCrew(crewRef: SelectCrewDto) {
+    const crew = await this.query()
+      .byCrew(crewRef)
+      .withTeam()
+      .withMembers()
+      .withGuildSettings()
+      .getOneOrFail();
+
+    if (!crew.approvedBy) {
+      return this.queueEnsureApprovalPrompt(crew);
+    } else if (!crew.auditMessageSf) {
+      await this.queueEnsureAuditPrompt(crew);
+    }
+
+    if (!crew.roleSf) {
+      return this.queueEnsureRole(crew);
+    }
+
+    if (!crew.crewSf || (!crew.voiceSf && crew.requireVoice)) {
+      for (const member of crew.members) {
+        member.crew = crew;
+        await this.queueEnsureMemberRole(member);
       }
+      return this.queueEnsureChannels(crew);
     }
+
+    await this.queueSendCrewInfo(crew);
+  }
+
+  private async queueEnsureRole(crew: Crew) {
+    await this.botService.publishDiscordAction({
+      type: DiscordActionType.ENSURE_ROLE,
+      guildSf: crew.guild.guildSf,
+      role: { id: crew.roleSf, name: crew.shortName },
+      target: { type: DiscordActionTarget.CREW, crewId: crew.id, field: 'roleSf' },
+    });
+  }
+
+  private async queueEnsureMemberRole(member: CrewMember) {
+    if (!member.crew.roleSf) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Crew role does not exist');
+    }
+
+    await this.botService.publishDiscordAction({
+      type: DiscordActionType.ASSIGN_ROLE,
+      guildSf: member.crew.guild.guildSf,
+      roleSf: member.crew.roleSf,
+      memberSf: member.memberSf,
+      target: {
+        type: DiscordActionTarget.CREW_MEMBER,
+        crewId: member.crew.id,
+        memberSf: member.memberSf,
+      },
+    });
+  }
+
+  private async queueEnsureChannels(crew: Crew) {
+    if (!crew.roleSf) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Crew role does not exist');
+    }
+
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+    const guildConfig = crew.guild.getConfig();
+
+    const {
+      crewSf: id,
+      team: { categorySf: parent },
+    } = crew;
+
+    const name = guildConfig[GuildSettingName.GUILD_CREW_PREFIX]
+      ? guildConfig[GuildSettingName.GUILD_CREW_PREFIX] + crew.slug
+      : `c-${crew.slug}`;
 
     const permissionOverwrites: OverwriteResolvable[] = [
       {
@@ -169,7 +243,7 @@ export class CrewServiceImpl extends CrewService {
         deny: [PermissionsBitField.Flags.ViewChannel],
       },
       {
-        id: role.id,
+        id: crew.roleSf,
         allow: [PermissionsBitField.Flags.ManageMessages, PermissionsBitField.Flags.ManageThreads],
       },
     ];
@@ -179,114 +253,115 @@ export class CrewServiceImpl extends CrewService {
     if (botRole) {
       permissionOverwrites.push({
         id: botRole.id,
-        allow: [PermissionsBitField.Flags.ViewChannel],
+        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageMessages],
       });
     }
 
-    if (team.guild?.config?.crewViewerRole) {
+    if (guildConfig[GuildSettingName.CREW_DETAULT_ROLE]) {
       permissionOverwrites.push({
-        id: team.guild.config.crewViewerRole,
+        id: guildConfig[GuildSettingName.CREW_DETAULT_ROLE],
         allow: [PermissionsBitField.Flags.ViewChannel],
       });
     }
 
-    if (team.guild?.config?.crewCreatorRole) {
-      permissionOverwrites.push({
-        id: team.guild.config.crewCreatorRole,
-        allow: [PermissionsBitField.Flags.ViewChannel],
-      });
-    }
-
-    const channel = await this.discordService.ensureChannel(team.guild.guildSf, data.crewSf, {
-      name: `${prefix}c-${data.slug}`,
-      parent: team.categorySf,
-      type: ChannelType.GuildText,
-      permissionOverwrites,
+    await this.botService.publishDiscordAction({
+      type: DiscordActionType.ENSURE_CHANNEL,
+      guildSf: crew.guild.guildSf,
+      channel: { name, id, parent, type: ChannelType.GuildText, permissionOverwrites },
+      target: { type: DiscordActionTarget.CREW, crewId: crew.id, field: 'crewSf' },
     });
 
-    if (!data.hasMovePrompt && data.hasMovePrompt !== false) {
-      data.hasMovePrompt = false;
+    if (crew.requireVoice) {
+      const parent = guildConfig[GuildSettingName.GUILD_VOICE_CATEGORY] || crew.team.categorySf;
+      await this.botService.publishDiscordAction({
+        type: DiscordActionType.ENSURE_CHANNEL,
+        guildSf: crew.guild.guildSf,
+        channel: { name, id, parent, type: ChannelType.GuildVoice, permissionOverwrites },
+        target: { type: DiscordActionTarget.CREW, crewId: crew.id, field: 'voiceSf' },
+      });
+    }
+  }
+
+  private async queueEnsureApprovalPrompt(crew: Crew) {
+    const war = await this.warService.query().byCurrent().getOneOrFail();
+    const guildConfig = crew.guild.getConfig();
+    const auditChannelSf = guildConfig[GuildSettingName.CREW_DEFAULT_AUDIT_CHANNEL];
+
+    if (auditChannelSf) {
+      const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+      const member = await discordGuild.members.fetch(crew.createdBy);
+      const prompt = new CrewAuditPromptBuilder().addApprovalMessage(crew, war.warNumber, member);
+
+      await this.botService.publishDiscordAction({
+        type: DiscordActionType.SEND_MESSAGE,
+        guildSf: crew.guild.guildSf,
+        channelSf: auditChannelSf,
+        message: { id: crew.auditMessageSf, ...prompt.build() },
+        target: { type: DiscordActionTarget.CREW, crewId: crew.id, field: 'auditMessageSf' },
+      });
+    }
+  }
+
+  private async queueEnsureAuditPrompt(crew: Crew) {
+    const war = await this.warService.query().byCurrent().getOneOrFail();
+    const guildConfig = crew.guild.getConfig();
+    const auditChannelSf = guildConfig[GuildSettingName.CREW_DEFAULT_AUDIT_CHANNEL];
+
+    if (auditChannelSf) {
+      const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+      const approvedBy = await discordGuild.members.fetch(crew.approvedBy);
+      const createdBy = await discordGuild.members.fetch(crew.createdBy);
+      const prompt = new CrewAuditPromptBuilder()
+        .addAuditMessage(crew, war.warNumber, createdBy)
+        .addApprovedMessage(approvedBy)
+        .addCrewDeleteButton(crew);
+
+      await this.botService.publishDiscordAction({
+        type: DiscordActionType.SEND_MESSAGE,
+        guildSf: crew.guild.guildSf,
+        channelSf: auditChannelSf,
+        message: { id: crew.auditMessageSf, ...prompt.build() },
+        target: { type: DiscordActionTarget.CREW, crewId: crew.id, field: 'auditMessageSf' },
+      });
+    }
+  }
+
+  public async queueSendCrewInfo(crew: Crew) {
+    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+
+    if (!crew.crewSf) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Crew channel does not exist');
     }
 
-    const crew = this.crewRepo.create(
-      Object.assign(data, {
-        crewSf: channel.id,
-        guildId: team.guildId,
-        roleSf: role.id,
-        teamId: team.id,
-      }),
-    );
+    const channel = await discordGuild.channels.fetch(crew.crewSf);
 
-    if (options.createVoice) {
-      const parent = team.guild.config.globalVoiceCategory
-        ? team.guild.config.globalVoiceCategory
-        : team.categorySf;
-      const voiceChannel = await this.discordService.ensureChannel(
-        team.guild.guildSf,
-        data.voiceSf,
-        {
-          name: `${prefix}c-${data.slug}`,
-          parent,
-          type: ChannelType.GuildVoice,
-          permissionOverwrites,
-        },
-      );
-      crew.voiceSf = voiceChannel.id;
+    if (!channel || !channel.isTextBased()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
-    // Create audit prompt
-    if (team.guild?.config?.crewAuditChannel) {
-      try {
-        const audit = await discordGuild.channels.fetch(team.guild.config.crewAuditChannel);
+    const members = await this.memberService.query().byCrew(crew).getMany();
+    const prompt = new CrewInfoPromptBuilder()
+      .addCrewPromptMessage(crew, members)
+      .addCrewControls(crew);
 
-        if (audit.isTextBased()) {
-          const prompt = new CrewAuditPromptBuilder()
-            .addAuditMessage(crew)
-            .addCrewDeleteButton(crew);
-          const message = await audit.send(prompt.build());
-          crew.auditMessageSf = message.id;
-        }
-      } catch (err) {
-        this.logger.error(
-          `Failed to create audit prompt for crew ${crew.name}: ${err.message}`,
-          err.stack,
-        );
-      }
-    }
-
-    await this.crewRepo.insert(crew);
-    // await this.crewRepo.upsert(crew, ['guildId', 'crewSf', 'deletedAt']);
-    crew.team = team;
-    crew.guild = team.guild;
-
-    await this.tagService.createTagForCrew(crew);
-
-    try {
-      await this.memberService.registerCrewMember(
-        channel.id,
-        crew.createdBy,
-        CrewMemberAccess.OWNER,
-      );
-    } catch (err) {
-      this.logger.error(
-        `Crew was created successfully but failed to register crew member: ${err.message}`,
-        err.stack,
-      );
-    }
-
-    if (channel.isTextBased()) {
-      await this.crewJoinPrompt(crew, channel);
-    }
-
-    return crew;
+    await this.botService.publishDiscordAction({
+      type: DiscordActionType.SEND_MESSAGE,
+      guildSf: crew.guild.guildSf,
+      channelSf: crew.crewSf,
+      message: prompt.build(),
+    });
   }
 
   public async deregisterCrew(
-    channelRef: Snowflake,
+    crewRef: SelectCrewDto,
     memberRef: Snowflake,
-    options: ArchiveCrew = {},
+    options: ArchiveCrewDto = {},
   ) {
-    const crew = await this.query().byCrew({ crewSf: channelRef }).withTickets().getOneOrFail();
+    const crew = await this.query()
+      .byCrew(crewRef)
+      .withTickets()
+      .withGuildSettings()
+      .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
 
     // Close all currently open tickets
@@ -300,44 +375,15 @@ export class CrewServiceImpl extends CrewService {
             throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid thread');
           }
 
-          const triageTag = await this.tagService
-            .queryTag()
-            .withCrews()
-            .byTeam({ id: ticket.crew.teamId })
-            .search(TicketTag.TRIAGE)
-            .getOneOrFail();
-
-          if (thread.appliedTags.includes(triageTag.tagSf)) {
-            return this.ticketService.updateTicket(
-              { threadSf: ticket.threadSf, updatedBy: memberRef },
-              TicketTag.ABANDONED,
-            );
-          } else {
-            return this.ticketService.updateTicket(
-              { threadSf: ticket.threadSf, updatedBy: memberRef },
-              TicketTag.DONE,
-            );
-          }
+          return this.ticketService.updateTicket(
+            { id: ticket.id },
+            { state: TicketTag.DONE, updatedBy: memberRef },
+          );
         } catch (err) {
           errors.push(err);
         }
       }),
     );
-
-    try {
-      const tagTemplate = await this.tagService
-        .queryTemplate()
-        .withCrews()
-        .byCrew(crew)
-        .withTags()
-        .withTagTeams()
-        .getOneOrFail();
-      const botMember = await discordGuild.members.fetchMe();
-      await this.tagService.deleteTagsByTemplate({ id: crew.guild.id }, [tagTemplate]);
-      await this.tagService.deleteTagTemplates(botMember, [tagTemplate]);
-    } catch (err) {
-      this.logger.error(`Failed to update ticket tags: ${err.message}`, err.stack);
-    }
 
     const discussion = await discordGuild.channels.fetch(crew.crewSf);
 
@@ -357,13 +403,13 @@ export class CrewServiceImpl extends CrewService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid role');
     }
 
-    const result = await this.crewRepo.updateReturning(
-      { crewSf: channelRef },
-      { deletedAt: new Date(), deletedBy: memberRef },
-    );
+    const result = await this.crewRepo.updateReturning(crewRef, {
+      deletedAt: new Date(),
+      deletedBy: memberRef,
+    });
 
-    if (crew.guild?.config?.crewAuditChannel && crew.auditMessageSf) {
-      const audit = await discordGuild.channels.fetch(crew.guild.config.crewAuditChannel);
+    if (crew.guild?.getConfig()['crew.audit_channel'] && crew.auditMessageSf) {
+      const audit = await discordGuild.channels.fetch(crew.guild.getConfig()['crew.audit_channel']);
 
       if (audit.isTextBased()) {
         try {
@@ -431,16 +477,18 @@ export class CrewServiceImpl extends CrewService {
     }
   }
 
-  public async updateCrew(channelRef: Snowflake, update: UpdateCrew) {
+  public async updateCrew(crewRef: SelectCrewDto, update: UpdateCrewDto) {
+    // return await this.crewRepo.
     try {
-      return await this.crewRepo.update({ crewSf: channelRef }, update);
+      const { id, crewSf } = crewRef;
+      return await this.crewRepo.update(id ? id : { crewSf }, update);
     } catch (err) {
       throw new DatabaseError('QUERY_FAILED', 'Failed to update crew', err);
     }
   }
 
   public async sendIndividualStatus(
-    crewRef: SelectCrew,
+    crewRef: SelectCrewDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
@@ -480,7 +528,7 @@ export class CrewServiceImpl extends CrewService {
   }
 
   public async sendAllStatus(
-    guildRef: SelectGuild,
+    guildRef: SelectGuildDto,
     targetChannelRef: Snowflake,
     memberRef: Snowflake,
   ) {
@@ -518,31 +566,6 @@ export class CrewServiceImpl extends CrewService {
     await targetChannel.send(prompt.build());
   }
 
-  async crewJoinPrompt(crew: Crew, channel?: GuildTextBasedChannel) {
-    if (!crew) {
-      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid crew');
-    }
-
-    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
-
-    if (!channel) {
-      const c = await discordGuild.channels.fetch(crew.crewSf);
-
-      if (!c || !c.isTextBased()) {
-        throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
-      }
-
-      channel = c;
-    }
-
-    const members = await this.memberService.query().byCrew(crew).getMany();
-    const prompt = new CrewInfoPromptBuilder()
-      .addCrewPromptMessage(crew, members)
-      .addCrewControls(crew);
-    const message = await channel.send(prompt.build());
-    await message.pin();
-  }
-
   async getOrCreateDefaultCrewAccessRule(crew: Crew) {
     if (!crew) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid crew');
@@ -577,7 +600,7 @@ export class CrewServiceImpl extends CrewService {
     });
 
     if (result?.identifiers) {
-      const [{ id }] = result.identifiers as SelectAccessEntry[];
+      const [{ id }] = result.identifiers as SelectAccessEntryDto[];
       return await this.accessService
         .query()
         .byGuild({ id: crew.guildId })

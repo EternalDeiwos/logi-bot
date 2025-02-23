@@ -4,7 +4,7 @@ import { GuildManager, Interaction, PermissionsBitField } from 'discord.js';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { AccessEntryQueryBuilder } from './access.query';
 import { AccessEntryRepository } from './access.repository';
-import { InsertAccessEntry } from './access.entity';
+import { InsertAccessEntryDto } from './access.entity';
 import { AccessDecision } from './access-decision';
 import { DiscordAPIInteraction } from 'src/types';
 
@@ -15,7 +15,7 @@ export type PartialInteraction = {
 
 export abstract class AccessService {
   abstract query(): AccessEntryQueryBuilder;
-  abstract createRule(data: InsertAccessEntry): Promise<InsertResult>;
+  abstract createRule(data: InsertAccessEntryDto): Promise<InsertResult>;
   abstract getTestArgs(
     interaction: DiscordAPIInteraction | [DiscordAPIInteraction],
   ): Promise<Parameters<AccessDecision['test']>>;
@@ -38,7 +38,7 @@ export class AccessServiceImpl extends AccessService {
     return new AccessEntryQueryBuilder(this.accessRepo);
   }
 
-  async createRule(data: InsertAccessEntry) {
+  async createRule(data: InsertAccessEntryDto) {
     return await this.accessRepo.insert(data);
   }
 

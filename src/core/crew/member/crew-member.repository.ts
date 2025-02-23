@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CommonRepository } from 'src/database/util';
-import { CrewMember, InsertCrewMember } from './crew-member.entity';
+import { CrewMember, InsertCrewMemberDto } from './crew-member.entity';
 
 @Injectable()
 export class CrewMemberRepository extends CommonRepository<CrewMember> {
@@ -9,7 +9,7 @@ export class CrewMemberRepository extends CommonRepository<CrewMember> {
     super(CrewMember, dataSource.createEntityManager());
   }
 
-  safeUpsert(payload: InsertCrewMember) {
+  safeUpsert(payload: InsertCrewMemberDto) {
     const [selectQuery] = this.createQueryBuilder('member')
       .select('member.access', 'access')
       .leftJoinAndSelect('member.guild', 'guild')

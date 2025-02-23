@@ -1,3 +1,4 @@
+import { PartialType, PickType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import {
   Entity,
@@ -8,12 +9,9 @@ import {
   ViewEntity,
   ViewColumn,
   PrimaryColumn,
-  DeepPartial,
   OneToMany,
 } from 'typeorm';
-import { Poi } from '../poi/poi.entity';
-
-export type SelectRegion = DeepPartial<Pick<Region, 'id'>>;
+import { Poi } from 'src/game/poi/poi.entity';
 
 @Entity()
 @Unique('uk_hex_major_minor_deleted_at', ['hexId', 'majorName', 'minorName', 'deletedAt'])
@@ -161,3 +159,5 @@ export class CurrentRegion {
     return `${this.majorName}, ${this.hexName}`;
   }
 }
+
+export class SelectRegionDto extends PartialType(PickType(Region, ['id'] as const)) {}

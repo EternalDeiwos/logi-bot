@@ -26,11 +26,10 @@ import { APITokenPayload } from 'src/core/api/api.service';
 import { GuildService } from 'src/core/guild/guild.service';
 import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { AccessService } from './access.service';
-import { AccessEntry } from './access.entity';
+import { AccessEntry, InsertAccessEntryDto } from './access.entity';
 import { AccessRule } from './access-rule';
 import { AccessRuleInner } from './access-rule-inner';
 import { AccessDecision } from './access-decision';
-import { InsertAccessEntryDto } from './dto/insert-access.dto';
 
 @ApiTags('rule')
 @ApiBearerAuth()

@@ -8,7 +8,6 @@ import {
   JoinColumn,
   ViewEntity,
   DeleteDateColumn,
-  DeepPartial,
   OneToMany,
 } from 'typeorm';
 import { Expose, Transform, Type } from 'class-transformer';
@@ -17,14 +16,12 @@ import { War } from 'src/game/war/war.entity';
 import { Region } from 'src/game/region/region.entity';
 import { Stockpile } from 'src/inventory/stockpile/stockpile.entity';
 import { StockpileLog } from 'src/inventory/stockpile/stockpile-log.entity';
+import { PartialType, PickType } from '@nestjs/swagger';
 
 export enum PoiMarkerType {
   DEPOT = 33,
   SEAPORT = 52,
 }
-
-export type SelectPoi = DeepPartial<Pick<Poi, 'id'>>;
-export type ArchivePoi = SelectPoi & { archiveSf?: Snowflake; tag?: string };
 
 @Entity()
 export class Poi {
@@ -256,4 +253,10 @@ export class ExpandedPoi {
   getMajorName() {
     return `${this.majorName}, ${this.hexName}`;
   }
+}
+
+export class SelectPoiDto extends PartialType(PickType(Poi, ['id'] as const)) {}
+export class ArchivePoiDto extends SelectPoiDto {
+  archiveSf?: Snowflake;
+  tag?: string;
 }
