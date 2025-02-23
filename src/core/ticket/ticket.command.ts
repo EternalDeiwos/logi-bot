@@ -292,8 +292,8 @@ export class TicketCommand {
     const reason = interaction.fields.getTextInputValue('ticket/decline/reason');
 
     const result = await this.ticketService.updateTicket(
-      { threadSf: threadRef, updatedBy: memberRef },
-      TicketTag.DECLINED,
+      { threadSf: threadRef },
+      { state: TicketTag.DECLINED, updatedBy: memberRef },
       reason,
     );
 
@@ -405,8 +405,8 @@ export class TicketCommand {
     }
 
     const result = await this.ticketService.updateTicket(
-      { threadSf: ticket.threadSf, updatedBy: memberRef },
-      tag,
+      { id: ticket.id },
+      { state: tag, updatedBy: memberRef },
       reason,
     );
 

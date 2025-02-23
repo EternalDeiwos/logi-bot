@@ -28,7 +28,7 @@ export class TicketQueryBuilder extends CommonQueryBuilder<Ticket> {
     this.qb.andWhere(
       new Brackets((qb) => {
         if (params.ids.length) {
-          qb.where(`${this.alias}.ticket_id IN (:...ids)`);
+          qb.where(`${this.alias}.id IN (:...ids)`);
         }
 
         if (params.threads.length) {

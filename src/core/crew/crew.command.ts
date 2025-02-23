@@ -484,7 +484,7 @@ export class CrewCommand {
       .query()
       .byCrew({ crewSf: interaction.channelId })
       .getOneOrFail();
-    await this.crewService.crewJoinPrompt(crew);
+    await this.crewService.queueSendCrewInfo(crew);
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Done')],

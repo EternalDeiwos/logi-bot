@@ -16,6 +16,17 @@ import { Expose, Transform } from 'class-transformer';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
+export enum TicketTag {
+  TRIAGE = 'Triage',
+  ACCEPTED = 'Accepted',
+  DECLINED = 'Declined',
+  REPEATABLE = 'Repeatable',
+  IN_PROGRESS = 'In Progress',
+  DONE = 'Done',
+  MOVED = 'Moved',
+  ABANDONED = 'Abandoned',
+}
+
 @Entity()
 export class Ticket {
   @Expose()
@@ -89,6 +100,10 @@ export class Ticket {
   @Index('sort_order_idx_ticket')
   sortOrder: string;
 
+  @Expose()
+  @Column({ type: 'enum', enum: TicketTag, default: TicketTag.TRIAGE })
+  state: TicketTag;
+
   @Column({ type: 'timestamptz', name: 'processed_at', nullable: true })
   processedAt: Date;
 
@@ -125,3 +140,6 @@ export class InsertTicketDto extends PartialType(
   ] as const),
 ) {}
 export class SelectTicketDto extends PartialType(PickType(Ticket, ['id', 'threadSf'] as const)) {}
+export class UpdateTicketDto extends PartialType(
+  PickType(Ticket, ['updatedBy', 'state'] as const),
+) {}

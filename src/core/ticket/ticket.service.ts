@@ -1,5 +1,5 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { InsertResult } from 'typeorm';
+import { InsertResult, UpdateResult } from 'typeorm';
 import { GuildManager, PermissionsBitField, Snowflake } from 'discord.js';
 import { AuthError, InternalError, ValidationError } from 'src/errors';
 import { TicketTag } from 'src/types';
@@ -9,7 +9,7 @@ import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { CrewInfoPromptBuilder } from 'src/core/crew/crew-info.prompt';
 import { CrewService } from 'src/core/crew/crew.service';
 import { SelectCrewChannelDto } from 'src/core/crew/crew.entity';
-import { InsertTicketDto, SelectTicketDto, Ticket } from './ticket.entity';
+import { InsertTicketDto, SelectTicketDto, Ticket, UpdateTicketDto } from './ticket.entity';
 import { TicketRepository } from './ticket.repository';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
 import { TicketUpdatePromptBuilder } from './ticket-update.prompt';
@@ -82,7 +82,11 @@ export abstract class TicketService {
   ): Promise<InsertResult>;
   abstract moveTicket(ticketRef: SelectTicketDto, ticketOverride: InsertTicketDto);
   abstract deleteTicket(ticketRef: SelectTicketDto, memberRef: Snowflake);
-  abstract updateTicket(ticket: InsertTicketDto, tag: TicketTag, reason?: string): Promise<Ticket>;
+  abstract updateTicket(
+    ticketRef: SelectTicketDto,
+    update: UpdateTicketDto,
+    reason?: string,
+  ): Promise<Ticket>;
 
   abstract sendIndividualStatus(
     crewRef: SelectCrewChannelDto,
@@ -179,7 +183,10 @@ export class TicketServiceImpl extends TicketService {
       },
     );
 
-    await this.updateTicket({ ...ticketRef, updatedBy: ticketOverride.updatedBy }, TicketTag.MOVED);
+    await this.updateTicket(ticketRef, {
+      updatedBy: ticketOverride.updatedBy,
+      state: TicketTag.MOVED,
+    });
   }
 
   async deleteTicket(ticketRef: SelectTicketDto, memberRef: Snowflake) {
@@ -212,20 +219,24 @@ export class TicketServiceImpl extends TicketService {
     return result;
   }
 
-  async updateTicket(data: InsertTicketDto, tag: TicketTag, reason?: string): Promise<Ticket> {
-    if (!data.updatedBy) {
+  async updateTicket(
+    ticketRef: SelectTicketDto,
+    update: UpdateTicketDto,
+    reason?: string,
+  ): Promise<Ticket> {
+    if (!update.updatedBy) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Ticket updates must provide updatedBy');
     }
 
     const ticket = await this.query()
       .withDeleted()
-      .byTicket({ threadSf: data.threadSf })
+      .byTicket(ticketRef)
       .withCrew()
       .withTeam()
       .getOneOrFail();
 
     const discordGuild = await this.guildManager.fetch(ticket.guild.guildSf);
-    const member = await discordGuild.members.fetch(data.updatedBy);
+    const member = await discordGuild.members.fetch(update.updatedBy);
     const forum = await discordGuild.channels.fetch(ticket.crew.team.forumSf);
 
     if (!forum || !forum.isThreadOnly()) {
@@ -234,22 +245,22 @@ export class TicketServiceImpl extends TicketService {
 
     const thread = await forum.threads.fetch(ticket.threadSf);
 
-    const result = await this.ticketRepo.updateReturning(
-      { threadSf: data.threadSf },
-      { ...data, updatedAt: new Date() },
-    );
+    const result = await this.ticketRepo.updateReturning(ticketRef, {
+      ...update,
+      updatedAt: new Date(),
+    });
 
     const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(
       member,
       ticket,
-      tag,
+      update.state,
       reason,
     );
 
     await thread.send(prompt.build());
 
     const starterMessage = await thread.fetchStarterMessage();
-    switch (tag) {
+    switch (update.state) {
       case TicketTag.TRIAGE:
         await starterMessage.edit(
           new TicketInfoPromptBuilder()
@@ -271,6 +282,7 @@ export class TicketServiceImpl extends TicketService {
         await starterMessage.edit({
           components: [],
         });
+        await this.deleteTicket(ticketRef, update.updatedBy);
         break;
 
       case TicketTag.IN_PROGRESS:
@@ -292,7 +304,7 @@ export class TicketServiceImpl extends TicketService {
 
     if (
       [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.IN_PROGRESS].includes(
-        tag,
+        update.state,
       ) &&
       member.id !== ticket.createdBy
     ) {
