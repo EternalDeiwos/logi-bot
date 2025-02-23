@@ -232,6 +232,11 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
   async reconcileCrewMembership(crewRef: SelectCrewDto) {
     const crew = await this.crewService.query().byCrew(crewRef).withMembers().getOneOrFail();
+
+    if (crew.disableAutomaticPruning) {
+      return;
+    }
+
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
 
