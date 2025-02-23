@@ -8,6 +8,9 @@ import { InsertCounterEntryDto } from './counter-entry.entity';
 import { GuildService } from 'src/core/guild/guild.service';
 import { CurrentCounter } from './counter.entity';
 import { CounterStaticUpdatePromptBuilder } from './ui/counter-static.prompt';
+import { GuildSettingName } from 'src/core/guild/guild-setting.entity';
+import { BotService } from 'src/bot/bot.service';
+import { DiscordActionType } from 'src/bot/discord-actions.consumer';
 
 export type CounterUpdate = { counter: CurrentCounter; channel: Snowflake };
 
@@ -17,6 +20,7 @@ export class CounterUpdateConsumer {
 
   constructor(
     private readonly guildManager: GuildManager,
+    private readonly botService: BotService,
     private readonly guildService: GuildService,
     private readonly counterService: CounterService,
   ) {}
@@ -38,6 +42,7 @@ export class CounterUpdateConsumer {
       .query()
       .byGuild({ guildSf: interaction.guildId })
       .getOneOrFail();
+    const guildConfig = guild.getConfig();
     const discordGuild = await this.guildManager.fetch(interaction.guildId);
     const counters = await this.counterService
       .query()
@@ -54,7 +59,11 @@ export class CounterUpdateConsumer {
     const member = await discordGuild.members.fetch(interaction.user);
     const prompt = new CounterStaticUpdatePromptBuilder().addUpdateControls(counters[0].crewId);
 
-    const channels = new Set<Snowflake>([guild.getConfig()['counter.log_channel']]);
+    const channels = new Set<Snowflake>(
+      guildConfig[GuildSettingName.COUNTER_LOG_CHANNEL]
+        ? [guildConfig[GuildSettingName.COUNTER_LOG_CHANNEL]]
+        : [],
+    );
     for (const counter of counters) {
       counter.guild = guild;
       prompt.addCounter(counter, {
@@ -70,10 +79,12 @@ export class CounterUpdateConsumer {
     const message = prompt.build();
 
     for (const channelRef of channels) {
-      const channel = await discordGuild.channels.fetch(channelRef);
-      if (channel.isSendable()) {
-        await channel.send(message);
-      }
+      await this.botService.publishDiscordAction({
+        type: DiscordActionType.SEND_MESSAGE,
+        guildSf: guild.guildSf,
+        channelSf: channelRef,
+        message,
+      });
     }
   }
 }

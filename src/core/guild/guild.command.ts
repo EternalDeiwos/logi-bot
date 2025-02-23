@@ -207,6 +207,10 @@ export class GuildCommand {
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
+      !new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .build()
+        .permit(...accessArgs) &&
       !guild.access
         .filter(
           (access) =>

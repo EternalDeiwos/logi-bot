@@ -366,6 +366,13 @@ export class CounterCommand {
       .withCatalog()
       .getMany();
 
+    if (!counters.length) {
+      return await this.botService.replyOrFollowUp(interaction, {
+        embeds: [new ErrorEmbed('ERROR_GENERIC').setTitle(`No registered counters for crew`)],
+        ephemeral: true,
+      });
+    }
+
     const accessArgs = await this.accessService.getTestArgs(interaction);
     const prompt = new CounterStaticUpdatePromptBuilder().addUpdateControls(counters[0].crewId);
 
