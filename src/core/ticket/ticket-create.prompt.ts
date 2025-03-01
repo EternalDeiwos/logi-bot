@@ -8,8 +8,8 @@ import {
 import { BasePromptBuilder } from 'src/bot/prompt';
 import { Crew, SelectCrewChannelDto } from 'src/core/crew/crew.entity';
 
-export const ticketPromptDescription = (multi = false) =>
-  `${multi ? 'Select a crew that will receive your ticket' : 'Create a ticket by clicking the button below'}. Please be patient for a member to discuss the ticket with you. If you are unsure of how to fill in a ticket then ask for help in any channel.`;
+export const ticketPromptDescription = () =>
+  `Create a ticket below. Please be patient for a member to discuss the ticket with you. If you are unsure of how to fill in a ticket then ask for help in any channel.`;
 
 export const ticketPromptTriageHelp = () =>
   `Your ticket will first be sent to Triage where it will be evaluated and assigned to a relevant crew. Once the ticket is assigned, then a member of the crew will evaluate the request and accept or decline it. If we cannot meet your request exactly (e.g. if there is a queue) then we will let you know about adjustments in the ticket.`;
@@ -32,11 +32,20 @@ Once your crew channel has been created, check the prompt for further instructio
 `;
 
 export class TicketCreatePromptBuilder extends BasePromptBuilder {
-  addCreateTicketMessage(selector: boolean = false) {
+  addCustomCreateTicketMessage(description: string) {
     const embed = new EmbedBuilder()
       .setColor('DarkGold')
       .setTitle('Create a Ticket')
-      .setDescription(ticketPromptDescription(selector))
+      .setDescription(description);
+
+    return this.add({ embeds: [embed] });
+  }
+
+  addCreateTicketMessage() {
+    const embed = new EmbedBuilder()
+      .setColor('DarkGold')
+      .setTitle('Create a Ticket')
+      .setDescription(ticketPromptDescription())
       .addFields(
         {
           name: 'Triage Process',

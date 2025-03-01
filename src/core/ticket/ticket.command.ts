@@ -1,5 +1,6 @@
 import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
 import {
+  BooleanOption,
   Button,
   ButtonContext,
   ComponentParam,
@@ -56,6 +57,23 @@ export class TicketDeclineReasonCommandParams {
   reason: string;
 }
 
+export class TicketPromptCommandParams {
+  @StringOption({
+    name: 'crew',
+    description: 'Select a crew',
+    autocomplete: true,
+    required: false,
+  })
+  crew: string;
+
+  @StringOption({
+    name: 'description',
+    description: 'Override prompt text',
+    required: false,
+  })
+  description: string;
+}
+
 @Injectable()
 @EchoCommand({
   name: 'ticket',
@@ -81,7 +99,7 @@ export class TicketCommand {
   })
   async onPrompt(
     @Context() [interaction]: SlashCommandContext,
-    @Options() data: SelectCrewCommandParams,
+    @Options() data: TicketPromptCommandParams,
   ) {
     try {
       BigInt(data.crew);
@@ -91,9 +109,15 @@ export class TicketCommand {
 
     const prompt = new TicketCreatePromptBuilder();
 
+    if (data.description) {
+      prompt.addCustomCreateTicketMessage(data.description);
+    } else {
+      prompt.addCreateTicketMessage();
+    }
+
     if (data.crew) {
       // Use selected crew
-      prompt.addCreateTicketMessage().addCreateButton({ crewSf: data.crew });
+      prompt.addCreateButton({ crewSf: data.crew });
     } else {
       // Show crew selector
       const crews = await this.crewService
@@ -101,7 +125,7 @@ export class TicketCommand {
         .byGuild({ guildSf: interaction.guildId })
         .getMany();
 
-      prompt.addCreateTicketMessage(true).addCrewSelector(crews);
+      prompt.addCrewSelector(crews);
     }
     await interaction.channel.send(prompt.build());
 
