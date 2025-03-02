@@ -174,7 +174,7 @@ export class CrewServiceImpl extends CrewService {
 
     if (!crew.approvedBy) {
       return this.queueEnsureApprovalPrompt(crew);
-    } else if (!crew.auditMessageSf) {
+    } else {
       await this.queueEnsureAuditPrompt(crew);
     }
 

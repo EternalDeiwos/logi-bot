@@ -55,7 +55,7 @@ export abstract class DiscordService {
   abstract sendMessage(
     guildSf: Snowflake,
     channelSf: Snowflake,
-    options: MessageCreateOptions,
+    options: MessageCreateOptions & { id?: Snowflake },
   ): Promise<[GuildBasedChannel, Message<true>[]]>;
 
   abstract sendDM(
@@ -196,26 +196,39 @@ export class DiscordServiceImpl extends DiscordService {
   public async sendMessage(
     guildSf: Snowflake,
     channelSf: Snowflake,
-    options: MessageCreateOptions,
+    message: MessageCreateOptions & { id?: Snowflake },
   ): Promise<[GuildBasedChannel, Message<true>[]]> {
+    const { id, ...options } = message;
     const discordGuild = await this.guildManager.fetch(guildSf);
     const channel = await discordGuild.channels.fetch(channelSf);
 
-    if (!channel || !channel.isSendable()) {
+    if (!channel || !channel.isTextBased()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
-    const { embeds, ...rest } = options;
-    const messages = await chunk(embeds, MAX_EMBEDS).reduce(
-      async (promise, embeds) => {
-        const messages = await promise;
-        messages.push(await channel.send({ ...rest, embeds }));
-        return messages;
-      },
-      Promise.resolve([] as Message<true>[]),
-    );
+    const existingMessage = await channel.messages.fetch(id);
 
-    return [channel, messages];
+    const { embeds, flags, ...rest } = options;
+    const chunkedEmbeds = chunk(embeds, MAX_EMBEDS);
+
+    if (chunkedEmbeds.length > 1) {
+      const messages = await chunkedEmbeds.reduce(
+        async (promise, embeds) => {
+          const messages = await promise;
+          messages.push(await channel.send({ ...rest, flags, embeds }));
+          return messages;
+        },
+        Promise.resolve([] as Message<true>[]),
+      );
+
+      return [channel, messages];
+    } else if (existingMessage && existingMessage.editable) {
+      const message = await existingMessage.edit({ ...rest, embeds });
+      return [channel, [message]];
+    } else {
+      const message = await channel.send({ ...rest, flags, embeds });
+      return [channel, [message]];
+    }
   }
 
   public async sendDM(
