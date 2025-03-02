@@ -284,6 +284,43 @@ export class CrewCommand {
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
   @Subcommand({
+    name: 'reconcile',
+    description: "Create crew channels and roles, if they don't already exist",
+    dmPermission: false,
+  })
+  async onCrewReconcile(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const crew = await this.crewService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .byCrew({ crewSf: data.crew || interaction.channelId })
+      .getOneOrFail();
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only a crew administrator can perform this action',
+      ).asDisplayable();
+    }
+
+    await this.crewService.reconcileCrew({ id: crew.id });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew reconcile scheduled')],
+    });
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
     name: 'enable_move',
     description: 'Enable or disable the movement interface',
     dmPermission: false,
@@ -914,6 +951,38 @@ export class CrewCommand {
 
     await this.botService.replyOrFollowUp(interaction, {
       embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crews purged')],
+    });
+  }
+
+  @Button('crew/reqapprove/:crew')
+  async onCrewApproveRequest(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('crew') crewRef: Snowflake,
+  ) {
+    // const accessArgs = await this.accessService.getTestArgs(interaction);
+    // const guild = await this.guildService
+    //   .query()
+    //   .byGuild({ guildSf: interaction.guildId })
+    //   .withAccessRules()
+    //   .getOneOrFail();
+
+    // if (
+    //   new AccessDecisionBuilder()
+    //     .addRule({ guildAdmin: true })
+    //     .build()
+    //     .deny(...accessArgs) &&
+    //   guild
+    //     .getAccessRulesForAction(GuildAction.CREW_MANAGE, AccessMode.ADMIN)
+    //     .every((entry) => AccessDecision.fromEntry(entry.rule).deny(...accessArgs))
+    // ) {
+    //   throw new AuthError('FORBIDDEN', 'Forbidden');
+    // }
+
+    await this.crewService.updateCrew({ id: crewRef }, { approvedBy: interaction.user.id });
+    await this.crewService.reconcileCrew({ id: crewRef });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew approved')],
     });
   }
 

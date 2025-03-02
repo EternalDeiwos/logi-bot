@@ -229,6 +229,7 @@ export class UpdateCrewDto extends PartialType(
     'isPermanent',
     'isSecureOnly',
     'isAutomaticPruning',
+    'approvedBy',
   ] as const),
 ) {}
 export class DeleteCrewDto extends SelectCrewDto {

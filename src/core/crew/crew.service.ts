@@ -35,11 +35,11 @@ import { AccessEntry, AccessRuleType, SelectAccessEntryDto } from 'src/core/acce
 import { ArchiveCrewDto, Crew, InsertCrewDto, SelectCrewDto, UpdateCrewDto } from './crew.entity';
 import { CrewRepository } from './crew.repository';
 import { CrewMemberService } from './member/crew-member.service';
+import { CrewMember } from './member/crew-member.entity';
 import { CrewAuditPromptBuilder } from './crew-audit.prompt';
 import { CrewInfoPromptBuilder } from './crew-info.prompt';
 import { CrewStatusPromptBuilder } from './crew-status.prompt';
 import { CrewQueryBuilder } from './crew.query';
-import { CrewMember } from './member/crew-member.entity';
 
 type RegisterCrewOptions = Partial<{
   createVoice: boolean;
@@ -190,7 +190,8 @@ export class CrewServiceImpl extends CrewService {
       return this.queueEnsureChannels(crew);
     }
 
-    await this.queueSendCrewInfo(crew);
+    await this.crewRepo.update({ id: crew.id }, { processedAt: new Date() });
+    return await this.queueSendCrewInfo(crew);
   }
 
   private async queueEnsureRole(crew: Crew) {
