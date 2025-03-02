@@ -1,8 +1,8 @@
 import { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { SelectCrewDto } from './crew.entity';
+import { Crew } from './crew.entity';
 
 export class CrewLogModalBuilder extends ModalBuilder {
-  addForm(crewRef: SelectCrewDto) {
+  addForm(crew: Crew) {
     const log = new TextInputBuilder()
       .setCustomId('crew/log/content')
       .setLabel('Crew Status')
@@ -11,7 +11,7 @@ export class CrewLogModalBuilder extends ModalBuilder {
       )
       .setStyle(TextInputStyle.Paragraph);
 
-    return this.setCustomId(`crew/log/${crewRef.crewSf}`)
+    return this.setCustomId(`crew/log/${crew.id}`)
       .setTitle('New Crew Log')
       .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(log));
   }

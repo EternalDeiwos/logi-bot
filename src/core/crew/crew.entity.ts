@@ -126,7 +126,7 @@ export class Crew {
     default: false,
     comment: 'Crew will not be pruned',
   })
-  disableAutomaticPruning: boolean;
+  isAutomaticPruning: boolean;
 
   @Column({
     type: 'boolean',
@@ -228,7 +228,7 @@ export class UpdateCrewDto extends PartialType(
     'hasMovePrompt',
     'isPermanent',
     'isSecureOnly',
-    'disableAutomaticPruning',
+    'isAutomaticPruning',
   ] as const),
 ) {}
 export class DeleteCrewDto extends SelectCrewDto {

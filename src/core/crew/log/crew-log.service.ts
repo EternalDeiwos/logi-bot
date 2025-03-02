@@ -3,6 +3,7 @@ import { GuildBasedChannel, GuildManager, Snowflake } from 'discord.js';
 import { InsertResult } from 'typeorm';
 import { InternalError } from 'src/errors';
 import { CrewService } from 'src/core/crew/crew.service';
+import { SelectCrewDto } from 'src/core/crew/crew.entity';
 import { WarService } from 'src/game/war/war.service';
 import { CrewLogRepository } from './crew-log.repository';
 import { InsertCrewLogDto } from './crew-log.entity';
@@ -12,12 +13,12 @@ export abstract class CrewLogService {
   /**
    * Abstract method for adding a crew log.
    *
-   * @param channelRef - The reference to the crew's channel.
+   * @param crewRef - The reference to the crew's channel.
    * @param memberRef - The reference to the member adding the log.
    * @param data - Partial data containing the content of the log.
    */
   abstract addCrewLog(
-    channelRef: Snowflake,
+    crewRef: SelectCrewDto,
     memberRef: Snowflake,
     data: InsertCrewLogDto,
   ): Promise<InsertResult>;
@@ -36,12 +37,8 @@ export class CrewLogServiceImpl extends CrewLogService {
     super();
   }
 
-  async addCrewLog(channelRef: Snowflake, memberRef: Snowflake, data: InsertCrewLogDto) {
-    const crew = await this.crewService
-      .query()
-      .byCrew({ crewSf: channelRef })
-      .withGuildSettings()
-      .getOneOrFail();
+  async addCrewLog(crewRef: SelectCrewDto, memberRef: Snowflake, data: InsertCrewLogDto) {
+    const crew = await this.crewService.query().byCrew(crewRef).withGuildSettings().getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
     const war = await this.warService.query().byCurrent().getOneOrFail();

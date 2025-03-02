@@ -2,14 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { Snowflake } from 'discord.js';
 import { CrewMemberAccess } from 'src/types';
-import { SelectCrewDto } from 'src/core/crew/crew.entity';
+import { SelectCrewIdDto } from 'src/core/crew/crew.entity';
 import { AccessRule } from './access-rule';
 
 export class AccessRuleInner {
   @Expose()
-  @ApiProperty({ type: () => SelectCrewDto })
-  @Type(() => SelectCrewDto)
-  crew?: SelectCrewDto;
+  @ApiProperty({ type: () => SelectCrewIdDto })
+  @Type(() => SelectCrewIdDto)
+  crew?: SelectCrewIdDto;
 
   @Expose()
   @ApiProperty({ enum: CrewMemberAccess })

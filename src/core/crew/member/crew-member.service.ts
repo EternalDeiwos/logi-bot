@@ -39,10 +39,10 @@ export abstract class CrewMemberService {
     memberRef: Snowflake,
   ): Promise<UpdateResult>;
 
-  abstract removeCrewMember(crew: Crew, member: GuildMember): Promise<DeleteResult>;
-  abstract removeCrewMember(crew: Crew, memberRef: Snowflake): Promise<DeleteResult>;
-  abstract removeCrewMember(channelRef: Snowflake, member: GuildMember): Promise<DeleteResult>;
-  abstract removeCrewMember(channelRef: Snowflake, memberRef: Snowflake): Promise<DeleteResult>;
+  abstract removeCrewMember(
+    crewRef: String | Crew,
+    memberRef: Snowflake | GuildMember,
+  ): Promise<DeleteResult>;
 
   abstract reconcileCrewLeaderRole(guildRef: SelectGuildDto, memberRef: Snowflake): Promise<void>;
   abstract reconcileCrewMembership(crewRef: SelectCrewDto): Promise<void>;
@@ -157,11 +157,11 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     );
   }
 
-  async removeCrewMember(channelRef: Snowflake | Crew, memberRef: Snowflake | GuildMember) {
+  async removeCrewMember(crewRef: string | Crew, memberRef: Snowflake | GuildMember) {
     const crew =
-      typeof channelRef === 'string'
-        ? await this.crewService.query().withDeleted().byCrew({ crewSf: channelRef }).getOneOrFail()
-        : channelRef;
+      typeof crewRef === 'string'
+        ? await this.crewService.query().byCrew({ id: crewRef }).withoutPending().getOneOrFail()
+        : crewRef;
 
     const crewMember = await this.query()
       .byCrew({ id: crew.id })
@@ -233,7 +233,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   async reconcileCrewMembership(crewRef: SelectCrewDto) {
     const crew = await this.crewService.query().byCrew(crewRef).withMembers().getOneOrFail();
 
-    if (crew.disableAutomaticPruning) {
+    if (!crew.isAutomaticPruning) {
       return;
     }
 
