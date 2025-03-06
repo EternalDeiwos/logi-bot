@@ -189,25 +189,27 @@ export class CounterCommand {
     }
 
     const accessArgs = await this.accessService.getTestArgs(interaction);
-
-    if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
-        .addRule({ guildAdmin: true })
-        .build()
-        .deny(...accessArgs)
-    ) {
-      throw new AuthError(
-        'FORBIDDEN',
-        'Only crew administrators may create counters',
-      ).asDisplayable();
-    }
-
     const counters = await this.counterService
       .query()
-      .byCrew({ id: crew.id })
+      .withAccessRules()
       .withCatalog()
+      .byCrew({ id: crew.id })
       .getMany();
+
+    for (const counter of counters) {
+      let passed = false;
+      for (const access of counter.access) {
+        if (AccessDecision.fromEntry(access.rule).permit(...accessArgs)) {
+          passed = true;
+          break;
+        }
+      }
+
+      if (!passed && counter.access.length) {
+        throw new AuthError('FORBIDDEN', 'No counters with rights').asDisplayable();
+      }
+    }
+
     return interaction.showModal(new CounterUpdateModalBuilder().addForm(counters));
   }
 
