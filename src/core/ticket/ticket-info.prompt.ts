@@ -35,7 +35,15 @@ ${body}
 
 type TriageControlDisabled = { [K in 'accept' | 'decline' | 'close']?: boolean };
 type TriageControlOptions = { disabled: TriageControlDisabled };
-type LifecycleControlDisabled = ('active' | 'repeat' | 'done' | 'close')[];
+type LifecycleControlDisabled = (
+  | 'active'
+  | 'repeat'
+  | 'done'
+  | 'close'
+  | 'hold'
+  | 'delivery'
+  | 'refresh'
+)[];
 type LifecycleControlOptions = { disabled: LifecycleControlDisabled };
 
 export class TicketInfoPromptBuilder extends BasePromptBuilder {
@@ -135,31 +143,57 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
   public addLifecycleControls(ticketRef: SelectTicketDto, options?: LifecycleControlOptions) {
     const inProgress = new ButtonBuilder()
       .setCustomId(`ticket/action/active/${ticketRef.threadSf}`)
+      .setEmoji('🛠️')
       .setLabel('In Progress')
       .setDisabled(Boolean(options?.disabled?.includes('active')))
       .setStyle(ButtonStyle.Primary);
 
     const repeatable = new ButtonBuilder()
       .setCustomId(`ticket/action/repeat/${ticketRef.threadSf}`)
+      .setEmoji('♻️')
       .setLabel('Repeatable')
       .setDisabled(Boolean(options?.disabled?.includes('repeat')))
       .setStyle(ButtonStyle.Secondary);
 
     const done = new ButtonBuilder()
       .setCustomId(`ticket/action/done/${ticketRef.threadSf}`)
+      .setEmoji('✅')
       .setLabel('Done')
       .setDisabled(Boolean(options?.disabled?.includes('done')))
+      .setStyle(ButtonStyle.Primary);
+
+    const hold = new ButtonBuilder()
+      .setCustomId(`ticket/action/hold/${ticketRef.threadSf}`)
+      .setEmoji('🛑')
+      .setLabel('On Hold')
+      .setDisabled(Boolean(options?.disabled?.includes('hold')))
+      .setStyle(ButtonStyle.Secondary);
+
+    const delivery = new ButtonBuilder()
+      .setCustomId(`ticket/action/delivery/${ticketRef.threadSf}`)
+      .setEmoji('🚛')
+      .setLabel('Ready')
+      .setDisabled(Boolean(options?.disabled?.includes('delivery')))
       .setStyle(ButtonStyle.Success);
 
     const close = new ButtonBuilder()
       .setCustomId(`ticket/action/close/${ticketRef.threadSf}`)
+      .setEmoji('🔒')
       .setLabel('Close')
       .setDisabled(Boolean(options?.disabled?.includes('close')))
       .setStyle(ButtonStyle.Danger);
 
+    const refresh = new ButtonBuilder()
+      .setCustomId(`ticket/refresh/${ticketRef.threadSf}`)
+      .setLabel('Refresh Title')
+      .setDisabled(Boolean(options?.disabled?.includes('refresh')))
+      .setStyle(ButtonStyle.Secondary);
+
     return this.add({
       components: [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, repeatable, done, close),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, delivery, done),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(repeatable, hold, close),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(refresh),
       ],
     });
   }

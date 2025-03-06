@@ -40,14 +40,16 @@ import { TicketCreateModalBuilder } from './ticket-create.modal';
 import { TicketDeclineModalBuilder } from './ticket-decline.modal';
 import { CrewUpdateModalBuilder } from '../crew/crew-update.modal';
 
-export const TicketActionToTag: Record<string, TicketTag> = {
+export const TicketActionToTag = {
   accept: TicketTag.ACCEPTED,
   decline: TicketTag.DECLINED,
   active: TicketTag.IN_PROGRESS,
   repeat: TicketTag.REPEATABLE,
+  delivery: TicketTag.DELIVERY,
+  hold: TicketTag.HOLD,
   done: TicketTag.DONE,
   close: TicketTag.ABANDONED,
-};
+} as const;
 
 export class TicketDeclineReasonCommandParams {
   @StringOption({
@@ -431,6 +433,7 @@ export class TicketCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
+      .withCrew()
       .byTicket({ threadSf: interaction.channelId })
       .getOneOrFail();
 
@@ -452,6 +455,37 @@ export class TicketCommand {
     await this.botService.replyOrFollowUp(interaction, prompt.build());
   }
 
+  @Button('ticket/refresh/:thread')
+  async onTicketRefresh(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('thread') threadRef: Snowflake,
+  ) {
+    await interaction.deferReply();
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const ticket = await this.ticketService
+      .query()
+      .withCrew()
+      .withTeam()
+      .byTicket({ threadSf: threadRef || interaction.channelId })
+      .getOneOrFail();
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: ticket.crew.id } })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
+    }
+
+    await this.ticketService.refreshTicket(ticket);
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket display refreshed')],
+    });
+  }
+
   @Button('ticket/action/:action/:thread')
   async onTicketAction(
     @Context() [interaction]: ButtonContext,
@@ -468,6 +502,7 @@ export class TicketCommand {
   }
 
   async lifecycleCommand([interaction]: [CommandInteraction], tag: TicketTag, reason?: string) {
+    await interaction.deferReply({ ephemeral: true });
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
@@ -562,6 +597,33 @@ export class TicketCommand {
   })
   async onTicketDoneCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.DONE);
+  }
+
+  @Subcommand({
+    name: 'pickup',
+    description: 'Mark a ticket ready for pick-up/delivery. Crew members only',
+    dmPermission: false,
+  })
+  async onTicketPickupCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.DELIVERY);
+  }
+
+  @Subcommand({
+    name: 'delivery',
+    description: 'Mark a ticket ready for pick-up/delivery. Crew members only',
+    dmPermission: false,
+  })
+  async onTicketDeliveryCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.DELIVERY);
+  }
+
+  @Subcommand({
+    name: 'hold',
+    description: 'Mark a ticket on-hold. Crew members only',
+    dmPermission: false,
+  })
+  async onTicketHoldCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.HOLD);
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
