@@ -24,7 +24,7 @@ export enum GuildAction {
 }
 
 @Entity('guild_access')
-@Unique('uk_access_rule_guild_deleted_at', ['ruleId', 'guildId', 'deletedAt'])
+@Unique('uk_access_rule_guild_deleted_at', ['ruleId', 'guildId', 'action', 'deletedAt'])
 export class GuildAccess {
   @PrimaryColumn({
     type: 'uuid',
