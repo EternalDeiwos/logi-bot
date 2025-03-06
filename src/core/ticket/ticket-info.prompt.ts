@@ -16,7 +16,7 @@ import { Crew, SelectCrewChannelDto } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { InsertTicketDto, SelectTicketDto } from './ticket.entity';
 
-const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
+export const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
 Welcome to our ticket system ${userMention(member)}. The members of our ${roleMention(role)} crew will be along as soon as possible to review your request. In the meanwhile, please make sure that you review the following instructions:
 
 - You may be required to provide resources for us to complete this ticket. When the ticket is complete, please post proof, such as a screenshot, or ask the member who completed the request to post information so the ticket can be closed.
@@ -47,8 +47,12 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
     const content = newTicketMessage(ticket.content, ticket.createdBy, crew.roleSf);
     const embed = new EmbedBuilder()
       .setColor(Colors.DarkGold)
-      .setTitle('New Ticket')
-      .setDescription(ticketTriageMessage(ticket.createdBy, crew.roleSf));
+      .setDescription(crew.ticketHelpText || ticketTriageMessage(ticket.createdBy, crew.roleSf));
+
+    if (!crew.ticketHelpText) {
+      embed.setTitle('New Ticket');
+    }
+
     const allowedMentions = {
       users: [ticket.createdBy],
       roles: crew.hasMovePrompt ? [] : [crew.roleSf],

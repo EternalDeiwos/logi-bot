@@ -1,4 +1,5 @@
 import { Brackets, Repository } from 'typeorm';
+import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectTicketDto, Ticket } from './ticket.entity';
 
@@ -9,6 +10,17 @@ export class TicketQueryBuilder extends CommonQueryBuilder<Ticket> {
       .withDeleted()
       .leftJoinAndSelect('ticket.guild', 'guild')
       .leftJoinAndSelect('ticket.previous', 'previous');
+  }
+
+  byChannel(channelRef: Snowflake) {
+    this.qb.andWhere(
+      new Brackets((qb) => {
+        qb.where(`ticket.thread_sf=:channelRef`).orWhere(`crew.crew_channel_sf=:channelRef`);
+      }),
+      { channelRef },
+    );
+
+    return this;
   }
 
   byTicket(ticketRef: SelectTicketDto | SelectTicketDto[]) {

@@ -20,8 +20,8 @@ import {
   TargetMessage,
 } from 'necord';
 import { Message, Snowflake } from 'discord.js';
-import { AuthError, InternalError } from 'src/errors';
-import { TicketTag } from 'src/types';
+import { AuthError, InternalError, ValidationError } from 'src/errors';
+import { CrewMemberAccess, TicketTag } from 'src/types';
 import { BotService, CommandInteraction } from 'src/bot/bot.service';
 import { SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
@@ -38,6 +38,7 @@ import { TicketCreatePromptBuilder } from './ticket-create.prompt';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
 import { TicketCreateModalBuilder } from './ticket-create.modal';
 import { TicketDeclineModalBuilder } from './ticket-decline.modal';
+import { CrewUpdateModalBuilder } from '../crew/crew-update.modal';
 
 export const TicketActionToTag: Record<string, TicketTag> = {
   accept: TicketTag.ACCEPTED,
@@ -368,6 +369,57 @@ export class TicketCommand {
       );
 
     await this.botService.replyOrFollowUp(interaction, prompt.build());
+  }
+
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'set_help',
+    description: 'Set crew help message for this crew. Crew admin only.',
+    dmPermission: false,
+  })
+  async onCrewTicketHelpUpdate(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    let crew = await this.crewService
+      .query()
+      .byCrew({ crewSf: data.crew || interaction.channelId })
+      .getOne();
+
+    if (!crew) {
+      const ticket = await this.ticketService
+        .query()
+        .withCrew()
+        .byTicket({ threadSf: interaction.channelId })
+        .byChannel(data.crew || interaction.channelId)
+        .getOne();
+
+      if (ticket) {
+        crew = ticket.crew;
+      }
+    }
+
+    if (!crew) {
+      throw new ValidationError('NOT_FOUND', 'Not a valid crew or ticket');
+    }
+
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only crew administrators can perform this action',
+      ).asDisplayable();
+    }
+
+    const modal = new CrewUpdateModalBuilder().forCrew(crew).addTicketHelpField(crew);
+    return interaction.showModal(modal);
   }
 
   @Subcommand({
