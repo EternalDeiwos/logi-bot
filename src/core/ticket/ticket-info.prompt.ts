@@ -185,7 +185,8 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
 
     const refresh = new ButtonBuilder()
       .setCustomId(`ticket/refresh/${ticketRef.threadSf}`)
-      .setLabel('Refresh Title')
+      .setEmoji('❌')
+      .setLabel('Refresh')
       .setDisabled(Boolean(options?.disabled?.includes('refresh')))
       .setStyle(ButtonStyle.Secondary);
 
