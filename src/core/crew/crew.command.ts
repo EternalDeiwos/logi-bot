@@ -589,9 +589,10 @@ export class CrewCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
-    const channelRef = data.crew || interaction.channelId;
+    const crewSf = data.crew || interaction.channelId;
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const result = await this.memberService.removeCrewMember(channelRef, memberRef);
+    const crew = await this.crewService.query().byCrew({ crewSf }).getOneOrFail();
+    const result = await this.memberService.removeCrewMember(crew, memberRef);
 
     if (result.affected) {
       await this.botService.replyOrFollowUp(interaction, {
