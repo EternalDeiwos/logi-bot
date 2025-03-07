@@ -304,6 +304,7 @@ export class TicketCommand {
     @Context() [interaction]: ModalContext,
     @ModalParam('thread') threadRef: Snowflake,
   ) {
+    await interaction.deferReply();
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
@@ -336,6 +337,7 @@ export class TicketCommand {
     @Context() [interaction]: ModalContext,
     @ModalParam('thread') threadRef: Snowflake,
   ) {
+    await interaction.deferReply();
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
