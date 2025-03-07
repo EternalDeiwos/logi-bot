@@ -194,7 +194,7 @@ export class TicketServiceImpl extends TicketService {
       updatedAt: new Date(),
     });
 
-    ticket.state = update.state;
+    Object.assign(ticket, update);
     const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(member, ticket, reason);
     await this.refreshTicket(ticket);
     await thread.send(prompt.build());

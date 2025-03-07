@@ -43,6 +43,7 @@ type LifecycleControlDisabled = (
   | 'hold'
   | 'delivery'
   | 'refresh'
+  | 'rename'
 )[];
 type LifecycleControlOptions = { disabled: LifecycleControlDisabled };
 
@@ -190,11 +191,18 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
       .setDisabled(Boolean(options?.disabled?.includes('refresh')))
       .setStyle(ButtonStyle.Secondary);
 
+    const rename = new ButtonBuilder()
+      .setCustomId(`ticket/rename/${ticketRef.threadSf}`)
+      .setEmoji('✏️')
+      .setLabel('Rename')
+      .setDisabled(Boolean(options?.disabled?.includes('rename')))
+      .setStyle(ButtonStyle.Secondary);
+
     return this.add({
       components: [
         new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, delivery, done),
         new ActionRowBuilder<ButtonBuilder>().addComponents(repeatable, hold, close),
-        new ActionRowBuilder<ButtonBuilder>().addComponents(refresh),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(refresh, rename),
       ],
     });
   }

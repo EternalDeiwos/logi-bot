@@ -49,7 +49,7 @@ export const ticketProperties: { [K in TicketTag]: TicketProperties } = {
   },
   [TicketTag.DELIVERY]: {
     color: Colors.DarkGreen,
-    action: 'is ready for pick up/delivery',
+    action: 'ready for pick up/delivery',
     title: 'Ready for Pick Up/Delivery',
   },
   [TicketTag.HOLD]: {

@@ -28,6 +28,7 @@ import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
 import { CrewService } from 'src/core/crew/crew.service';
+import { CrewUpdateModalBuilder } from 'src/core/crew/crew-update.modal';
 import { AccessService } from 'src/core/access/access.service';
 import { AccessDecisionBuilder } from 'src/core/access/access-decision.builder';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
@@ -38,7 +39,7 @@ import { TicketCreatePromptBuilder } from './ticket-create.prompt';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
 import { TicketCreateModalBuilder } from './ticket-create.modal';
 import { TicketDeclineModalBuilder } from './ticket-decline.modal';
-import { CrewUpdateModalBuilder } from '../crew/crew-update.modal';
+import { TicketUpdateModalBuilder } from './ticket-update.modal';
 
 export const TicketActionToTag = {
   accept: TicketTag.ACCEPTED,
@@ -299,6 +300,38 @@ export class TicketCommand {
     interaction.showModal(modal);
   }
 
+  @Modal('ticket/update/:thread')
+  async onTicketUpdate(
+    @Context() [interaction]: ModalContext,
+    @ModalParam('thread') threadRef: Snowflake,
+  ) {
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const ticket = await this.ticketService
+      .query()
+      .withCrew()
+      .byChannel(threadRef || interaction.channelId)
+      .getOne();
+
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: ticket.crewId } })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
+    }
+
+    const name = interaction.fields.getTextInputValue('ticket/name');
+    await this.ticketService.updateTicket({ id: ticket.id }, { name, updatedBy: memberRef });
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket updated')],
+    });
+  }
+
   @Modal('ticket/decline/:thread')
   async onTicketDecline(
     @Context() [interaction]: ModalContext,
@@ -392,7 +425,6 @@ export class TicketCommand {
       const ticket = await this.ticketService
         .query()
         .withCrew()
-        .byTicket({ threadSf: interaction.channelId })
         .byChannel(data.crew || interaction.channelId)
         .getOne();
 
@@ -462,6 +494,33 @@ export class TicketCommand {
   })
   async onTicketRefreshCommand(@Context() [interaction]: SlashCommandContext) {
     return this.ticketRefreshCommand([interaction], interaction.channelId);
+  }
+
+  @Button('ticket/rename/:thread')
+  async onTicketRename(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('thread') threadRef: Snowflake,
+  ) {
+    const ticket = await this.ticketService
+      .query()
+      .withCrew()
+      .byChannel(threadRef || interaction.channelId)
+      .getOne();
+
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: ticket.crewId } })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
+    }
+
+    const modal = new TicketUpdateModalBuilder().forTicket(ticket).addTicketNameField(ticket);
+    return interaction.showModal(modal);
   }
 
   @Button('ticket/refresh/:thread')

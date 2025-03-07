@@ -153,5 +153,5 @@ export class InsertTicketDto extends PartialType(
 ) {}
 export class SelectTicketDto extends PartialType(PickType(Ticket, ['id', 'threadSf'] as const)) {}
 export class UpdateTicketDto extends PartialType(
-  PickType(Ticket, ['updatedBy', 'state'] as const),
+  PickType(Ticket, ['name', 'updatedBy', 'state'] as const),
 ) {}
