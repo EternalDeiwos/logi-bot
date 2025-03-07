@@ -194,34 +194,39 @@ export class TicketServiceImpl extends TicketService {
       updatedAt: new Date(),
     });
 
+    const postUpdate = update.state !== undefined && ticket.state !== update.state;
+
     Object.assign(ticket, update);
-    const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(member, ticket, reason);
     await this.refreshTicket(ticket);
-    await thread.send(prompt.build());
 
-    if (
-      [TicketTag.DECLINED, TicketTag.ABANDONED, TicketTag.DONE, TicketTag.MOVED].includes(
-        ticket.state,
-      )
-    ) {
-      await this.deleteTicket(ticketRef, update.updatedBy);
-    }
+    if (postUpdate) {
+      const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(member, ticket, reason);
+      await thread.send(prompt.build());
 
-    if (
-      [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.IN_PROGRESS].includes(
-        update.state,
-      ) &&
-      member.id !== ticket.createdBy
-    ) {
-      try {
-        const creator = await thread.guild.members.fetch(ticket.createdBy);
-        const dm = await creator.createDM();
-        await dm.send(prompt.build());
-      } catch (err) {
-        this.logger.error(
-          `Failed to DM ticket creator for ${ticket.name} in ${discordGuild.name}: ${err.message}`,
-          err.stack,
-        );
+      if (
+        [TicketTag.DECLINED, TicketTag.ABANDONED, TicketTag.DONE, TicketTag.MOVED].includes(
+          ticket.state,
+        )
+      ) {
+        await this.deleteTicket(ticketRef, update.updatedBy);
+      }
+
+      if (
+        [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.IN_PROGRESS].includes(
+          update.state,
+        ) &&
+        member.id !== ticket.createdBy
+      ) {
+        try {
+          const creator = await thread.guild.members.fetch(ticket.createdBy);
+          const dm = await creator.createDM();
+          await dm.send(prompt.build());
+        } catch (err) {
+          this.logger.error(
+            `Failed to DM ticket creator for ${ticket.name} in ${discordGuild.name}: ${err.message}`,
+            err.stack,
+          );
+        }
       }
     }
 

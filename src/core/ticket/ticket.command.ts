@@ -1,6 +1,5 @@
 import { Injectable, Logger, UseFilters, UseInterceptors } from '@nestjs/common';
 import {
-  BooleanOption,
   Button,
   ButtonContext,
   ComponentParam,
