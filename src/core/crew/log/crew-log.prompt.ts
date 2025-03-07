@@ -23,7 +23,6 @@ export class CrewLogPromptBuilder extends BasePromptBuilder {
     const embed = new EmbedBuilder()
       .setTitle(`Crew Update: ${crew.name}`)
       .setColor(Colors.DarkGreen)
-      .setThumbnail(discordGuild.iconURL())
       .setDescription(content)
       .setFooter({
         iconURL: member.avatarURL() ?? member.user.avatarURL(),
