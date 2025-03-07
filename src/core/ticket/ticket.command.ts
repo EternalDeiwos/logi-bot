@@ -20,8 +20,8 @@ import {
   TargetMessage,
 } from 'necord';
 import { Message, Snowflake } from 'discord.js';
-import { AuthError, InternalError } from 'src/errors';
-import { TicketTag } from 'src/types';
+import { AuthError, InternalError, ValidationError } from 'src/errors';
+import { CrewMemberAccess, TicketTag } from 'src/types';
 import { BotService, CommandInteraction } from 'src/bot/bot.service';
 import { SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
@@ -38,15 +38,18 @@ import { TicketCreatePromptBuilder } from './ticket-create.prompt';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
 import { TicketCreateModalBuilder } from './ticket-create.modal';
 import { TicketDeclineModalBuilder } from './ticket-decline.modal';
+import { CrewUpdateModalBuilder } from '../crew/crew-update.modal';
 
-export const TicketActionToTag: Record<string, TicketTag> = {
+export const TicketActionToTag = {
   accept: TicketTag.ACCEPTED,
   decline: TicketTag.DECLINED,
   active: TicketTag.IN_PROGRESS,
   repeat: TicketTag.REPEATABLE,
+  delivery: TicketTag.DELIVERY,
+  hold: TicketTag.HOLD,
   done: TicketTag.DONE,
   close: TicketTag.ABANDONED,
-};
+} as const;
 
 export class TicketDeclineReasonCommandParams {
   @StringOption({
@@ -370,6 +373,57 @@ export class TicketCommand {
     await this.botService.replyOrFollowUp(interaction, prompt.build());
   }
 
+  @UseInterceptors(CrewSelectAutocompleteInterceptor)
+  @Subcommand({
+    name: 'set_help',
+    description: 'Set crew help message for this crew. Crew admin only.',
+    dmPermission: false,
+  })
+  async onCrewTicketHelpUpdate(
+    @Context() [interaction]: SlashCommandContext,
+    @Options() data: SelectCrewCommandParams,
+  ) {
+    let crew = await this.crewService
+      .query()
+      .byCrew({ crewSf: data.crew || interaction.channelId })
+      .getOne();
+
+    if (!crew) {
+      const ticket = await this.ticketService
+        .query()
+        .withCrew()
+        .byTicket({ threadSf: interaction.channelId })
+        .byChannel(data.crew || interaction.channelId)
+        .getOne();
+
+      if (ticket) {
+        crew = ticket.crew;
+      }
+    }
+
+    if (!crew) {
+      throw new ValidationError('NOT_FOUND', 'Not a valid crew or ticket');
+    }
+
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only crew administrators can perform this action',
+      ).asDisplayable();
+    }
+
+    const modal = new CrewUpdateModalBuilder().forCrew(crew).addTicketHelpField(crew);
+    return interaction.showModal(modal);
+  }
+
   @Subcommand({
     name: 'triage',
     description: 'Show the triage prompt change the state of the ticket',
@@ -379,6 +433,7 @@ export class TicketCommand {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
+      .withCrew()
       .byTicket({ threadSf: interaction.channelId })
       .getOneOrFail();
 
@@ -400,6 +455,50 @@ export class TicketCommand {
     await this.botService.replyOrFollowUp(interaction, prompt.build());
   }
 
+  @Subcommand({
+    name: 'refresh',
+    description: 'Refresh ticket state. For debugging purposes. Crew member only.',
+    dmPermission: false,
+  })
+  async onTicketRefreshCommand(@Context() [interaction]: SlashCommandContext) {
+    return this.ticketRefreshCommand([interaction], interaction.channelId);
+  }
+
+  @Button('ticket/refresh/:thread')
+  async onTicketRefresh(
+    @Context() [interaction]: ButtonContext,
+    @ComponentParam('thread') threadRef: Snowflake,
+  ) {
+    return this.ticketRefreshCommand([interaction], threadRef || interaction.channelId);
+  }
+
+  async ticketRefreshCommand([interaction]: [CommandInteraction], threadSf: Snowflake) {
+    await interaction.deferReply();
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const ticket = await this.ticketService
+      .query()
+      .withCrew()
+      .withTeam()
+      .byTicket({ threadSf })
+      .getOneOrFail();
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: ticket.crew.id } })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
+    }
+
+    await this.ticketService.refreshTicket(ticket);
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Ticket display refreshed')],
+    });
+  }
+
   @Button('ticket/action/:action/:thread')
   async onTicketAction(
     @Context() [interaction]: ButtonContext,
@@ -416,6 +515,7 @@ export class TicketCommand {
   }
 
   async lifecycleCommand([interaction]: [CommandInteraction], tag: TicketTag, reason?: string) {
+    await interaction.deferReply({ ephemeral: true });
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const ticket = await this.ticketService
       .query()
@@ -510,6 +610,33 @@ export class TicketCommand {
   })
   async onTicketDoneCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.DONE);
+  }
+
+  @Subcommand({
+    name: 'pickup',
+    description: 'Mark a ticket ready for pick-up/delivery. Crew members only',
+    dmPermission: false,
+  })
+  async onTicketPickupCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.DELIVERY);
+  }
+
+  @Subcommand({
+    name: 'delivery',
+    description: 'Mark a ticket ready for pick-up/delivery. Crew members only',
+    dmPermission: false,
+  })
+  async onTicketDeliveryCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.DELIVERY);
+  }
+
+  @Subcommand({
+    name: 'hold',
+    description: 'Mark a ticket on-hold. Crew members only',
+    dmPermission: false,
+  })
+  async onTicketHoldCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.HOLD);
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)

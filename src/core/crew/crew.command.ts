@@ -995,6 +995,39 @@ export class CrewCommand {
     return interaction.showModal(modal);
   }
 
+  @Modal('crew/update/:crew')
+  async onCrewUpdate(
+    @Context() [interaction]: ModalContext,
+    @ModalParam('crew') channelRef: Snowflake,
+  ) {
+    const accessArgs = await this.accessService.getTestArgs(interaction);
+    const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const update = {
+      ticketHelpText: interaction.fields.getTextInputValue('crew/ticket_help'),
+    };
+    const crewRef = SelectCrewDto.from(channelRef);
+    const crew = await this.crewService.query().byCrew(crewRef).getOneOrFail();
+
+    if (
+      new AccessDecisionBuilder()
+        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
+        .addRule({ guildAdmin: true })
+        .build()
+        .deny(...accessArgs)
+    ) {
+      throw new AuthError(
+        'FORBIDDEN',
+        'Only crew administrators can perform this action',
+      ).asDisplayable();
+    }
+
+    await this.crewService.updateCrew({ id: crew.id }, update);
+
+    await this.botService.replyOrFollowUp(interaction, {
+      embeds: [new SuccessEmbed('SUCCESS_GENERIC').setTitle('Crew updated')],
+    });
+  }
+
   @Modal('crew/delete/:crew')
   async onCrewDelete(
     @Context() [interaction]: ModalContext,

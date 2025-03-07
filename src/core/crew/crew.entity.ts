@@ -101,6 +101,9 @@ export class Crew {
   @Index('audit_message_sf_idx_crew')
   auditMessageSf?: Snowflake;
 
+  @Column({ type: 'text', name: 'ticket_help', nullable: true })
+  ticketHelpText?: string;
+
   @Expose()
   @Column({
     type: 'boolean',
@@ -225,6 +228,7 @@ export class UpdateCrewDto extends PartialType(
     'roleSf',
     'voiceSf',
     'auditMessageSf',
+    'ticketHelpText',
     'hasMovePrompt',
     'isPermanent',
     'isSecureOnly',

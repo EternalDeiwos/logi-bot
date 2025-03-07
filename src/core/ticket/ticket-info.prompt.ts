@@ -16,7 +16,7 @@ import { Crew, SelectCrewChannelDto } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { InsertTicketDto, SelectTicketDto } from './ticket.entity';
 
-const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
+export const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
 Welcome to our ticket system ${userMention(member)}. The members of our ${roleMention(role)} crew will be along as soon as possible to review your request. In the meanwhile, please make sure that you review the following instructions:
 
 - You may be required to provide resources for us to complete this ticket. When the ticket is complete, please post proof, such as a screenshot, or ask the member who completed the request to post information so the ticket can be closed.
@@ -35,7 +35,15 @@ ${body}
 
 type TriageControlDisabled = { [K in 'accept' | 'decline' | 'close']?: boolean };
 type TriageControlOptions = { disabled: TriageControlDisabled };
-type LifecycleControlDisabled = ('active' | 'repeat' | 'done' | 'close')[];
+type LifecycleControlDisabled = (
+  | 'active'
+  | 'repeat'
+  | 'done'
+  | 'close'
+  | 'hold'
+  | 'delivery'
+  | 'refresh'
+)[];
 type LifecycleControlOptions = { disabled: LifecycleControlDisabled };
 
 export class TicketInfoPromptBuilder extends BasePromptBuilder {
@@ -47,8 +55,12 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
     const content = newTicketMessage(ticket.content, ticket.createdBy, crew.roleSf);
     const embed = new EmbedBuilder()
       .setColor(Colors.DarkGold)
-      .setTitle('New Ticket')
-      .setDescription(ticketTriageMessage(ticket.createdBy, crew.roleSf));
+      .setDescription(crew.ticketHelpText || ticketTriageMessage(ticket.createdBy, crew.roleSf));
+
+    if (!crew.ticketHelpText) {
+      embed.setTitle('New Ticket');
+    }
+
     const allowedMentions = {
       users: [ticket.createdBy],
       roles: crew.hasMovePrompt ? [] : [crew.roleSf],
@@ -131,31 +143,58 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
   public addLifecycleControls(ticketRef: SelectTicketDto, options?: LifecycleControlOptions) {
     const inProgress = new ButtonBuilder()
       .setCustomId(`ticket/action/active/${ticketRef.threadSf}`)
+      .setEmoji('🛠️')
       .setLabel('In Progress')
       .setDisabled(Boolean(options?.disabled?.includes('active')))
       .setStyle(ButtonStyle.Primary);
 
     const repeatable = new ButtonBuilder()
       .setCustomId(`ticket/action/repeat/${ticketRef.threadSf}`)
+      .setEmoji('♻️')
       .setLabel('Repeatable')
       .setDisabled(Boolean(options?.disabled?.includes('repeat')))
       .setStyle(ButtonStyle.Secondary);
 
     const done = new ButtonBuilder()
       .setCustomId(`ticket/action/done/${ticketRef.threadSf}`)
+      .setEmoji('✅')
       .setLabel('Done')
       .setDisabled(Boolean(options?.disabled?.includes('done')))
+      .setStyle(ButtonStyle.Primary);
+
+    const hold = new ButtonBuilder()
+      .setCustomId(`ticket/action/hold/${ticketRef.threadSf}`)
+      .setEmoji('🛑')
+      .setLabel('On Hold')
+      .setDisabled(Boolean(options?.disabled?.includes('hold')))
+      .setStyle(ButtonStyle.Secondary);
+
+    const delivery = new ButtonBuilder()
+      .setCustomId(`ticket/action/delivery/${ticketRef.threadSf}`)
+      .setEmoji('🚛')
+      .setLabel('Ready')
+      .setDisabled(Boolean(options?.disabled?.includes('delivery')))
       .setStyle(ButtonStyle.Success);
 
     const close = new ButtonBuilder()
       .setCustomId(`ticket/action/close/${ticketRef.threadSf}`)
+      .setEmoji('🔒')
       .setLabel('Close')
       .setDisabled(Boolean(options?.disabled?.includes('close')))
       .setStyle(ButtonStyle.Danger);
 
+    const refresh = new ButtonBuilder()
+      .setCustomId(`ticket/refresh/${ticketRef.threadSf}`)
+      .setEmoji('❌')
+      .setLabel('Refresh')
+      .setDisabled(Boolean(options?.disabled?.includes('refresh')))
+      .setStyle(ButtonStyle.Secondary);
+
     return this.add({
       components: [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, repeatable, done, close),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, delivery, done),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(repeatable, hold, close),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(refresh),
       ],
     });
   }

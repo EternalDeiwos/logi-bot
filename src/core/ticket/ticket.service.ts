@@ -1,5 +1,5 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { InsertResult, UpdateResult } from 'typeorm';
+import { InsertResult } from 'typeorm';
 import { GuildManager, PermissionsBitField, Snowflake } from 'discord.js';
 import { AuthError, InternalError, ValidationError } from 'src/errors';
 import { TicketTag } from 'src/types';
@@ -17,63 +17,6 @@ import { TicketClosedPromptBuilder } from './ticket-closed.prompt';
 import { TicketStatusPromptBuilder } from './ticket-status.prompt';
 import { TicketQueryBuilder } from './ticket.query';
 
-export const tagsRemoved: { [K in TicketTag]: TicketTag[] } = {
-  [TicketTag.TRIAGE]: [
-    TicketTag.ACCEPTED,
-    TicketTag.DECLINED,
-    TicketTag.ABANDONED,
-    TicketTag.IN_PROGRESS,
-    TicketTag.REPEATABLE,
-    TicketTag.MOVED,
-    TicketTag.DONE,
-  ],
-  [TicketTag.ACCEPTED]: [
-    TicketTag.TRIAGE,
-    TicketTag.DECLINED,
-    TicketTag.ABANDONED,
-    TicketTag.IN_PROGRESS,
-    TicketTag.REPEATABLE,
-    TicketTag.DONE,
-    TicketTag.MOVED,
-  ],
-  [TicketTag.DECLINED]: [
-    TicketTag.TRIAGE,
-    TicketTag.ACCEPTED,
-    TicketTag.ABANDONED,
-    TicketTag.DONE,
-    TicketTag.MOVED,
-  ],
-  [TicketTag.ABANDONED]: [TicketTag.DONE, TicketTag.ACCEPTED, TicketTag.DECLINED, TicketTag.MOVED],
-  [TicketTag.DONE]: [
-    TicketTag.IN_PROGRESS,
-    TicketTag.ACCEPTED,
-    TicketTag.REPEATABLE,
-    TicketTag.ABANDONED,
-    TicketTag.DECLINED,
-    TicketTag.MOVED,
-  ],
-  [TicketTag.IN_PROGRESS]: [
-    TicketTag.REPEATABLE,
-    TicketTag.DONE,
-    TicketTag.ABANDONED,
-    TicketTag.MOVED,
-  ],
-  [TicketTag.REPEATABLE]: [
-    TicketTag.IN_PROGRESS,
-    TicketTag.DONE,
-    TicketTag.ABANDONED,
-    TicketTag.MOVED,
-  ],
-  [TicketTag.MOVED]: [
-    TicketTag.TRIAGE,
-    TicketTag.ACCEPTED,
-    TicketTag.DECLINED,
-    TicketTag.IN_PROGRESS,
-    TicketTag.DONE,
-    TicketTag.ABANDONED,
-  ],
-};
-
 export abstract class TicketService {
   abstract query(): TicketQueryBuilder;
   abstract createTicket(
@@ -87,6 +30,7 @@ export abstract class TicketService {
     update: UpdateTicketDto,
     reason?: string,
   ): Promise<Ticket>;
+  abstract refreshTicket(ticket: Ticket): Promise<void>;
 
   abstract sendIndividualStatus(
     crewRef: SelectCrewChannelDto,
@@ -153,7 +97,7 @@ export class TicketServiceImpl extends TicketService {
     }
 
     const thread = await forum.threads.create({
-      name: ticket.name,
+      name: Ticket.makeName(ticket.name, TicketTag.TRIAGE),
       message: prompt.build(),
     });
 
@@ -214,7 +158,7 @@ export class TicketServiceImpl extends TicketService {
 
     // Update thread after database otherwise thread update handler will loop
     await thread.send(new TicketClosedPromptBuilder().addTicketClosedMessage(guildMember).build());
-    await thread.edit({ locked: true, archived: true });
+    await thread.edit({ archived: true });
 
     return result;
   }
@@ -250,56 +194,18 @@ export class TicketServiceImpl extends TicketService {
       updatedAt: new Date(),
     });
 
-    const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(
-      member,
-      ticket,
-      update.state,
-      reason,
-    );
+    await this.refreshTicket(ticket);
 
+    ticket.state = update.state;
+    const prompt = new TicketUpdatePromptBuilder().addTicketUpdateMessage(member, ticket, reason);
     await thread.send(prompt.build());
 
-    const starterMessage = await thread.fetchStarterMessage();
-    switch (update.state) {
-      case TicketTag.TRIAGE:
-        await starterMessage.edit(
-          new TicketInfoPromptBuilder()
-            .addTriageControls(ticket, { disabled: { accept: ticket.crew.hasMovePrompt } })
-            .build(),
-        );
-        break;
-
-      case TicketTag.ACCEPTED:
-        await starterMessage.edit(
-          new TicketInfoPromptBuilder().addLifecycleControls(ticket).build(),
-        );
-        break;
-
-      case TicketTag.DECLINED:
-      case TicketTag.ABANDONED:
-      case TicketTag.DONE:
-      case TicketTag.MOVED:
-        await starterMessage.edit({
-          components: [],
-        });
-        await this.deleteTicket(ticketRef, update.updatedBy);
-        break;
-
-      case TicketTag.IN_PROGRESS:
-        await starterMessage.edit(
-          new TicketInfoPromptBuilder()
-            .addLifecycleControls(ticket, { disabled: ['active'] })
-            .build(),
-        );
-        break;
-
-      case TicketTag.REPEATABLE:
-        await starterMessage.edit(
-          new TicketInfoPromptBuilder()
-            .addLifecycleControls(ticket, { disabled: ['active', 'repeat', 'close'] })
-            .build(),
-        );
-        break;
+    if (
+      [TicketTag.DECLINED, TicketTag.ABANDONED, TicketTag.DONE, TicketTag.MOVED].includes(
+        ticket.state,
+      )
+    ) {
+      await this.deleteTicket(ticketRef, update.updatedBy);
     }
 
     if (
@@ -322,6 +228,76 @@ export class TicketServiceImpl extends TicketService {
 
     if (result?.affected) {
       return (result?.raw as Ticket[]).pop();
+    }
+  }
+
+  public async refreshTicket(ticket: Ticket) {
+    const discordGuild = await this.guildManager.fetch(ticket.guild.guildSf);
+    const forum = await discordGuild.channels.fetch(ticket.crew.team.forumSf);
+
+    if (!forum || !forum.isThreadOnly()) {
+      throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid forum');
+    }
+
+    const thread = await forum.threads.fetch(ticket.threadSf);
+    await thread.edit({ name: ticket.displayName });
+
+    const starterMessage = await thread.fetchStarterMessage();
+    switch (ticket.state) {
+      case TicketTag.TRIAGE:
+        await starterMessage.edit(
+          new TicketInfoPromptBuilder()
+            .addTriageControls(ticket, { disabled: { accept: ticket.crew.hasMovePrompt } })
+            .build(),
+        );
+        break;
+
+      case TicketTag.ACCEPTED:
+        await starterMessage.edit(
+          new TicketInfoPromptBuilder().addLifecycleControls(ticket).build(),
+        );
+        break;
+
+      case TicketTag.DECLINED:
+      case TicketTag.ABANDONED:
+      case TicketTag.DONE:
+      case TicketTag.MOVED:
+        await starterMessage.edit({
+          components: [],
+        });
+        break;
+
+      case TicketTag.IN_PROGRESS:
+        await starterMessage.edit(
+          new TicketInfoPromptBuilder()
+            .addLifecycleControls(ticket, { disabled: ['active'] })
+            .build(),
+        );
+        break;
+
+      case TicketTag.DELIVERY:
+        await starterMessage.edit(
+          new TicketInfoPromptBuilder()
+            .addLifecycleControls(ticket, { disabled: ['delivery'] })
+            .build(),
+        );
+        break;
+
+      case TicketTag.HOLD:
+        await starterMessage.edit(
+          new TicketInfoPromptBuilder()
+            .addLifecycleControls(ticket, { disabled: ['hold'] })
+            .build(),
+        );
+        break;
+
+      case TicketTag.REPEATABLE:
+        await starterMessage.edit(
+          new TicketInfoPromptBuilder()
+            .addLifecycleControls(ticket, { disabled: ['active', 'repeat', 'close'] })
+            .build(),
+        );
+        break;
     }
   }
 

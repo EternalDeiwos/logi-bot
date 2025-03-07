@@ -13,19 +13,22 @@ import {
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Expose, Transform } from 'class-transformer';
+import { TicketTag } from 'src/types';
 import { Guild } from 'src/core/guild/guild.entity';
 import { Crew } from 'src/core/crew/crew.entity';
 
-export enum TicketTag {
-  TRIAGE = 'Triage',
-  ACCEPTED = 'Accepted',
-  DECLINED = 'Declined',
-  REPEATABLE = 'Repeatable',
-  IN_PROGRESS = 'In Progress',
-  DONE = 'Done',
-  MOVED = 'Moved',
-  ABANDONED = 'Abandoned',
-}
+export const TicketTagToEmote = {
+  [TicketTag.ABANDONED]: '🔒',
+  [TicketTag.ACCEPTED]: '🟠',
+  [TicketTag.DECLINED]: '❌',
+  [TicketTag.DELIVERY]: '🚛',
+  [TicketTag.DONE]: '✅',
+  [TicketTag.HOLD]: '🛑',
+  [TicketTag.IN_PROGRESS]: '🛠️',
+  [TicketTag.MOVED]: '↗️',
+  [TicketTag.REPEATABLE]: '♻️',
+  [TicketTag.TRIAGE]: '⚪️',
+} as const;
 
 @Entity()
 export class Ticket {
@@ -126,6 +129,15 @@ export class Ticket {
   @Expose()
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
+
+  @Expose()
+  get displayName() {
+    return Ticket.makeName(this.name, this.state);
+  }
+
+  static makeName(name: string, tag: TicketTag = TicketTag.TRIAGE) {
+    return `${TicketTagToEmote[tag]} ${name}`;
+  }
 }
 
 export class InsertTicketDto extends PartialType(

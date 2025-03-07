@@ -47,6 +47,16 @@ export const ticketProperties: { [K in TicketTag]: TicketProperties } = {
     action: 'started',
     title: 'In Progress',
   },
+  [TicketTag.DELIVERY]: {
+    color: Colors.DarkGreen,
+    action: 'is ready for pick up/delivery',
+    title: 'Ready for Pick Up/Delivery',
+  },
+  [TicketTag.HOLD]: {
+    color: Colors.DarkOrange,
+    action: 'on hold',
+    title: 'On Hold',
+  },
   [TicketTag.REPEATABLE]: {
     color: Colors.Aqua,
     action: 'marked repeatable',
@@ -60,8 +70,8 @@ export const ticketProperties: { [K in TicketTag]: TicketProperties } = {
 };
 
 export class TicketUpdatePromptBuilder extends BasePromptBuilder {
-  addTicketUpdateMessage(updatedBy: GuildMember, ticket: Ticket, tag: TicketTag, reason?: string) {
-    const properties = ticketProperties[tag];
+  addTicketUpdateMessage(updatedBy: GuildMember, ticket: Ticket, reason?: string) {
+    const properties = ticketProperties[ticket.state];
     const message =
       reason &&
       reason

@@ -20,6 +20,8 @@ export enum TicketTag {
   DECLINED = 'Declined',
   REPEATABLE = 'Repeatable',
   IN_PROGRESS = 'In Progress',
+  DELIVERY = 'Ready for Pickup/Delivery',
+  HOLD = 'On Hold',
   DONE = 'Done',
   MOVED = 'Moved',
   ABANDONED = 'Abandoned',
