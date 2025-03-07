@@ -455,18 +455,31 @@ export class TicketCommand {
     await this.botService.replyOrFollowUp(interaction, prompt.build());
   }
 
+  @Subcommand({
+    name: 'refresh',
+    description: 'Refresh ticket state. For debugging purposes. Crew member only.',
+    dmPermission: false,
+  })
+  async onTicketRefreshCommand(@Context() [interaction]: SlashCommandContext) {
+    return this.ticketRefreshCommand([interaction], interaction.channelId);
+  }
+
   @Button('ticket/refresh/:thread')
   async onTicketRefresh(
     @Context() [interaction]: ButtonContext,
     @ComponentParam('thread') threadRef: Snowflake,
   ) {
+    return this.ticketRefreshCommand([interaction], threadRef || interaction.channelId);
+  }
+
+  async ticketRefreshCommand([interaction]: [CommandInteraction], threadSf: Snowflake) {
     await interaction.deferReply();
     const accessArgs = await this.accessService.getTestArgs(interaction);
     const ticket = await this.ticketService
       .query()
       .withCrew()
       .withTeam()
-      .byTicket({ threadSf: threadRef || interaction.channelId })
+      .byTicket({ threadSf })
       .getOneOrFail();
 
     if (
