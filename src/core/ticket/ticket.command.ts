@@ -36,7 +36,11 @@ import { TicketService } from './ticket.service';
 import { SelectTicketDto } from './ticket.entity';
 import { TicketCreatePromptBuilder } from './ticket-create.prompt';
 import { TicketInfoPromptBuilder } from './ticket-info.prompt';
-import { TicketCreateModalBuilder } from './ticket-create.modal';
+import {
+  makeProxyTicketMessage,
+  supportedLocales,
+  TicketCreateModalBuilder,
+} from './ticket-create.modal';
 import { TicketDeclineModalBuilder } from './ticket-decline.modal';
 import { TicketUpdateModalBuilder } from './ticket-update.modal';
 
@@ -146,11 +150,13 @@ export class TicketCommand {
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
   ) {
+    const locale = supportedLocales.find((l) => interaction.locale.startsWith(l));
     const modal = new TicketCreateModalBuilder().addForm(
       {
         crewSf: data.crew || interaction.channelId,
       },
       interaction.user.id,
+      locale,
     );
     return interaction.showModal(modal);
   }
@@ -160,11 +166,13 @@ export class TicketCommand {
     @Context() [interaction]: ButtonContext,
     @ComponentParam('crew') channelRef: Snowflake,
   ) {
+    const locale = supportedLocales.find((l) => interaction.locale.startsWith(l));
     const modal = new TicketCreateModalBuilder().addForm(
       {
         crewSf: channelRef || interaction.channelId,
       },
       interaction.user.id,
+      locale,
     );
     return interaction.showModal(modal);
   }
@@ -174,11 +182,13 @@ export class TicketCommand {
     @Context() [interaction]: StringSelectContext,
     @SelectedStrings() [selected]: string[],
   ) {
+    const locale = supportedLocales.find((l) => interaction.locale.startsWith(l));
     const modal = new TicketCreateModalBuilder().addForm(
       {
         crewSf: selected,
       },
       interaction.user.id,
+      locale,
     );
     return interaction.showModal(modal);
   }
@@ -205,17 +215,23 @@ export class TicketCommand {
       channelRef = guild.getConfig()['guild.triage_crew_sf'];
     }
 
-    const modal = new TicketCreateModalBuilder().addForm({ crewSf: channelRef }, authorRef, {
-      what: {
-        value: TicketCreateModalBuilder.makeProxyTicketMessage(
-          message.content,
-          memberRef,
-          authorRef,
-          channelRef,
-          message.id,
-        ),
+    const locale = supportedLocales.find((l) => interaction.locale.startsWith(l));
+    const modal = new TicketCreateModalBuilder().addForm(
+      { crewSf: channelRef },
+      authorRef,
+      locale,
+      {
+        detail: {
+          value: makeProxyTicketMessage(
+            message.content,
+            memberRef,
+            authorRef,
+            channelRef,
+            message.id,
+          ),
+        },
       },
-    });
+    );
     interaction.showModal(modal);
   }
 
@@ -262,17 +278,27 @@ export class TicketCommand {
     @ModalParam('author') authorRef: Snowflake,
   ) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
+    const who = interaction.fields.getTextInputValue('ticket/form/who');
+    const what = interaction.fields.getTextInputValue('ticket/form/what');
+    const detail = interaction.fields.getTextInputValue('ticket/form/detail');
+    const where = interaction.fields.getTextInputValue('ticket/form/where');
+    const when = interaction.fields.getTextInputValue('ticket/form/when');
 
-    const title = interaction.fields.getTextInputValue('ticket/form/title');
+    const regiment =
+      who && !who.toLowerCase().includes('none') ? `[${who.toUpperCase()}]` : 'for personal use';
+    const title = `${regiment} ${what}`;
+
     const content = [
       '## What do you need?',
-      interaction.fields.getTextInputValue('ticket/form/what'),
+      what,
+      '',
+      detail,
       '',
       '## Where is it needed?',
-      interaction.fields.getTextInputValue('ticket/form/where'),
+      where,
       '',
       '## When do you need it by?',
-      interaction.fields.getTextInputValue('ticket/form/when'),
+      when,
       '',
       '',
     ].join('\n');

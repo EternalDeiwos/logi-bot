@@ -22,6 +22,7 @@ export enum TicketTag {
   IN_PROGRESS = 'In Progress',
   DELIVERY = 'Ready for Pickup/Delivery',
   HOLD = 'On Hold',
+  QUEUED = 'Queued',
   DONE = 'Done',
   MOVED = 'Moved',
   ABANDONED = 'Abandoned',
