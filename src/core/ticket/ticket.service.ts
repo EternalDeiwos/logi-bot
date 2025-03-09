@@ -306,7 +306,9 @@ export class TicketServiceImpl extends TicketService {
       case TicketTag.REPEATABLE:
         await starterMessage.edit(
           new TicketInfoPromptBuilder()
-            .addLifecycleControls(ticket, { disabled: ['active', 'repeat', 'close'] })
+            .addLifecycleControls(ticket, {
+              disabled: ['queued', 'active', 'delivery', 'repeat', 'close'],
+            })
             .build(),
         );
         break;
