@@ -21,7 +21,7 @@ const formDetail = {
     },
     what: {
       label: 'Request',
-      placeholder: 'e.g. x25 Spatha + x36 Nemeses',
+      placeholder: 'e.g. x25 Spatha + x36 Nemesis',
     },
     detail: {
       label: 'Details',
@@ -44,7 +44,7 @@ const formDetail = {
     },
     what: {
       label: 'Demande',
-      placeholder: 'ex : x25 Spatha + x36 Nemeses',
+      placeholder: 'ex : x25 Spatha + x36 Nemesis',
     },
     detail: {
       label: 'Détails',
@@ -52,7 +52,7 @@ const formDetail = {
     },
     where: {
       label: 'Où',
-      value: "Nous l'obtiendrons quand ce sera prêt",
+      value: 'Nous viendrons le récupérer',
     },
     when: {
       label: 'Quand',
@@ -67,7 +67,7 @@ const formDetail = {
     },
     what: {
       label: 'Запрос',
-      placeholder: 'например x25 Spatha + x36 Nemeses',
+      placeholder: 'например x25 Spatha + x36 Nemesis',
     },
     detail: {
       label: 'Подробности',
@@ -90,7 +90,7 @@ const formDetail = {
     },
     what: {
       label: 'Prośba',
-      placeholder: 'np. x25 Spatha + x36 Nemeses',
+      placeholder: 'np. x25 Spatha + x36 Nemesis',
     },
     detail: {
       label: 'Szczegóły',
@@ -113,7 +113,7 @@ const formDetail = {
     },
     what: {
       label: '请求',
-      placeholder: '例如：x25 Spatha + x36 Nemeses',
+      placeholder: '例如：x25 Spatha + x36 Nemesis',
     },
     detail: {
       label: '详细信息',
