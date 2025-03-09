@@ -37,6 +37,11 @@ export const ticketProperties: { [K in TicketTag]: TicketProperties } = {
     action: 'closed',
     title: 'Ticket Abandoned',
   },
+  [TicketTag.QUEUED]: {
+    color: Colors.Blurple,
+    action: 'queued',
+    title: 'Ordered Queued',
+  },
   [TicketTag.DONE]: {
     color: Colors.DarkGreen,
     action: 'completed',

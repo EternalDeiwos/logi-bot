@@ -40,6 +40,7 @@ type LifecycleControlDisabled = (
   | 'repeat'
   | 'done'
   | 'close'
+  | 'queued'
   | 'hold'
   | 'delivery'
   | 'refresh'
@@ -142,6 +143,13 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
   }
 
   public addLifecycleControls(ticketRef: SelectTicketDto, options?: LifecycleControlOptions) {
+    const queued = new ButtonBuilder()
+      .setCustomId(`ticket/action/queued/${ticketRef.threadSf}`)
+      .setEmoji('🟠')
+      .setLabel('Queued')
+      .setDisabled(Boolean(options?.disabled?.includes('queued')))
+      .setStyle(ButtonStyle.Secondary);
+
     const inProgress = new ButtonBuilder()
       .setCustomId(`ticket/action/active/${ticketRef.threadSf}`)
       .setEmoji('🛠️')
@@ -200,7 +208,7 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
 
     return this.add({
       components: [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(inProgress, delivery, done),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(queued, inProgress, delivery, done),
         new ActionRowBuilder<ButtonBuilder>().addComponents(repeatable, hold, close),
         new ActionRowBuilder<ButtonBuilder>().addComponents(refresh, rename),
       ],

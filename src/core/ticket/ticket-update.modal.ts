@@ -11,7 +11,7 @@ export class TicketUpdateModalBuilder extends ModalBuilder {
       .setCustomId('ticket/name')
       .setLabel('Name')
       .setValue(ticket.name)
-      .setStyle(TextInputStyle.Paragraph)
+      .setStyle(TextInputStyle.Short)
       .setMaxLength(2048);
 
     return this.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(name));

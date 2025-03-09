@@ -279,6 +279,14 @@ export class TicketServiceImpl extends TicketService {
         );
         break;
 
+      case TicketTag.QUEUED:
+        await starterMessage.edit(
+          new TicketInfoPromptBuilder()
+            .addLifecycleControls(ticket, { disabled: ['queued'] })
+            .build(),
+        );
+        break;
+
       case TicketTag.DELIVERY:
         await starterMessage.edit(
           new TicketInfoPromptBuilder()

@@ -19,7 +19,8 @@ import { Crew } from 'src/core/crew/crew.entity';
 
 export const TicketTagToEmote = {
   [TicketTag.ABANDONED]: '🔒',
-  [TicketTag.ACCEPTED]: '🟠',
+  [TicketTag.ACCEPTED]: '⚪️',
+  [TicketTag.QUEUED]: '🟠',
   [TicketTag.DECLINED]: '❌',
   [TicketTag.DELIVERY]: '🚛',
   [TicketTag.DONE]: '✅',
@@ -27,7 +28,7 @@ export const TicketTagToEmote = {
   [TicketTag.IN_PROGRESS]: '🛠️',
   [TicketTag.MOVED]: '↗️',
   [TicketTag.REPEATABLE]: '♻️',
-  [TicketTag.TRIAGE]: '⚪️',
+  [TicketTag.TRIAGE]: '🚩',
 } as const;
 
 @Entity()

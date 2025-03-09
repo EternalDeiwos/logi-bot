@@ -47,6 +47,7 @@ export const TicketActionToTag = {
   repeat: TicketTag.REPEATABLE,
   delivery: TicketTag.DELIVERY,
   hold: TicketTag.HOLD,
+  queued: TicketTag.QUEUED,
   done: TicketTag.DONE,
   close: TicketTag.ABANDONED,
 } as const;
@@ -661,6 +662,15 @@ export class TicketCommand {
   })
   async onTicketRepeatCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.REPEATABLE);
+  }
+
+  @Subcommand({
+    name: 'queued',
+    description: 'Ticket added to queue. Crew members only',
+    dmPermission: false,
+  })
+  async onTicketQueuedCommand(@Context() context: SlashCommandContext) {
+    return this.lifecycleCommand(context, TicketTag.QUEUED);
   }
 
   @Subcommand({
