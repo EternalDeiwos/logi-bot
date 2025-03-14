@@ -21,6 +21,7 @@ Welcome to our ticket system ${userMention(member)}. The members of our ${roleMe
 
 - You may be required to provide resources for us to complete this ticket. When the ticket is complete, please post proof, such as a screenshot, or ask the member who completed the request to post information so the ticket can be closed.
 - Crew members can accept or decline the ticket using the controls provided.
+- Whoever accepts the ticket will be responsible for it.
 - Once accepted, crew members can update the ticket using the buttons which will inform you of any progress, for example: when your request has been started if you are waiting in a queue.
 - Only once a request is **completed, delivered, and proof is posted to this channel** should the ticket be marked as _Done_.
 - At any point if you no longer need this ticket then you can close the ticket yourself by clicking the _Close_ button below.

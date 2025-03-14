@@ -83,12 +83,23 @@ export class TicketUpdatePromptBuilder extends BasePromptBuilder {
         .split('\n')
         .map((r) => `> ${r}`)
         .join('\n');
-    const description = `Your ticket ${channelMention(ticket.threadSf)} was ${properties.action} by ${updatedBy}`;
+    const reasonPart = reason ? ` for the following reason:\n\n${message}` : '';
+    const mainPart = `Your ticket ${channelMention(ticket.threadSf)} was ${properties.action} by ${updatedBy}`;
+    const description = [mainPart, reasonPart].join('');
+
     const embed = new EmbedBuilder()
       .setTitle(properties.title)
       .setColor(properties.color)
-      .setDescription(description + ((reason && ` for the following reason:\n\n${message}`) || ''))
+      .setDescription(description)
       .setThumbnail(updatedBy.avatarURL() ?? updatedBy.user.avatarURL());
+
+    if (ticket.state === TicketTag.ACCEPTED) {
+      embed.addFields({
+        name: 'Responsibility',
+        value: 'They are now responsible for this ticket.',
+        inline: false,
+      });
+    }
 
     return this.add({
       embeds: [embed],
