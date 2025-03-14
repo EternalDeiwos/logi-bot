@@ -26,6 +26,7 @@ import { SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
+import { GuildSettingName } from 'src/core/guild/guild-setting.entity';
 import { CrewService } from 'src/core/crew/crew.service';
 import { CrewUpdateModalBuilder } from 'src/core/crew/crew-update.modal';
 import { AccessService } from 'src/core/access/access.service';
@@ -284,9 +285,8 @@ export class TicketCommand {
     const where = interaction.fields.getTextInputValue('ticket/form/where');
     const when = interaction.fields.getTextInputValue('ticket/form/when');
 
-    const regiment =
-      who && !who.toLowerCase().includes('none') ? `[${who.toUpperCase()}]` : 'for personal use';
-    const title = `${regiment} ${what}`;
+    const regiment = who && !who.toLowerCase().includes('none') ? `[${who.toUpperCase()}] ` : '';
+    const title = [regiment, what].join('');
 
     const content = [
       '## What do you need?',
@@ -303,7 +303,17 @@ export class TicketCommand {
       '',
     ].join('\n');
 
-    const crew = await this.crewService.query().byCrew({ crewSf: crewRef }).getOneOrFail();
+    const guild = await this.guildService
+      .query()
+      .byGuild({ guildSf: interaction.guildId })
+      .getOneOrFail();
+    const guildSettings = guild.getConfig();
+    const crew =
+      (await this.crewService.query().byCrew({ crewSf: crewRef }).getOne()) ??
+      (await this.crewService
+        .query()
+        .byCrew({ crewSf: guildSettings[GuildSettingName.GUILD_TRIAGE_CREW] })
+        .getOneOrFail());
     const result = await this.ticketService.createTicket(crew, {
       name: title,
       content,
