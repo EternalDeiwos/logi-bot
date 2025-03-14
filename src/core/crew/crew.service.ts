@@ -511,8 +511,15 @@ export class CrewServiceImpl extends CrewService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
-    if (crew.isSecureOnly && !(await this.discordService.isChannelPrivate(targetChannel))) {
-      throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
+    try {
+      if (crew.isSecureOnly && !(await this.discordService.isChannelPrivate(targetChannel))) {
+        throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
+      }
+    } catch {
+      throw new ExternalError(
+        'DISCORD_API_ERROR',
+        `Failed to resolve crew channel for ${crew.name} in ${crew.guild.name}`,
+      );
     }
 
     const war = await this.warService.query().byCurrent().getOneOrFail();
@@ -557,7 +564,8 @@ export class CrewServiceImpl extends CrewService {
       try {
         crewChannel = await discordGuild.channels.fetch(crew.crewSf);
       } catch {
-        throw new ExternalError('DISCORD_API_ERROR', `Failed to resolve channel: ${crew.crewSf}`);
+        this.logger.warn(`Failed to resolve crew channel for ${crew.name} in ${crew.guild.name}`);
+        continue;
       }
 
       if (

@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { InsertResult } from 'typeorm';
-import { GuildManager, PermissionsBitField, Snowflake } from 'discord.js';
+import { GuildBasedChannel, GuildManager, PermissionsBitField, Snowflake } from 'discord.js';
 import { AuthError, InternalError, ValidationError } from 'src/errors';
 import { TicketTag } from 'src/types';
 import { DiscordService } from 'src/bot/discord.service';
@@ -328,7 +328,13 @@ export class TicketServiceImpl extends TicketService {
       .withMembers()
       .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
-    const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+
+    let crewChannel: GuildBasedChannel;
+    try {
+      crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+    } catch {
+      this.logger.warn(`Failed to resolve crew channel for ${crew.name} in ${crew.guild.name}`);
+    }
 
     if (!crewChannel.permissionsFor(memberRef).has(PermissionsBitField.Flags.ViewChannel, true)) {
       throw new AuthError('FORBIDDEN', 'You do not have access to that crew').asDisplayable();
@@ -378,7 +384,13 @@ export class TicketServiceImpl extends TicketService {
     const crews = [];
 
     for (const crew of srcCrews) {
-      const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+      let crewChannel: GuildBasedChannel;
+      try {
+        crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+      } catch {
+        this.logger.warn(`Failed to resolve crew channel for ${crew.name} in ${crew.guild.name}`);
+        continue;
+      }
 
       if (
         !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||
