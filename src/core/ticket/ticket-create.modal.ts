@@ -52,22 +52,22 @@ const formDetail = {
     },
     where: {
       label: 'Où',
-      value: 'Nous viendrons le récupérer',
+      value: 'We will fetch it when it is done',
     },
     when: {
       label: 'Quand',
-      value: 'Dès que possible',
+      value: 'As soon as possible',
     },
   },
   ru: {
     title: 'Создать заявку',
     who: {
       label: 'Полк',
-      placeholder: 'например AIR или нет',
+      placeholder: 'Например AIR или нет',
     },
     what: {
       label: 'Запрос',
-      placeholder: 'например x25 Spatha + x36 Nemesis',
+      placeholder: 'Например x25 Spatha + x36 Nemesis',
     },
     detail: {
       label: 'Подробности',
@@ -75,11 +75,11 @@ const formDetail = {
     },
     where: {
       label: 'Где',
-      value: 'Мы заберем это, когда будет готово',
+      value: 'We will fetch it when it is done',
     },
     when: {
       label: 'Когда',
-      value: 'Как можно скорее',
+      value: 'As soon as possible',
     },
   },
   pl: {
@@ -98,11 +98,11 @@ const formDetail = {
     },
     where: {
       label: 'Gdzie',
-      value: 'Odbierzemy to, gdy będzie gotowe',
+      value: 'We will fetch it when it is done',
     },
     when: {
       label: 'Kiedy',
-      value: 'Jak najszybciej',
+      value: 'As soon as possible',
     },
   },
   zh: {
@@ -121,11 +121,11 @@ const formDetail = {
     },
     where: {
       label: '位置',
-      value: '完成后我们将取走',
+      value: 'We will fetch it when it is done',
     },
     when: {
       label: '时间',
-      value: '尽快',
+      value: 'As soon as possible',
     },
   },
 } as const;
