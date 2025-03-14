@@ -5,6 +5,7 @@ import {
   ChannelType,
   Client,
   DiscordAPIError,
+  GuildBasedChannel,
   GuildManager,
   OverwriteResolvable,
   PermissionsBitField,
@@ -547,11 +548,17 @@ export class CrewServiceImpl extends CrewService {
       .withTeam()
       .withMembers()
       .withTickets()
+      .withoutPending()
       .getMany();
     const crews = [];
 
     for (const crew of srcCrews) {
-      const crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+      let crewChannel: GuildBasedChannel;
+      try {
+        crewChannel = await discordGuild.channels.fetch(crew.crewSf);
+      } catch {
+        throw new ExternalError('DISCORD_API_ERROR', `Failed to resolve channel: ${crew.crewSf}`);
+      }
 
       if (
         !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||

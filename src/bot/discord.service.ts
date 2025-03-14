@@ -296,12 +296,16 @@ export class DiscordServiceImpl extends DiscordService {
     let channel: GuildBasedChannel;
     let guild: Guild;
 
-    if (maybeChannel instanceof GuildChannel) {
+    if (typeof maybeChannel === 'string') {
+      try {
+        guild = await this.guildManager.fetch(maybeChannel);
+        channel = await guild.channels.fetch(channelRef);
+      } catch (err) {
+        throw new ExternalError('DISCORD_API_ERROR', `Failed to resolve channel: ${channelRef}`);
+      }
+    } else {
       channel = maybeChannel;
       guild = channel.guild;
-    } else {
-      guild = await this.guildManager.fetch(maybeChannel);
-      channel = await guild.channels.fetch(channelRef);
     }
 
     return !channel
