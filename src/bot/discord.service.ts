@@ -172,11 +172,11 @@ export class DiscordServiceImpl extends DiscordService {
     const guild = await this.guildManager.fetch(guildSf);
 
     if (channelSf) {
-      const channel = await guild.channels.fetch(channelSf);
-
-      if (channel) {
-        // Note: do not overwrite permissions
+      try {
+        const channel = await guild.channels.fetch(channelSf);
         return channel;
+      } catch {
+        this.logger.warn(`Channel ${channelSf} no longer exists in ${guild.name}`);
       }
     }
 

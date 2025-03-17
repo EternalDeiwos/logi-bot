@@ -1,5 +1,6 @@
 import { Injectable, Logger, UseFilters } from '@nestjs/common';
 import { Context, ContextOf, On } from 'necord';
+import { Client } from 'discord.js';
 import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { TicketService } from 'src/core/ticket/ticket.service';
 import { CrewService } from 'src/core/crew/crew.service';
@@ -7,6 +8,7 @@ import { CrewMemberService } from 'src/core/crew/member/crew-member.service';
 import { GuildService } from 'src/core/guild/guild.service';
 import { CrewJoinPromptBuilder } from './crew/crew-join.prompt';
 import { TicketInfoPromptBuilder } from './ticket/ticket-info.prompt';
+import { CrewSettingName } from './crew/crew-setting.entity';
 
 @Injectable()
 @UseFilters(DiscordExceptionFilter)
@@ -14,6 +16,7 @@ export class BotEventListener {
   private readonly logger = new Logger(BotEventListener.name);
 
   constructor(
+    private readonly client: Client,
     private readonly guildService: GuildService,
     private readonly ticketService: TicketService,
     private readonly crewService: CrewService,
@@ -37,6 +40,21 @@ export class BotEventListener {
     // Deregister guild
   }
 
+  @On('threadDelete')
+  async onThreadDelete(@Context() [thread]: ContextOf<'threadDelete'>) {
+    const ticket = await this.ticketService
+      .query()
+      .byTicket({ threadSf: thread.id })
+      .withCrew()
+      .withCrewSettings()
+      .getOneOrFail();
+
+    await this.ticketService.deleteTicket({ threadSf: ticket.id }, this.client.user.id);
+    this.logger.warn(
+      `Ticket deleted: ${ticket.name} for ${ticket.crew.name} in ${ticket.guild.name}`,
+    );
+  }
+
   @On('threadCreate')
   async onThreadCreate(@Context() [thread]: ContextOf<'threadCreate'>) {
     // This is a hack to delay the event to ensure the Ticket record is written to the database before proceeding.
@@ -45,14 +63,18 @@ export class BotEventListener {
       .query()
       .byTicket({ threadSf: thread.id })
       .withCrew()
+      .withCrewSettings()
       .getOneOrFail();
 
+    const crewSettings = ticket.crew.getConfig();
     const message = await thread.fetchStarterMessage();
     const prompt = new TicketInfoPromptBuilder();
 
-    prompt.addTriageControls(ticket, { disabled: { accept: ticket.crew.hasMovePrompt } });
+    prompt.addTriageControls(ticket, {
+      disabled: { accept: crewSettings[CrewSettingName.CREW_TRIAGE].asBoolean() },
+    });
 
-    if (ticket.crew.hasMovePrompt) {
+    if (crewSettings[CrewSettingName.CREW_TRIAGE].asBoolean()) {
       const crews = await this.crewService
         .query()
         .byGuildAndShared({ guildSf: thread.guildId })

@@ -25,6 +25,8 @@ import { CrewLogService, CrewLogServiceImpl } from './crew/log/crew-log.service'
 import { CrewLogRepository } from './crew/log/crew-log.repository';
 import { CrewShareService, CrewShareServiceImpl } from './crew/share/crew-share.service';
 import { CrewShareRepository } from './crew/share/crew-share.repository';
+import { CrewAccess } from './crew/crew-access.entity';
+import { CrewSetting } from './crew/crew-setting.entity';
 import { CrewController } from './crew/crew.controller';
 import { TicketService, TicketServiceImpl } from './ticket/ticket.service';
 import { TicketCommand } from './ticket/ticket.command';
@@ -32,6 +34,8 @@ import { TicketRepository } from './ticket/ticket.repository';
 import { TicketController } from './ticket/ticket.controller';
 import { AccessModule } from './access/access.module';
 import { CrewDiscordActionsResponseConsumer } from './crew/crew-discord-actions-response.consumer';
+import { CrewAccessRepository } from './crew/crew-access.repository';
+import { CrewSettingRepository } from './crew/crew-setting.repository';
 
 @Module({
   imports: [
@@ -40,7 +44,17 @@ import { CrewDiscordActionsResponseConsumer } from './crew/crew-discord-actions-
     forwardRef(() => GuildModule),
     ApiModule,
     AccessModule,
-    TypeOrmModule.forFeature([Team, Crew, CrewMember, Ticket, CrewLog, Guild, CrewShare]),
+    TypeOrmModule.forFeature([
+      Team,
+      Crew,
+      CrewMember,
+      CrewAccess,
+      CrewSetting,
+      Ticket,
+      CrewLog,
+      Guild,
+      CrewShare,
+    ]),
     WarModule,
   ],
   providers: [
@@ -52,6 +66,8 @@ import { CrewDiscordActionsResponseConsumer } from './crew/crew-discord-actions-
     CrewMemberRepository,
     CrewLogRepository,
     CrewShareRepository,
+    CrewAccessRepository,
+    CrewSettingRepository,
     TicketCommand,
     TicketRepository,
     CrewDiscordActionsResponseConsumer,

@@ -16,7 +16,9 @@ export abstract class GuildService {
     template: Required<Pick<InsertGuildSettingDto, 'updatedBy' | 'guildId'>>,
     config: GuildConfig,
   ): Promise<InsertResult>;
-  abstract grantAccess(access: InsertGuildAccessDto): Promise<InsertResult>;
+  abstract grantAccess(
+    access: InsertGuildAccessDto | InsertGuildAccessDto[],
+  ): Promise<InsertResult>;
 }
 
 @Injectable()
@@ -59,7 +61,7 @@ export class GuildServiceImpl extends GuildService {
     return result;
   }
 
-  async grantAccess(data: InsertGuildAccessDto) {
+  async grantAccess(data: InsertGuildAccessDto | InsertGuildAccessDto[]) {
     return await this.accessRepo.insert(data);
   }
 }

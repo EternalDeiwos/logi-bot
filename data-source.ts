@@ -27,6 +27,8 @@ import { CounterAccess } from 'src/inventory/counter/counter-access.entity';
 import { GuildSetting } from 'src/core/guild/guild-setting.entity';
 import { GuildAccess } from 'src/core/guild/guild-access.entity';
 import * as migrations from 'src/database/migrations';
+import { CrewAccess } from 'src/core/crew/crew-access.entity';
+import { CrewSetting } from 'src/core/crew/crew-setting.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -46,6 +48,8 @@ export const AppDataSource = new DataSource({
     Guild,
     GuildSetting,
     CrewShare,
+    CrewAccess,
+    CrewSetting,
     War,
     Region,
     CurrentRegion,

@@ -98,6 +98,7 @@ export class CrewDiscordActionsResponseConsumer {
       `Registering crew voice channel ${payload.channelSf} for target ${JSON.stringify(payload.target)}`,
     );
     await this.crewService.updateCrew({ id }, { voiceSf: payload.channelSf });
+    await this.crewService.reconcileCrew({ id });
   }
 
   private async ensureAuditMessage(

@@ -19,6 +19,7 @@ import { CrewService } from 'src/core/crew/crew.service';
 import { CrewMemberRepository } from './crew-member.repository';
 import { SelectCrewMemberDto, UpdateCrewMemberDto } from './crew-member.entity';
 import { CrewMemberQueryBuilder } from './crew-member.query';
+import { CrewSettingName } from '../crew-setting.entity';
 
 export abstract class CrewMemberService {
   abstract query(): CrewMemberQueryBuilder;
@@ -231,9 +232,18 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   }
 
   async reconcileCrewMembership(crewRef: SelectCrewDto) {
-    const crew = await this.crewService.query().byCrew(crewRef).withMembers().getOneOrFail();
+    const crew = await this.crewService
+      .query()
+      .byCrew(crewRef)
+      .withMembers()
+      .withSettings()
+      .getOneOrFail();
+    const {
+      [CrewSettingName.CREW_PRUNING]: autoPruneFlag,
+      [CrewSettingName.CREW_OPSEC]: opsecFlag,
+    } = crew.getConfig();
 
-    if (!crew.isAutomaticPruning) {
+    if (!autoPruneFlag || !autoPruneFlag.asBoolean()) {
       return;
     }
 
@@ -264,7 +274,8 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
       if (
         crew.guild?.getConfig()['crew.viewer_role'] &&
-        crew.isSecureOnly &&
+        opsecFlag &&
+        opsecFlag.asBoolean() &&
         !member.roles.cache.has(crew.guild?.getConfig()['crew.viewer_role']) &&
         crewMember.access >= CrewMemberAccess.MEMBER
       ) {
@@ -295,9 +306,11 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       .byGuild(guildRef)
       .byMember(memberRef)
       .withGuildSettings()
+      .withCrewSettings()
       .withoutPending()
       .getMany();
     for (const crewMember of members) {
+      const { [CrewSettingName.CREW_OPSEC]: opsecFlag } = crewMember.crew.getConfig();
       let channel: GuildBasedChannel | null;
       try {
         channel = await discordGuild.channels.fetch(crewMember.crew.crewSf);
@@ -325,7 +338,8 @@ export class CrewMemberServiceImpl extends CrewMemberService {
 
       if (
         crewMember.crew?.guild?.getConfig()['crew.viewer_role'] &&
-        crewMember.crew?.isSecureOnly &&
+        opsecFlag &&
+        opsecFlag.asBoolean() &&
         !member.roles.cache.has(crewMember.crew?.guild?.getConfig()['crew.viewer_role']) &&
         crewMember.access >= CrewMemberAccess.MEMBER
       ) {

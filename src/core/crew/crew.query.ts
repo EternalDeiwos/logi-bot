@@ -3,6 +3,7 @@ import { Snowflake } from 'discord.js';
 import { CommonQueryBuilder } from 'src/database/util';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { Crew, SelectCrewDto } from './crew.entity';
+import { CrewSettingName } from './crew-setting.entity';
 
 const searchWhere = (crewAlias: string = 'crew') => {
   return new Brackets((qb) =>
@@ -124,6 +125,19 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
+  bySetting(key: CrewSettingName, value: unknown) {
+    this.qb.andWhere(
+      new Brackets((qb) =>
+        qb.where(`crew_setting.name=:${key}`).andWhere(`crew_setting.value=:v_${key}`),
+      ),
+      {
+        [key]: key,
+        [`v_${key}`]: typeof value === 'string' ? value : JSON.stringify(value),
+      },
+    );
+    return this;
+  }
+
   withTeam() {
     this.qb.leftJoinAndSelect('crew.team', 'team');
     return this;
@@ -153,8 +167,18 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
+  withSettings() {
+    this.qb.leftJoinAndSelect('crew.settings', 'crew_setting');
+    return this;
+  }
+
+  withAccessRules() {
+    this.qb.leftJoinAndSelect('crew.access', 'access').leftJoinAndSelect('access.rule', 'rule');
+    return this;
+  }
+
   withGuildSettings() {
-    this.qb.leftJoinAndSelect('guild.settings', 'settings');
+    this.qb.leftJoinAndSelect('guild.settings', 'guild_setting');
     return this;
   }
 
