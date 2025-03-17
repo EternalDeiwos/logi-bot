@@ -14,6 +14,7 @@ import { BasePromptBuilder } from 'src/bot/prompt';
 import { PromptEmbed } from 'src/bot/embed';
 import { Crew, SelectCrewChannelDto } from 'src/core/crew/crew.entity';
 import { Guild } from 'src/core/guild/guild.entity';
+import { CrewSettingName } from 'src/core/crew/crew-setting.entity';
 import { InsertTicketDto, SelectTicketDto } from './ticket.entity';
 
 export const ticketTriageMessage = (member: Snowflake, role: Snowflake) => `
@@ -55,18 +56,25 @@ export class TicketInfoPromptBuilder extends BasePromptBuilder {
   }
 
   public addTicketMessage(ticket: InsertTicketDto, crew: Crew) {
+    const {
+      [CrewSettingName.CREW_TICKET_HELP_TEXT]: ticketHelpText,
+      [CrewSettingName.CREW_TRIAGE]: triageFlag,
+    } = crew.getConfig();
     const content = newTicketMessage(ticket.content, ticket.createdBy, crew.roleSf);
     const embed = new EmbedBuilder()
       .setColor(Colors.DarkGold)
-      .setDescription(crew.ticketHelpText || ticketTriageMessage(ticket.createdBy, crew.roleSf));
+      .setDescription(
+        (ticketHelpText && ticketHelpText.asString()) ||
+          ticketTriageMessage(ticket.createdBy, crew.roleSf),
+      );
 
-    if (!crew.ticketHelpText) {
+    if (!ticketHelpText) {
       embed.setTitle('New Ticket');
     }
 
     const allowedMentions = {
       users: [ticket.createdBy],
-      roles: crew.hasMovePrompt ? [] : [crew.roleSf],
+      roles: triageFlag.asBoolean() ? [] : [crew.roleSf],
     };
 
     return this.add({

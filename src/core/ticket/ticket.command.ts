@@ -20,7 +20,7 @@ import {
 } from 'necord';
 import { Message, Snowflake } from 'discord.js';
 import { AuthError, InternalError, ValidationError } from 'src/errors';
-import { CrewMemberAccess, TicketTag } from 'src/types';
+import { AccessMode, CrewMemberAccess, TicketTag } from 'src/types';
 import { BotService, CommandInteraction } from 'src/bot/bot.service';
 import { SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
@@ -28,7 +28,10 @@ import { DiscordExceptionFilter } from 'src/bot/bot-exception.filter';
 import { GuildService } from 'src/core/guild/guild.service';
 import { GuildSettingName } from 'src/core/guild/guild-setting.entity';
 import { CrewService } from 'src/core/crew/crew.service';
-import { CrewUpdateModalBuilder } from 'src/core/crew/crew-update.modal';
+import { CrewSettingName } from 'src/core/crew/crew-setting.entity';
+import { CrewAction } from 'src/core/crew/crew-access.entity';
+import { AccessDecision } from 'src/core/access/access-decision';
+import { CrewSettingUpdateModalBuilder } from 'src/core/crew/crew-update.modal';
 import { AccessService } from 'src/core/access/access.service';
 import { AccessDecisionBuilder } from 'src/core/access/access-decision.builder';
 import { SelectCrewCommandParams } from 'src/core/crew/crew.command';
@@ -246,17 +249,21 @@ export class TicketCommand {
     const ticket = await this.ticketService
       .query()
       .withCrew()
+      .withCrewAccess()
       .byTicket({ threadSf: threadRef })
       .getOneOrFail();
 
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: ticket.crew.id } })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: ticket.crew.id } })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !ticket.crew
+        .getAccessRulesForAction(CrewAction.CREW_TICKET_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
@@ -346,17 +353,21 @@ export class TicketCommand {
     const ticket = await this.ticketService
       .query()
       .withCrew()
+      .withCrewAccess()
       .byChannel(threadRef || interaction.channelId)
       .getOne();
 
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: ticket.crewId } })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: ticket.crew.id } })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !ticket.crew
+        .getAccessRulesForAction(CrewAction.CREW_TICKET_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
@@ -379,17 +390,21 @@ export class TicketCommand {
     const ticket = await this.ticketService
       .query()
       .withCrew()
+      .withCrewAccess()
       .byTicket({ threadSf: threadRef })
       .getOneOrFail();
 
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: ticket.crew.id } })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: ticket.crew.id } })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !ticket.crew
+        .getAccessRulesForAction(CrewAction.CREW_TICKET_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
@@ -414,16 +429,24 @@ export class TicketCommand {
   })
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
     const ticketRef: SelectTicketDto = { threadSf: interaction.channelId };
-    const ticket = await this.ticketService.query().withCrew().byTicket(ticketRef).getOneOrFail();
+    const ticket = await this.ticketService
+      .query()
+      .withCrew()
+      .withCrewAccess()
+      .byTicket(ticketRef)
+      .getOneOrFail();
 
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: ticket.crew.id } })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: ticket.crew.id } })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !ticket.crew
+        .getAccessRulesForAction(CrewAction.CREW_TICKET_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
@@ -457,12 +480,14 @@ export class TicketCommand {
     let crew = await this.crewService
       .query()
       .byCrew({ crewSf: data.crew || interaction.channelId })
+      .withSettings()
       .getOne();
 
     if (!crew) {
       const ticket = await this.ticketService
         .query()
         .withCrew()
+        .withCrewAccess()
         .byChannel(data.crew || interaction.channelId)
         .getOne();
 
@@ -478,11 +503,14 @@ export class TicketCommand {
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: crew.id }, crewRole: CrewMemberAccess.ADMIN })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !crew
+        .getAccessRulesForAction(CrewAction.CREW_SETTING_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError(
         'FORBIDDEN',
@@ -490,7 +518,14 @@ export class TicketCommand {
       ).asDisplayable();
     }
 
-    const modal = new CrewUpdateModalBuilder().forCrew(crew).addTicketHelpField(crew);
+    const { [CrewSettingName.CREW_TICKET_HELP_TEXT]: ticketHelp } = crew.getConfig();
+    const modal = new CrewSettingUpdateModalBuilder()
+      .forCrew(crew)
+      .addField(
+        CrewSettingName.CREW_TICKET_HELP_TEXT,
+        'Help Text',
+        ticketHelp && ticketHelp.asString(),
+      );
     return interaction.showModal(modal);
   }
 
@@ -504,17 +539,21 @@ export class TicketCommand {
     const ticket = await this.ticketService
       .query()
       .withCrew()
+      .withCrewAccess()
       .byTicket({ threadSf: interaction.channelId })
       .getOneOrFail();
 
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: ticket.crew.id } })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: ticket.crew.id } })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !ticket.crew
+        .getAccessRulesForAction(CrewAction.CREW_TICKET_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
@@ -542,17 +581,21 @@ export class TicketCommand {
     const ticket = await this.ticketService
       .query()
       .withCrew()
+      .withCrewAccess()
       .byChannel(threadRef || interaction.channelId)
       .getOne();
 
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: ticket.crewId } })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: ticket.crew.id } })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !ticket.crew
+        .getAccessRulesForAction(CrewAction.CREW_TICKET_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
@@ -575,16 +618,21 @@ export class TicketCommand {
     const ticket = await this.ticketService
       .query()
       .withCrew()
+      .withCrewAccess()
+      .withCrewSettings()
       .withTeam()
       .byTicket({ threadSf })
       .getOneOrFail();
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: ticket.crew.id } })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: ticket.crew.id } })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !ticket.crew
+        .getAccessRulesForAction(CrewAction.CREW_TICKET_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }
@@ -623,11 +671,14 @@ export class TicketCommand {
     const accessArgs = await this.accessService.getTestArgs(interaction);
 
     if (
-      new AccessDecisionBuilder()
-        .addRule({ crew: { id: ticket.crew.id } })
+      !new AccessDecisionBuilder()
         .addRule({ guildAdmin: true })
+        .addRule({ crew: { id: ticket.crew.id } })
         .build()
-        .deny(...accessArgs)
+        .permit(...accessArgs) &&
+      !ticket.crew
+        .getAccessRulesForAction(CrewAction.CREW_TICKET_MANAGE, AccessMode.WRITE)
+        .some((access) => AccessDecision.fromEntry(access.rule).permit(...accessArgs))
     ) {
       throw new AuthError('FORBIDDEN', 'Only crew members can perform this action').asDisplayable();
     }

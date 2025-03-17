@@ -16,6 +16,7 @@ import { TicketUpdatePromptBuilder } from './ticket-update.prompt';
 import { TicketClosedPromptBuilder } from './ticket-closed.prompt';
 import { TicketStatusPromptBuilder } from './ticket-status.prompt';
 import { TicketQueryBuilder } from './ticket.query';
+import { CrewSettingName } from '../crew/crew-setting.entity';
 
 export abstract class TicketService {
   abstract query(): TicketQueryBuilder;
@@ -64,7 +65,12 @@ export class TicketServiceImpl extends TicketService {
   }
 
   async createTicket(crewRef: SelectCrewChannelDto, ticket?: InsertTicketDto) {
-    const crew = await this.crewService.query().byCrew(crewRef).withTeam().getOneOrFail();
+    const crew = await this.crewService
+      .query()
+      .byCrew(crewRef)
+      .withTeam()
+      .withSettings()
+      .getOneOrFail();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const forum = await discordGuild.channels.fetch(crew.team.forumSf);
 
@@ -176,6 +182,7 @@ export class TicketServiceImpl extends TicketService {
       .withDeleted()
       .byTicket(ticketRef)
       .withCrew()
+      .withCrewSettings()
       .withTeam()
       .getOneOrFail();
 
@@ -236,6 +243,7 @@ export class TicketServiceImpl extends TicketService {
   }
 
   public async refreshTicket(ticket: Ticket) {
+    const crewSettings = ticket.crew.getConfig();
     const discordGuild = await this.guildManager.fetch(ticket.guild.guildSf);
     const forum = await discordGuild.channels.fetch(ticket.crew.team.forumSf);
 
@@ -251,7 +259,9 @@ export class TicketServiceImpl extends TicketService {
       case TicketTag.TRIAGE:
         await starterMessage.edit(
           new TicketInfoPromptBuilder()
-            .addTriageControls(ticket, { disabled: { accept: ticket.crew.hasMovePrompt } })
+            .addTriageControls(ticket, {
+              disabled: { accept: crewSettings[CrewSettingName.CREW_TRIAGE].asBoolean() },
+            })
             .build(),
         );
         break;
@@ -326,7 +336,9 @@ export class TicketServiceImpl extends TicketService {
       .withTeam()
       .withTickets()
       .withMembers()
+      .withSettings()
       .getOneOrFail();
+    const crewSettings = crew.getConfig();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
 
     let crewChannel: GuildBasedChannel;
@@ -346,7 +358,10 @@ export class TicketServiceImpl extends TicketService {
       throw new ValidationError('VALIDATION_FAILED', 'Invalid channel').asDisplayable();
     }
 
-    if (crew.isSecureOnly && !(await this.discordService.isChannelPrivate(targetChannel))) {
+    if (
+      crewSettings[CrewSettingName.CREW_OPSEC].asBoolean() &&
+      !(await this.discordService.isChannelPrivate(targetChannel))
+    ) {
       throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
     }
 
@@ -380,10 +395,12 @@ export class TicketServiceImpl extends TicketService {
       .withTeam()
       .withMembers()
       .withTickets()
+      .withSettings()
       .getMany();
     const crews = [];
 
     for (const crew of srcCrews) {
+      const crewSettings = crew.getConfig();
       let crewChannel: GuildBasedChannel;
       try {
         crewChannel = await discordGuild.channels.fetch(crew.crewSf);
@@ -394,7 +411,7 @@ export class TicketServiceImpl extends TicketService {
 
       if (
         !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||
-        (crew.isSecureOnly && !targetChannelSecure)
+        (crewSettings[CrewSettingName.CREW_OPSEC].asBoolean() && !targetChannelSecure)
       ) {
         continue;
       }

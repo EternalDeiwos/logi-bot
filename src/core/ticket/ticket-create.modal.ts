@@ -173,7 +173,7 @@ export class TicketCreateModalBuilder extends ModalBuilder {
       .setCustomId('ticket/form/what')
       .setLabel((what?.emoji ? `${what.emoji} ` : '') + formDetail[locale].what.label)
       .setPlaceholder(formDetail[locale].what.placeholder)
-      .setMaxLength(25)
+      .setMaxLength(32)
       .setRequired(true)
       .setValue(what?.value || '')
       .setStyle(TextInputStyle.Short);

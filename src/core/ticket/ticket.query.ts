@@ -63,6 +63,16 @@ export class TicketQueryBuilder extends CommonQueryBuilder<Ticket> {
     return this;
   }
 
+  withCrewSettings() {
+    this.qb.leftJoinAndSelect('crew.settings', 'crew_settings');
+    return this;
+  }
+
+  withCrewAccess() {
+    this.qb.leftJoinAndSelect('crew.access', 'crew_access');
+    return this;
+  }
+
   withPreviousGuild() {
     this.qb.leftJoinAndSelect('previous_crew.guild', 'previous_guild');
     return this;
