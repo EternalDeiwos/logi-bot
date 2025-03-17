@@ -14,13 +14,18 @@ import {
 } from 'typeorm';
 import { Snowflake } from 'discord.js';
 import { Expose, Transform, Type } from 'class-transformer';
-import { CrewMemberAccess } from 'src/types';
+import { AccessMode, CrewMemberAccess } from 'src/types';
 import { Ticket } from 'src/core/ticket/ticket.entity';
 import { Team } from 'src/core/team/team.entity';
 import { Guild } from 'src/core/guild/guild.entity';
 import { CrewMember } from './member/crew-member.entity';
 import { CrewLog } from './log/crew-log.entity';
 import { CrewShare } from './share/crew-share.entity';
+import { CrewAccess, CrewAction } from './crew-access.entity';
+import { CrewSetting, CrewSettingName } from './crew-setting.entity';
+
+export type CrewConfig = Partial<Record<CrewSettingName, CrewSetting>>;
+export type CrewConfigValue = Partial<Record<CrewSettingName, string>>;
 
 @Entity()
 @Unique('uk_guild_name_deleted_at', ['guildId', 'shortName', 'deletedAt'])
@@ -101,53 +106,6 @@ export class Crew {
   @Index('audit_message_sf_idx_crew')
   auditMessageSf?: Snowflake;
 
-  @Column({ type: 'text', name: 'ticket_help', nullable: true })
-  ticketHelpText?: string;
-
-  @Expose()
-  @Column({
-    type: 'boolean',
-    name: 'enable_move_prompt',
-    default: false,
-    comment: 'Tickets for this crew will display the move dialog by default',
-  })
-  hasMovePrompt: boolean;
-
-  @Expose()
-  @Column({
-    type: 'boolean',
-    name: 'is_permanent',
-    default: false,
-    comment: 'Crew will not be archived during a purge',
-  })
-  isPermanent: boolean;
-
-  @Expose()
-  @Column({
-    type: 'boolean',
-    name: 'is_pruning',
-    default: false,
-    comment: 'Crew will not be pruned',
-  })
-  isAutomaticPruning: boolean;
-
-  @Column({
-    type: 'boolean',
-    name: 'require_voice_channel',
-    default: false,
-    comment: 'Crew will be created with a voice channel',
-  })
-  requireVoice: boolean;
-
-  @Expose()
-  @Column({
-    type: 'boolean',
-    name: 'secure_only',
-    default: true,
-    comment: 'Crew information to be displayed only in private channels',
-  })
-  isSecureOnly: boolean;
-
   @Expose()
   @Type(() => CrewMember)
   @Transform(({ value }) => (value ? value : null))
@@ -168,6 +126,12 @@ export class Crew {
 
   @OneToMany(() => CrewShare, (share) => share.crew)
   shared: CrewShare[];
+
+  @OneToMany(() => CrewAccess, (access) => access.crew)
+  access: CrewAccess[];
+
+  @OneToMany(() => CrewSetting, (setting) => setting.crew)
+  settings: CrewSetting[];
 
   @Column({ type: 'timestamptz', name: 'processed_at', nullable: true })
   processedAt: Date;
@@ -196,6 +160,17 @@ export class Crew {
     const members = await this.members;
     return members.find((member) => member.access === CrewMemberAccess.OWNER);
   }
+
+  getConfig() {
+    return this.settings.reduce((config, current) => {
+      config[current.name] = current;
+      return config;
+    }, {} as CrewConfig);
+  }
+
+  getAccessRulesForAction(action: CrewAction, access: AccessMode = AccessMode.READ) {
+    return this.access.filter((rule) => rule.action === action && rule.access <= access);
+  }
 }
 
 export class InsertCrewDto extends PartialType(
@@ -207,12 +182,18 @@ export class InsertCrewDto extends PartialType(
     'tickets',
     'logs',
     'shared',
+    'access',
+    'settings',
     'createdAt',
     'deletedAt',
     'processedAt',
     'getCrewOwner',
+    'getConfig',
+    'getAccessRulesForAction',
   ] as const),
-) {}
+) {
+  settings?: Partial<Record<CrewSettingName, unknown>>;
+}
 export class SelectCrewIdDto extends PartialType(PickType(Crew, ['id'] as const)) {}
 export class SelectCrewChannelDto extends PartialType(PickType(Crew, ['crewSf'] as const)) {}
 export class SelectCrewDto extends IntersectionType(SelectCrewIdDto, SelectCrewChannelDto) {
@@ -223,18 +204,7 @@ export class SelectCrewDto extends IntersectionType(SelectCrewIdDto, SelectCrewC
   }
 }
 export class UpdateCrewDto extends PartialType(
-  PickType(Crew, [
-    'crewSf',
-    'roleSf',
-    'voiceSf',
-    'auditMessageSf',
-    'ticketHelpText',
-    'hasMovePrompt',
-    'isPermanent',
-    'isSecureOnly',
-    'isAutomaticPruning',
-    'approvedBy',
-  ] as const),
+  PickType(Crew, ['crewSf', 'roleSf', 'voiceSf', 'auditMessageSf', 'approvedBy'] as const),
 ) {}
 export class DeleteCrewDto extends SelectCrewDto {
   deletedBySf?: Snowflake;

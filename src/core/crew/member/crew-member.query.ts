@@ -58,7 +58,12 @@ export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
   }
 
   withGuildSettings() {
-    this.qb.leftJoinAndSelect('guild.settings', 'settings');
+    this.qb.leftJoinAndSelect('guild.settings', 'guild_settings');
+    return this;
+  }
+
+  withCrewSettings() {
+    this.qb.leftJoinAndSelect('crew.settings', 'crew_settings');
     return this;
   }
 

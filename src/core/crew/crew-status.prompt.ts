@@ -22,8 +22,7 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
   addIndividualCrewStatus(discordGuild: DiscordGuild, crew: Crew, war?: string | number) {
     const fields: { name: string; value: string }[] = [];
     const owner = crew.members.find((member) => member.access === CrewMemberAccess.OWNER);
-    const admins = crew.members.filter((member) => member.access === CrewMemberAccess.ADMIN);
-    const leadership = [owner, ...admins];
+    const leadership = crew.members.filter((member) => member.access <= CrewMemberAccess.ADMIN);
     const embed = new EmbedBuilder()
       .setTitle(`Crew: ${crew.name}`)
       .setColor(Colors.DarkGreen)
@@ -39,7 +38,7 @@ export class CrewStatusPromptBuilder extends BasePromptBuilder {
       });
     }
 
-    if (admins.length) {
+    if (leadership.length > 1) {
       fields.push({
         name: 'Crew Admins',
         value: leadership.map((member) => `- ${userMention(member.memberSf)}`).join('\n'),
