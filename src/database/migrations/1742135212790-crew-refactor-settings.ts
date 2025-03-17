@@ -101,24 +101,6 @@ export class CrewRefactorSettings1742135212790 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-        WITH settings AS (
-            SELECT
-                s.crew_id,
-                jsonb_object_agg(s.name, s.value) as obj
-            FROM "app"."crew_setting" s
-            GROUP BY s.crew_id
-        )
-        UPDATE "app"."crew" c
-        SET ticket_help=s.obj->>'crew.ticket_help',
-            is_permanent=(s.obj->>'crew.enable_permanent')::bool,
-            secure_only=(s.obj->>'crew.enable_opsec')::bool,
-            is_pruning=(s.obj->>'crew.enable_pruning')::bool,
-            require_voice_channel=(s.obj->>'crew.enable_voice')::bool,
-            enable_move_prompt=(s.obj->>'crew.enable_triage')::bool
-        FROM settings s
-        WHERE c.id=s.crew_id;
-    `);
     await queryRunner.query(
       `ALTER TABLE "app"."crew_setting" DROP CONSTRAINT "uk_setting_name_crew"`,
     );
@@ -148,5 +130,23 @@ export class CrewRefactorSettings1742135212790 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "app"."crew" ADD "enable_move_prompt" boolean NOT NULL DEFAULT false`,
     );
+    await queryRunner.query(`
+        WITH settings AS (
+            SELECT
+                s.crew_id,
+                jsonb_object_agg(s.name, s.value) as obj
+            FROM "app"."crew_setting" s
+            GROUP BY s.crew_id
+        )
+        UPDATE "app"."crew" c
+        SET ticket_help=s.obj->>'crew.ticket_help',
+            is_permanent=(s.obj->>'crew.enable_permanent')::bool,
+            secure_only=(s.obj->>'crew.enable_opsec')::bool,
+            is_pruning=(s.obj->>'crew.enable_pruning')::bool,
+            require_voice_channel=(s.obj->>'crew.enable_voice')::bool,
+            enable_move_prompt=(s.obj->>'crew.enable_triage')::bool
+        FROM settings s
+        WHERE c.id=s.crew_id;
+    `);
   }
 }
