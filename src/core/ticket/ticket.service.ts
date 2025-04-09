@@ -338,7 +338,7 @@ export class TicketServiceImpl extends TicketService {
       .withMembers()
       .withSettings()
       .getOneOrFail();
-    const crewSettings = crew.getConfig();
+    const { [CrewSettingName.CREW_OPSEC]: opsecFlag } = crew.getConfig();
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
 
     let crewChannel: GuildBasedChannel;
@@ -359,7 +359,8 @@ export class TicketServiceImpl extends TicketService {
     }
 
     if (
-      crewSettings[CrewSettingName.CREW_OPSEC].asBoolean() &&
+      opsecFlag &&
+      opsecFlag.asBoolean() &&
       !(await this.discordService.isChannelPrivate(targetChannel))
     ) {
       throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
@@ -400,7 +401,7 @@ export class TicketServiceImpl extends TicketService {
     const crews = [];
 
     for (const crew of srcCrews) {
-      const crewSettings = crew.getConfig();
+      const { [CrewSettingName.CREW_OPSEC]: opsecFlag } = crew.getConfig();
       let crewChannel: GuildBasedChannel;
       try {
         crewChannel = await discordGuild.channels.fetch(crew.crewSf);
@@ -411,7 +412,7 @@ export class TicketServiceImpl extends TicketService {
 
       if (
         !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||
-        (crewSettings[CrewSettingName.CREW_OPSEC].asBoolean() && !targetChannelSecure)
+        (opsecFlag && opsecFlag.asBoolean() && !targetChannelSecure)
       ) {
         continue;
       }
