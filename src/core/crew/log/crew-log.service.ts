@@ -8,6 +8,7 @@ import { WarService } from 'src/game/war/war.service';
 import { CrewLogRepository } from './crew-log.repository';
 import { InsertCrewLogDto } from './crew-log.entity';
 import { CrewLogPromptBuilder } from './crew-log.prompt';
+import { GuildSettingName } from 'src/core/guild/guild-setting.entity';
 
 export abstract class CrewLogService {
   /**
@@ -42,6 +43,7 @@ export class CrewLogServiceImpl extends CrewLogService {
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
     const channel = await discordGuild.channels.fetch(crew.crewSf);
     const war = await this.warService.query().byCurrent().getOneOrFail();
+    const { [GuildSettingName.GUILD_LOG_CHANNEL]: globalLogChannelSf } = crew.guild.getConfig();
 
     if (!channel || !channel.isTextBased()) {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
@@ -58,15 +60,15 @@ export class CrewLogServiceImpl extends CrewLogService {
       prompt.clone<CrewLogPromptBuilder>().addCrewMention(crew).build(),
     );
 
-    if (crew.guild?.getConfig()['guild.log_channel']) {
+    if (globalLogChannelSf) {
       let logChannel: GuildBasedChannel;
       try {
-        logChannel = await discordGuild.channels.fetch(crew.guild.getConfig()['guild.log_channel']);
+        logChannel = await discordGuild.channels.fetch(globalLogChannelSf);
         if (logChannel && logChannel.isTextBased()) {
-          await logChannel.send(prompt.addCrewJoinButton(crew).addCrewChannelLink(crew).build());
+          await logChannel.send(prompt.addCrewChannelLink(crew).build());
         }
       } catch (err) {
-        this.logger.warn(`Configured global log channel for ${crew.guild.name} is missing`);
+        this.logger.warn(`Configured global log channel for ${crew.guild.name} is missing`, err);
       }
     }
 
