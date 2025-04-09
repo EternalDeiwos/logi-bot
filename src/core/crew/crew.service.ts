@@ -683,7 +683,11 @@ export class CrewServiceImpl extends CrewService {
     }
 
     try {
-      if (opsecFlag.asBoolean() && !(await this.discordService.isChannelPrivate(targetChannel))) {
+      if (
+        opsecFlag &&
+        opsecFlag.asBoolean() &&
+        !(await this.discordService.isChannelPrivate(targetChannel))
+      ) {
         throw new AuthError('FORBIDDEN', 'This channel is not secure').asDisplayable();
       }
     } catch (err) {
@@ -736,7 +740,7 @@ export class CrewServiceImpl extends CrewService {
     const crews = [];
 
     for (const crew of srcCrews) {
-      const crewConfig = crew.getConfig();
+      const { [CrewSettingName.CREW_OPSEC]: opsecFlag } = crew.getConfig();
       let crewChannel: GuildBasedChannel;
       try {
         crewChannel = await discordGuild.channels.fetch(crew.crewSf);
@@ -747,7 +751,7 @@ export class CrewServiceImpl extends CrewService {
 
       if (
         !crewChannel.permissionsFor(member).has(PermissionsBitField.Flags.ViewChannel) ||
-        (crewConfig[CrewSettingName.CREW_OPSEC].asBoolean() && !targetChannelSecure)
+        (opsecFlag && opsecFlag.asBoolean() && !targetChannelSecure)
       ) {
         continue;
       }
