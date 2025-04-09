@@ -665,6 +665,7 @@ export class TicketCommand {
     const ticket = await this.ticketService
       .query()
       .withCrew()
+      .withCrewAccess()
       .byTicket({ threadSf: interaction.channelId })
       .getOneOrFail();
 
