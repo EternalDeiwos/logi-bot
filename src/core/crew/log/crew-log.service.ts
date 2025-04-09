@@ -63,7 +63,7 @@ export class CrewLogServiceImpl extends CrewLogService {
       try {
         logChannel = await discordGuild.channels.fetch(crew.guild.getConfig()['guild.log_channel']);
         if (logChannel && logChannel.isTextBased()) {
-          await logChannel.send(prompt.build());
+          await logChannel.send(prompt.addCrewJoinButton(crew).addCrewChannelLink(crew).build());
         }
       } catch (err) {
         this.logger.warn(`Configured global log channel for ${crew.guild.name} is missing`);
