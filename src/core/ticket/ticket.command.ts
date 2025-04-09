@@ -230,7 +230,7 @@ export class TicketCommand {
             message.content,
             memberRef,
             authorRef,
-            channelRef,
+            message.channelId,
             message.id,
           ),
         },
