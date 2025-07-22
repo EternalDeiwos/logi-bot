@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Snowflake } from 'discord.js';
+import { InternalError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { CrewMember } from 'src/core/crew/member/crew-member.entity';
 import { SelectCrewIdDto } from 'src/core/crew/crew.entity';
@@ -16,6 +17,13 @@ export class AccessDecision {
   ) {}
 
   static fromEntry(entry: AccessEntry) {
+    if (!entry) {
+      throw new InternalError(
+        'INTERNAL_SERVER_ERROR',
+        'No access rules defined. Contact a guild administrator.',
+      ).asDisplayable();
+    }
+
     return new AccessDecision(entry.type, entry.rule);
   }
 
