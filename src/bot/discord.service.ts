@@ -213,7 +213,7 @@ export class DiscordServiceImpl extends DiscordService {
 
     if (
       category
-        ? !bot.permissionsIn(category).has(PermissionsBitField.Flags.ManageChannels)
+        ? !category.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
         : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
     ) {
       throw new ExternalError(
@@ -322,7 +322,7 @@ export class DiscordServiceImpl extends DiscordService {
 
     if (
       channel
-        ? !bot.permissionsIn(channel).has(PermissionsBitField.Flags.ManageChannels)
+        ? !channel.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
         : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
     ) {
       throw new ExternalError(
