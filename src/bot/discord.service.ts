@@ -14,6 +14,7 @@ import {
   User,
   Client,
   DMChannel,
+  CategoryChannel,
 } from 'discord.js';
 import { chunk } from 'lodash';
 import { ExternalError, InternalError } from 'src/errors';
@@ -196,8 +197,25 @@ export class DiscordServiceImpl extends DiscordService {
     }
 
     const bot = await guild.members.fetchMe();
+    let category: GuildBasedChannel;
 
-    if (!bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)) {
+    try {
+      if (options.parent) {
+        category = await guild.channels.fetch(
+          options?.parent && typeof options.parent === 'string'
+            ? options.parent
+            : (options.parent as CategoryChannel).id,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(`Category ${options?.parent} no longer exists in ${guild.name}`);
+    }
+
+    if (
+      category
+        ? !bot.permissionsIn(category).has(PermissionsBitField.Flags.ManageChannels)
+        : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
+    ) {
       throw new ExternalError(
         'INSUFFICIENT_PRIVILEGES',
         'Bot requires additional privileges: Manage Channels',
@@ -293,21 +311,28 @@ export class DiscordServiceImpl extends DiscordService {
   async deleteChannel(guildSf: Snowflake, channelSf: Snowflake) {
     const guild = await this.guildManager.fetch(guildSf);
     const bot = await guild.members.fetchMe();
+    let channel: GuildBasedChannel;
 
-    if (!bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)) {
+    try {
+      channel = await guild.channels.fetch(channelSf);
+    } catch (err) {
+      this.logger.warn(`Channel ${channelSf} no longer exists in ${guild.name}`);
+      return;
+    }
+
+    if (
+      channel
+        ? !bot.permissionsIn(channel).has(PermissionsBitField.Flags.ManageChannels)
+        : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
+    ) {
       throw new ExternalError(
         'INSUFFICIENT_PRIVILEGES',
         'Bot requires additional privileges: Manage Channels',
       ).asDisplayable();
     }
 
-    if (channelSf) {
-      try {
-        const channel = await guild.channels.fetch(channelSf);
-        await channel.delete();
-      } catch {
-        this.logger.warn(`Channel ${channelSf} no longer exists in ${guild.name}`);
-      }
+    if (channel) {
+      await channel.delete();
     }
   }
 
