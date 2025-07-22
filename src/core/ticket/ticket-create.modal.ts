@@ -16,8 +16,8 @@ const formDetail = {
   en: {
     title: 'Create a Ticket',
     who: {
-      label: 'Responsible Regiment',
-      placeholder: 'e.g. WLL or none',
+      label: 'Your Regiment',
+      placeholder: 'e.g. HvL or none',
     },
     what: {
       label: 'Request',
@@ -40,7 +40,7 @@ const formDetail = {
     title: 'Créer un ticket',
     who: {
       label: 'Régiment',
-      placeholder: 'ex : WLL ou aucun',
+      placeholder: 'ex : HvL ou aucun',
     },
     what: {
       label: 'Demande',
@@ -109,7 +109,7 @@ const formDetail = {
     title: '创建工单',
     who: {
       label: '团级',
-      placeholder: '例如：WLL 或 无',
+      placeholder: 'HvL 或 无',
     },
     what: {
       label: '请求',

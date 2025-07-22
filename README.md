@@ -13,7 +13,7 @@ Foxhole is a persistent warfare MMO where all materials used on the front lines 
 - Stockpile contents tracking from [FIR](https://github.com/GICodeWarrior/fir) reports
 - Discord bot
 
-Logi-bot was initially developed for use by Winter Legion Logistics (WLL).
+Logi-bot was initially developed for use by Winter Legion Logistics (WLL), and is in active use by High Velocity Logistics (HvL) and several other groups.
 
 > [!CAUTION]
 > This application is WIP. If you need assistance please open an issue but be aware that at any point this might not be under active development.
