@@ -23,7 +23,7 @@ const schema = {
   DISCORD_INVITE_LINK: Joi.string().default('https://discord.gg/winterlegion'),
   DISCORD_BOT_TOKEN: Joi.string().required(),
   DISCORD_BOT_CLIENT_ID: Joi.string().required(),
-  DISCORD_BOT_PERMISSIONS: Joi.string().default('19097840626768'),
+  DISCORD_BOT_PERMISSIONS: Joi.string().default('17998329277520'),
   DISCORD_BOT_SCOPE: Joi.string().default('bot applications.commands'),
 
   // War API

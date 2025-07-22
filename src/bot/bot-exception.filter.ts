@@ -69,7 +69,8 @@ export class DiscordExceptionFilter implements ExceptionFilter<CaughtErrors> {
 
   async catchDiscord(exception: DiscordAPIError, host: NecordArgumentsHost): Promise<BaseError> {
     // 40061 = Tag name must be unique
-    if ([40061].includes(exception.code as number)) {
+    // 50035 = Invalid Form Body
+    if ([40061, 50035].includes(exception.code as number)) {
       return new ValidationError('VALIDATION_FAILED', exception.message).asDisplayable();
     }
 

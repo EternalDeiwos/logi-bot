@@ -126,7 +126,7 @@ export class DiscordServiceImpl extends DiscordService {
 
     const bot = await guild.members.fetchMe();
 
-    if (!bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
+    if (!bot.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
       throw new ExternalError(
         'INSUFFICIENT_PRIVILEGES',
         'Bot requires additional privileges: Manage Roles',
@@ -142,7 +142,7 @@ export class DiscordServiceImpl extends DiscordService {
     const member = await guild.members.fetch(memberSf);
     const bot = await guild.members.fetchMe();
 
-    if (!bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
+    if (!bot.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
       throw new ExternalError(
         'INSUFFICIENT_PRIVILEGES',
         'Bot requires additional privileges: Manage Roles',
@@ -166,7 +166,7 @@ export class DiscordServiceImpl extends DiscordService {
     const member = await guild.members.fetch(memberSf);
     const bot = await guild.members.fetchMe();
 
-    if (!bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
+    if (!bot.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
       throw new ExternalError(
         'INSUFFICIENT_PRIVILEGES',
         'Bot requires additional privileges: Manage Roles',
@@ -209,22 +209,18 @@ export class DiscordServiceImpl extends DiscordService {
       }
     } catch (err) {
       this.logger.warn(`Category ${options?.parent} no longer exists in ${guild.name}`);
-      throw new ExternalError(
-        'INSUFFICIENT_PRIVILEGES',
-        'Bot requires additional privileges for category: Manage Channels',
-      ).asDisplayable();
     }
 
-    // if (
-    //   category
-    //     ? !category.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
-    //     : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
-    // ) {
-    //   throw new ExternalError(
-    //     'INSUFFICIENT_PRIVILEGES',
-    //     'Bot requires additional privileges: Manage Channels',
-    //   ).asDisplayable();
-    // }
+    if (
+      category
+        ? !category.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
+        : !bot.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
+    ) {
+      throw new ExternalError(
+        'INSUFFICIENT_PRIVILEGES',
+        'Bot requires additional privileges: Manage Channels',
+      ).asDisplayable();
+    }
 
     return await guild.channels.create(options);
   }
@@ -324,16 +320,16 @@ export class DiscordServiceImpl extends DiscordService {
       return;
     }
 
-    // if (
-    //   channel
-    //     ? !channel.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
-    //     : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
-    // ) {
-    //   throw new ExternalError(
-    //     'INSUFFICIENT_PRIVILEGES',
-    //     'Bot requires additional privileges: Manage Channels',
-    //   ).asDisplayable();
-    // }
+    if (
+      channel
+        ? !channel.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
+        : !bot.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
+    ) {
+      throw new ExternalError(
+        'INSUFFICIENT_PRIVILEGES',
+        'Bot requires additional privileges: Manage Channels',
+      ).asDisplayable();
+    }
 
     if (channel) {
       await channel.delete();
@@ -344,7 +340,7 @@ export class DiscordServiceImpl extends DiscordService {
     const guild = await this.guildManager.fetch(guildSf);
     const bot = await guild.members.fetchMe();
 
-    if (!bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
+    if (!bot.permissions.has(PermissionsBitField.Flags.ManageRoles, true)) {
       throw new ExternalError(
         'INSUFFICIENT_PRIVILEGES',
         'Bot requires additional privileges: Manage Roles',

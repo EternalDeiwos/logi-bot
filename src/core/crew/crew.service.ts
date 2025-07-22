@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InsertResult, UpdateResult } from 'typeorm';
 import {
   CategoryChannel,
@@ -23,7 +24,7 @@ import {
 import { AccessMode, CrewMemberAccess, TicketTag } from 'src/types';
 import { DiscordService } from 'src/bot/discord.service';
 import { BotService } from 'src/bot/bot.service';
-import { DiscordActionTarget, DiscordActionType } from 'src/bot/discord-actions.consumer';
+import { DiscordActionType } from 'src/bot/discord-actions.consumer';
 import { SelectGuildDto } from 'src/core/guild/guild.entity';
 import { GuildSettingName } from 'src/core/guild/guild-setting.entity';
 import { TeamService } from 'src/core/team/team.service';
@@ -92,6 +93,7 @@ export class CrewServiceImpl extends CrewService {
 
   constructor(
     private readonly client: Client,
+    private readonly config: ConfigService,
     private readonly guildManager: GuildManager,
     private readonly discordService: DiscordService,
     private readonly botService: BotService,
@@ -337,7 +339,21 @@ export class CrewServiceImpl extends CrewService {
     if (botRole) {
       permissionOverwrites.push({
         id: botRole.id,
-        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageMessages],
+        allow: [
+          PermissionsBitField.Flags.ViewChannel,
+          PermissionsBitField.Flags.ManageChannels,
+          PermissionsBitField.Flags.ManageThreads,
+          PermissionsBitField.Flags.ManageMessages,
+          PermissionsBitField.Flags.SendMessages,
+          PermissionsBitField.Flags.SendMessagesInThreads,
+          PermissionsBitField.Flags.CreatePublicThreads,
+          PermissionsBitField.Flags.CreatePrivateThreads,
+          PermissionsBitField.Flags.EmbedLinks,
+          PermissionsBitField.Flags.AttachFiles,
+          PermissionsBitField.Flags.AddReactions,
+          PermissionsBitField.Flags.UseExternalEmojis,
+          PermissionsBitField.Flags.ReadMessageHistory,
+        ],
       });
     }
 
