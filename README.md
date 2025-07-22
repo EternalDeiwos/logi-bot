@@ -2,7 +2,7 @@
 
 > TODO Banner
 
-[![discord](https://img.shields.io/discord/711362115570761739?style=plastic&logo=discord&labelColor=424549)](https://discord.gg/winterlegion) [![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
+[![discord](https://img.shields.io/discord/1372310822877139064?style=plastic&logo=discord&labelColor=424549)](https://discord.gg/hvl) [![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
 > A logistics assistant for Foxhole
 
