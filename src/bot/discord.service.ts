@@ -209,18 +209,22 @@ export class DiscordServiceImpl extends DiscordService {
       }
     } catch (err) {
       this.logger.warn(`Category ${options?.parent} no longer exists in ${guild.name}`);
-    }
-
-    if (
-      category
-        ? !category.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
-        : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
-    ) {
       throw new ExternalError(
         'INSUFFICIENT_PRIVILEGES',
-        'Bot requires additional privileges: Manage Channels',
+        'Bot requires additional privileges for category: Manage Channels',
       ).asDisplayable();
     }
+
+    // if (
+    //   category
+    //     ? !category.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
+    //     : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
+    // ) {
+    //   throw new ExternalError(
+    //     'INSUFFICIENT_PRIVILEGES',
+    //     'Bot requires additional privileges: Manage Channels',
+    //   ).asDisplayable();
+    // }
 
     return await guild.channels.create(options);
   }
@@ -320,16 +324,16 @@ export class DiscordServiceImpl extends DiscordService {
       return;
     }
 
-    if (
-      channel
-        ? !channel.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
-        : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
-    ) {
-      throw new ExternalError(
-        'INSUFFICIENT_PRIVILEGES',
-        'Bot requires additional privileges: Manage Channels',
-      ).asDisplayable();
-    }
+    // if (
+    //   channel
+    //     ? !channel.permissionsFor(bot).has(PermissionsBitField.Flags.ManageChannels, true)
+    //     : !bot.roles.botRole.permissions.has(PermissionsBitField.Flags.ManageChannels, true)
+    // ) {
+    //   throw new ExternalError(
+    //     'INSUFFICIENT_PRIVILEGES',
+    //     'Bot requires additional privileges: Manage Channels',
+    //   ).asDisplayable();
+    // }
 
     if (channel) {
       await channel.delete();
