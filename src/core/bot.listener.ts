@@ -79,6 +79,8 @@ export class BotEventListener {
         .query()
         .byGuildAndShared({ guildSf: thread.guildId })
         .withTeam()
+        .limit(25)
+        .order()
         .getMany();
       prompt.addMoveSelector(
         { threadSf: thread.id },

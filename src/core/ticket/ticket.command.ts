@@ -455,6 +455,8 @@ export class TicketCommand {
       .query()
       .byGuildAndShared({ guildSf: ticket.guild.guildSf })
       .withTeam()
+      .limit(25)
+      .order()
       .getMany();
     const prompt = new TicketInfoPromptBuilder()
       .addGenericMessage('Select destination')
