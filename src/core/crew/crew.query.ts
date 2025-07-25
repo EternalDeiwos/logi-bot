@@ -138,6 +138,11 @@ export class CrewQueryBuilder extends CommonQueryBuilder<Crew> {
     return this;
   }
 
+  order() {
+    this.qb.orderBy('guild.name').orderBy('team.name').addOrderBy('crew.name');
+    return this;
+  }
+
   withTeam() {
     this.qb.leftJoinAndSelect('crew.team', 'team');
     return this;
