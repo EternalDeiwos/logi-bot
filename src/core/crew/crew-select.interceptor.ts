@@ -18,6 +18,7 @@ export class CrewSelectAutocompleteInterceptor extends AutocompleteInterceptor {
         .query()
         .withTeam()
         .searchByGuildWithShared({ guildSf: interaction.guildId }, focused.value.toString())
+        .limit(25)
         .getMany();
       return interaction.respond(
         results.map((result) => {
