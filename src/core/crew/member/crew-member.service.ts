@@ -175,27 +175,31 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       .withoutDeletedCrews()
       .getOneOrFail();
 
-    const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
+    if (crew.guild) {
+      const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
 
-    let member: GuildMember;
-    try {
-      member =
-        typeof memberRef === 'string'
-          ? await discordGuild.members.fetch(crewMember.memberSf)
-          : memberRef;
-    } catch {
-      this.logger.debug(`Guild member ${memberRef} has already left the guild`);
-    }
+      let member: GuildMember;
+      try {
+        member =
+          typeof memberRef === 'string'
+            ? await discordGuild.members.fetch(crewMember.memberSf)
+            : memberRef;
+      } catch {
+        this.logger.debug(`Guild member ${memberRef} has already left the guild`);
+      }
 
-    try {
-      if (member) {
-        await member.roles.remove(crew.roleSf);
+      try {
+        if (member) {
+          await member.roles.remove(crew.roleSf);
+        }
+      } catch (err) {
+        const role = await discordGuild.roles.fetch(crew.roleSf);
+        if (role.members.has(crewMember.memberSf)) {
+          throw new ExternalError('DISCORD_API_ERROR', 'Failed to remove member role', err);
+        }
       }
-    } catch (err) {
-      const role = await discordGuild.roles.fetch(crew.roleSf);
-      if (role.members.has(crewMember.memberSf)) {
-        throw new ExternalError('DISCORD_API_ERROR', 'Failed to remove member role', err);
-      }
+    } else {
+      this.logger.warn(`Failed to get guild for crew ${crew.name}`);
     }
 
     const result = await this.memberRepo.updateReturning(
