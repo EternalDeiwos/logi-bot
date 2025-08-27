@@ -161,7 +161,12 @@ export class CrewMemberServiceImpl extends CrewMemberService {
   async removeCrewMember(crewRef: string | Crew, memberRef: Snowflake | GuildMember) {
     const crew =
       typeof crewRef === 'string'
-        ? await this.crewService.query().byCrew({ id: crewRef }).withoutPending().getOneOrFail()
+        ? await this.crewService
+            .query()
+            .byCrew({ id: crewRef })
+            .withDeleted()
+            .withoutPending()
+            .getOneOrFail()
         : crewRef;
 
     const crewMember = await this.query()
