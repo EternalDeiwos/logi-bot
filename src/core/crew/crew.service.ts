@@ -499,7 +499,7 @@ export class CrewServiceImpl extends CrewService {
       throw new InternalError('INTERNAL_SERVER_ERROR', 'Invalid channel');
     }
 
-    const members = await this.memberService.query().byCrew(crew).getMany();
+    const members = await this.memberService.query().byCrew(crew).withoutDeletedCrews().getMany();
     const prompt = new CrewInfoPromptBuilder()
       .addCrewPromptMessage(crew, members)
       .addCrewControls(crew);

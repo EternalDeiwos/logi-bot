@@ -7,10 +7,7 @@ import { CrewMemberAccess } from 'src/types';
 export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
   constructor(repo: Repository<CrewMember>) {
     super(repo, 'member');
-    this.qb
-      .leftJoinAndSelect('member.guild', 'guild')
-      .leftJoinAndSelect('member.crew', 'crew')
-      .andWhere('crew.deleted_at IS NULL');
+    this.qb.leftJoinAndSelect('member.guild', 'guild').leftJoinAndSelect('member.crew', 'crew');
   }
 
   byCrewMember(memberRef: SelectCrewMemberDto) {
@@ -76,6 +73,11 @@ export class CrewMemberQueryBuilder extends CommonQueryBuilder<CrewMember> {
 
   withoutPending() {
     this.qb.andWhere('crew.processed_at IS NOT NULL');
+    return this;
+  }
+
+  withoutDeletedCrews() {
+    this.qb.andWhere('crew.deleted_at IS NULL');
     return this;
   }
 }

@@ -76,6 +76,7 @@ export class AccessServiceImpl extends AccessService {
       .query()
       .byGuild({ guildSf: interaction.guildId })
       .byMember(memberSf)
+      .withoutDeletedCrews()
       .getMany();
     const guildAdmin = memberPermissions.has(PermissionsBitField.Flags.Administrator);
 

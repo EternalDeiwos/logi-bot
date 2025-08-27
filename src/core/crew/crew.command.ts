@@ -748,6 +748,7 @@ export class CrewCommand {
     const targetMember = await this.memberService
       .query()
       .byCrewMember({ crewId: crew.id, memberSf: data.member.id })
+      .withoutDeletedCrews()
       .getOne();
 
     if (!targetMember) {
@@ -768,6 +769,7 @@ export class CrewCommand {
       .query()
       .byCrew({ id: crew.id })
       .byAccess(CrewMemberAccess.OWNER)
+      .withoutDeletedCrews()
       .getMany();
 
     for (const owner of oldOwners) {
@@ -822,6 +824,7 @@ export class CrewCommand {
     const targetMember = await this.memberService
       .query()
       .byCrewMember({ crewId: crew.id, memberSf: data.member.id })
+      .withoutDeletedCrews()
       .getOne();
 
     if (!targetMember) {

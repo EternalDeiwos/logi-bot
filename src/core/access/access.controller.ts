@@ -84,6 +84,7 @@ export class AccessEntryController {
       .query()
       .byGuild({ guildSf: auth.aud })
       .byMember(auth.sub)
+      .withoutDeletedCrews()
       .getMany();
 
     const result = AccessDecision.fromEntry(entry).permit(

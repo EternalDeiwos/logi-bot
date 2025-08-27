@@ -172,6 +172,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
     const crewMember = await this.query()
       .byCrew({ id: crew.id })
       .byMember(typeof memberRef === 'string' ? memberRef : memberRef.id)
+      .withoutDeletedCrews()
       .getOneOrFail();
 
     const discordGuild = await this.guildManager.fetch(crew.guild.guildSf);
@@ -222,6 +223,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       .byGuild(guildRef)
       .byMember(memberRef)
       .byAccess(CrewMemberAccess.OWNER)
+      .withoutDeletedCrews()
       .getCount();
 
     this.logger.debug(`Leadership for ${member.displayName}: ${count}`);
@@ -313,6 +315,7 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       .withGuildSettings()
       .withCrewSettings()
       .withoutPending()
+      .withoutDeletedCrews()
       .getMany();
     for (const crewMember of members) {
       const { [CrewSettingName.CREW_OPSEC]: opsecFlag } = crewMember.crew.getConfig();
