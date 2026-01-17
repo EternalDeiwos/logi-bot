@@ -207,7 +207,9 @@ export class CrewMemberServiceImpl extends CrewMemberService {
       { deletedAt: new Date() },
     );
 
-    await this.reconcileCrewLeaderRole({ id: crew.guildId }, memberRef as Snowflake);
+    if (crew.guild) {
+      await this.reconcileCrewLeaderRole({ id: crew.guildId }, memberRef as Snowflake);
+    }
 
     return result;
   }
