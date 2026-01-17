@@ -76,7 +76,10 @@ export class DiscordExceptionFilter implements ExceptionFilter<CaughtErrors> {
 
     // 50013 = Missing Permissions
     if ([50013].includes(exception.code as number)) {
-      return new ExternalError('INSUFFICIENT_PRIVILEGES', 'Bot requires additional privileges');
+      return new ExternalError(
+        'INSUFFICIENT_PRIVILEGES',
+        'Bot requires additional privileges',
+      ).asDisplayable();
     }
 
     return new ExternalError('DISCORD_API_ERROR', 'Unknown', exception);
