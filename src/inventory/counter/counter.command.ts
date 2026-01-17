@@ -11,7 +11,13 @@ import {
   StringOption,
   Subcommand,
 } from 'necord';
-import { CommandInteraction, inlineCode, MessageComponentInteraction } from 'discord.js';
+import {
+  Collection,
+  CommandInteraction,
+  inlineCode,
+  MessageComponentInteraction,
+  TextInputModalData,
+} from 'discord.js';
 import { AuthError, ValidationError } from 'src/errors';
 import { CrewMemberAccess } from 'src/types';
 import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
@@ -60,12 +66,7 @@ export class CreateCounterCommandParams {
   })
   kind: string;
 
-  @StringOption({
-    name: 'crew',
-    description: 'Select a crew',
-    autocomplete: true,
-    required: false,
-  })
+  @StringOption({ name: 'crew', description: 'Select a crew', autocomplete: true, required: false })
   crew: string;
 
   @StringOption({
@@ -78,10 +79,7 @@ export class CreateCounterCommandParams {
 }
 
 @Injectable()
-@DeltaCommand({
-  name: 'counter',
-  description: 'Manage counters',
-})
+@DeltaCommand({ name: 'counter', description: 'Manage counters' })
 @UseFilters(DiscordExceptionFilter)
 export class CounterCommand {
   private readonly logger = new Logger(CounterCommand.name);
@@ -94,11 +92,7 @@ export class CounterCommand {
   ) {}
 
   @UseInterceptors(CounterCreateAutocompleteInterceptor)
-  @Subcommand({
-    name: 'create',
-    description: 'Create a counter',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'create', description: 'Create a counter' })
   async onCreateCounter(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: CreateCounterCommandParams,
@@ -158,11 +152,7 @@ export class CounterCommand {
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'update',
-    description: 'Update crew counters',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'update', description: 'Update crew counters' })
   async onUpdateCounter(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,
@@ -224,7 +214,7 @@ export class CounterCommand {
   @Modal('counter/update')
   async onCounterUpdateModal(@Context() [interaction]: ModalContext) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
-    const fields = interaction.fields.fields.reduce(
+    const fields = (interaction.fields.fields as Collection<string, TextInputModalData>).reduce(
       (acc, field) => {
         acc[field.customId] = field.value;
         return acc;
@@ -237,11 +227,7 @@ export class CounterCommand {
       .query()
       .withAccessRules()
       .withCatalog()
-      .byCounter(
-        Object.keys(fields).map((id) => ({
-          id,
-        })),
-      )
+      .byCounter(Object.keys(fields).map((id) => ({ id })))
       .getMany();
 
     for (const counter of counters) {
@@ -292,9 +278,7 @@ export class CounterCommand {
         });
       }
 
-      return await this.botService.replyOrFollowUp(interaction, {
-        embeds: [embed],
-      });
+      return await this.botService.replyOrFollowUp(interaction, { embeds: [embed] });
     }
 
     await this.botService.replyOrFollowUp(interaction, {
@@ -303,11 +287,7 @@ export class CounterCommand {
   }
 
   @UseInterceptors(CounterSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'delete',
-    description: 'Delete crew counter',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'delete', description: 'Delete crew counter' })
   async onDeleteCounter(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCounterCommandParams,
@@ -348,11 +328,7 @@ export class CounterCommand {
   }
 
   @UseInterceptors(CrewSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'show',
-    description: 'Show crew counters',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'show', description: 'Show crew counters' })
   async onShowCounter(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectCrewCommandParams,

@@ -27,11 +27,7 @@ import { GuildSettingAutocompleteInterceptor } from './guild-setting.interceptor
 import { GuildAction } from './guild-access.entity';
 
 export class EditGuildCommandParams {
-  @StringOption({
-    name: 'name',
-    description: 'Display name for this guild',
-    required: false,
-  })
+  @StringOption({ name: 'name', description: 'Display name for this guild', required: false })
   name: string;
 
   @StringOption({
@@ -43,12 +39,7 @@ export class EditGuildCommandParams {
 }
 
 export class SelectGuildCommandParams {
-  @StringOption({
-    name: 'crew',
-    description: 'Select a guild',
-    autocomplete: true,
-    required: true,
-  })
+  @StringOption({ name: 'crew', description: 'Select a guild', autocomplete: true, required: true })
   guild: string;
 }
 
@@ -61,11 +52,7 @@ export class SettingTextCommandParams {
   })
   setting: GuildSettingName;
 
-  @StringOption({
-    name: 'value',
-    description: 'A value',
-    required: true,
-  })
+  @StringOption({ name: 'value', description: 'A value', required: true })
   value: string;
 }
 
@@ -96,11 +83,7 @@ export class SettingRoleCommandParams {
   })
   setting: GuildSettingName;
 
-  @RoleOption({
-    name: 'role',
-    description: 'A role',
-    required: true,
-  })
+  @RoleOption({ name: 'role', description: 'A role', required: true })
   role: Role;
 }
 
@@ -131,12 +114,7 @@ export class GrantGuildAccessCommandParams {
   })
   action: GuildAction;
 
-  @StringOption({
-    name: 'rule',
-    description: 'Select a rule',
-    autocomplete: true,
-    required: true,
-  })
+  @StringOption({ name: 'rule', description: 'Select a rule', autocomplete: true, required: true })
   ruleId: string;
 
   @StringOption({
@@ -149,10 +127,7 @@ export class GrantGuildAccessCommandParams {
 }
 
 @Injectable()
-@EchoCommand({
-  name: 'guild',
-  description: 'Manage guilds',
-})
+@EchoCommand({ name: 'guild', description: 'Manage guilds' })
 @UseFilters(DiscordExceptionFilter)
 export class GuildCommand {
   private readonly logger = new Logger(GuildCommand.name);
@@ -163,11 +138,7 @@ export class GuildCommand {
     private readonly accessService: AccessService,
   ) {}
 
-  @Subcommand({
-    name: 'register',
-    description: 'Register this guild',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'register', description: 'Register this guild' })
   async onGuildRegister(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: EditGuildCommandParams,
@@ -232,11 +203,7 @@ export class GuildCommand {
   }
 
   @UseInterceptors(GuildSettingAutocompleteInterceptor)
-  @Subcommand({
-    name: 'set_role',
-    description: 'Update guild settings (role)',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'set_role', description: 'Update guild settings (role)' })
   async onGuildSettingRole(
     @Context() context: SlashCommandContext,
     @Options() { setting, role }: SettingRoleCommandParams,
@@ -249,11 +216,7 @@ export class GuildCommand {
   }
 
   @UseInterceptors(GuildSettingAutocompleteInterceptor)
-  @Subcommand({
-    name: 'set_channel',
-    description: 'Update guild settings (channel)',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'set_channel', description: 'Update guild settings (channel)' })
   async onGuildSettingChannel(
     @Context() context: SlashCommandContext,
     @Options() { setting, channel }: SettingChannelCommandParams,
@@ -266,11 +229,7 @@ export class GuildCommand {
   }
 
   @UseInterceptors(GuildSettingAutocompleteInterceptor)
-  @Subcommand({
-    name: 'set_category',
-    description: 'Update guild settings (category)',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'set_category', description: 'Update guild settings (category)' })
   async onGuildSettingCategory(
     @Context() context: SlashCommandContext,
     @Options() { setting, category }: SettingCategoryCommandParams,
@@ -283,11 +242,7 @@ export class GuildCommand {
   }
 
   @UseInterceptors(GuildSettingAutocompleteInterceptor)
-  @Subcommand({
-    name: 'set_text',
-    description: 'Update guild settings (text)',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'set_text', description: 'Update guild settings (text)' })
   async onGuildSettingText(
     @Context() context: SlashCommandContext,
     @Options() { setting, value }: SettingTextCommandParams,
@@ -300,11 +255,7 @@ export class GuildCommand {
   }
 
   @UseInterceptors(GuildGrantAccessAutocompleteInterceptor)
-  @Subcommand({
-    name: 'grant',
-    description: 'Grant guild-level privileges to bot features',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'grant', description: 'Grant guild-level privileges to bot features' })
   async onGrantGuildAccess(
     @Context() [interaction]: SlashCommandContext,
     @Options() options: GrantGuildAccessCommandParams,

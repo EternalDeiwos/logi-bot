@@ -107,7 +107,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'prompt',
     description: 'Create a form to start the ticket wizard',
-    dmPermission: false,
   })
   async onPrompt(
     @Context() [interaction]: SlashCommandContext,
@@ -148,7 +147,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'new',
     description: 'Create a new ticket',
-    dmPermission: false,
   })
   async onNewTicketCommand(
     @Context() [interaction]: SlashCommandContext,
@@ -199,7 +197,6 @@ export class TicketCommand {
 
   @MessageCommand({
     name: 'Create Ticket',
-    dmPermission: false,
   })
   async onTicketStartForMessage(
     @Context() [interaction]: MessageCommandContext,
@@ -425,7 +422,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'move',
     description: 'Show the move prompt to send this ticket to another crew',
-    dmPermission: false,
   })
   async onTicketMovePrompt(@Context() [interaction]: SlashCommandContext) {
     const ticketRef: SelectTicketDto = { threadSf: interaction.channelId };
@@ -473,7 +469,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'set_help',
     description: 'Set crew help message for this crew. Crew admin only.',
-    dmPermission: false,
   })
   async onCrewTicketHelpUpdate(
     @Context() [interaction]: SlashCommandContext,
@@ -534,7 +529,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'triage',
     description: 'Show the triage prompt change the state of the ticket',
-    dmPermission: false,
   })
   async onTicketTriagePrompt(@Context() [interaction]: SlashCommandContext) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
@@ -569,7 +563,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'refresh',
     description: 'Refresh ticket state. For debugging purposes. Crew member only.',
-    dmPermission: false,
   })
   async onTicketRefreshCommand(@Context() [interaction]: SlashCommandContext) {
     return this.ticketRefreshCommand([interaction], interaction.channelId);
@@ -700,7 +693,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'accept',
     description: 'Accept a ticket. Crew members only',
-    dmPermission: false,
   })
   async onTicketAcceptCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.ACCEPTED);
@@ -709,7 +701,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'decline',
     description: 'Decline a ticket. Crew members only',
-    dmPermission: false,
   })
   async onTicketDeclineCommand(
     @Context() context: SlashCommandContext,
@@ -721,7 +712,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'close',
     description: 'Mark a ticket as abandoned. Crew members only',
-    dmPermission: false,
   })
   async onTicketCloseCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.ABANDONED);
@@ -730,7 +720,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'abandoned',
     description: 'Mark a ticket as abandoned. Crew members only',
-    dmPermission: false,
   })
   async onTicketAbandonedCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.ABANDONED);
@@ -739,7 +728,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'start',
     description: 'Mark a ticket as being in progress. Crew members only',
-    dmPermission: false,
   })
   async onTicketStartCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.IN_PROGRESS);
@@ -748,7 +736,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'repeatable',
     description: 'Mark a ticket as repeatable. Crew members only',
-    dmPermission: false,
   })
   async onTicketRepeatCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.REPEATABLE);
@@ -757,7 +744,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'queued',
     description: 'Ticket added to queue. Crew members only',
-    dmPermission: false,
   })
   async onTicketQueuedCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.QUEUED);
@@ -766,7 +752,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'done',
     description: 'Complete a ticket. Crew members only',
-    dmPermission: false,
   })
   async onTicketDoneCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.DONE);
@@ -775,7 +760,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'pickup',
     description: 'Mark a ticket ready for pick-up/delivery. Crew members only',
-    dmPermission: false,
   })
   async onTicketPickupCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.DELIVERY);
@@ -784,7 +768,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'delivery',
     description: 'Mark a ticket ready for pick-up/delivery. Crew members only',
-    dmPermission: false,
   })
   async onTicketDeliveryCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.DELIVERY);
@@ -793,7 +776,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'hold',
     description: 'Mark a ticket on-hold. Crew members only',
-    dmPermission: false,
   })
   async onTicketHoldCommand(@Context() context: SlashCommandContext) {
     return this.lifecycleCommand(context, TicketTag.HOLD);
@@ -803,7 +785,6 @@ export class TicketCommand {
   @Subcommand({
     name: 'status',
     description: 'Display the current ticket status for crews',
-    dmPermission: false,
   })
   async onCrewStatusRequest(
     @Context() [interaction]: SlashCommandContext,

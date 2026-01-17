@@ -22,14 +22,16 @@ import {
 } from 'necord';
 import {
   ChannelType,
+  Collection,
   GuildChannel,
   GuildMember,
   PermissionsBitField,
   Snowflake,
+  TextInputModalData,
   User,
 } from 'discord.js';
 import { compact } from 'lodash';
-import { AuthError, DatabaseError, ValidationError } from 'src/errors';
+import { AuthError, ValidationError } from 'src/errors';
 import { AccessMode, CrewMemberAccess } from 'src/types';
 import { ErrorEmbed, SuccessEmbed } from 'src/bot/embed';
 import { EchoCommand } from 'src/core/echo.command-group';
@@ -314,7 +316,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'create',
     description: 'Create a new crew',
-    dmPermission: false,
   })
   async onCreateCrew(
     @Context() [interaction]: SlashCommandContext,
@@ -382,7 +383,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'reconcile',
     description: "Create crew channels and roles, if they don't already exist",
-    dmPermission: false,
   })
   async onCrewReconcile(
     @Context() [interaction]: SlashCommandContext,
@@ -457,7 +457,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'set_flag',
     description: 'Update guild settings (boolean)',
-    dmPermission: false,
   })
   async onCrewSettingBoolean(
     @Context() context: SlashCommandContext,
@@ -480,7 +479,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'set_text',
     description: 'Update guild settings (text)',
-    dmPermission: false,
   })
   async onCrewSettingText(
     @Context() context: SlashCommandContext,
@@ -503,7 +501,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'grant',
     description: 'Grant crew-level privileges to bot features',
-    dmPermission: false,
   })
   async onGrantCrewAccess(
     @Context() [interaction]: SlashCommandContext,
@@ -594,7 +591,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'join',
     description: 'Join a crew',
-    dmPermission: false,
   })
   async onJoinCrew(
     @Context() context: SlashCommandContext,
@@ -607,7 +603,6 @@ export class CrewCommand {
   @SlashCommand({
     name: 'joincrew',
     description: 'Join a crew',
-    dmPermission: false,
   })
   async onGlobalJoinCrew(
     @Context() context: SlashCommandContext,
@@ -650,7 +645,6 @@ export class CrewCommand {
     name: 'prompt',
     description:
       'Show a generic prompt to join the crew of this channel. Must be run in crew channel.',
-    dmPermission: false,
   })
   async onCrewJoinPrompt(@Context() [interaction]: SlashCommandContext) {
     const crew = await this.crewService
@@ -692,7 +686,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'leave',
     description: 'Leave a crew',
-    dmPermission: false,
   })
   async onLeaveCrew(
     @Context() context: SlashCommandContext,
@@ -705,7 +698,6 @@ export class CrewCommand {
   @SlashCommand({
     name: 'leavecrew',
     description: 'Leave a crew',
-    dmPermission: false,
   })
   async onLeaveCrewAlias(
     @Context() context: SlashCommandContext,
@@ -718,7 +710,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'owner',
     description: 'Transfer ownership to another crew member. Owner only.',
-    dmPermission: false,
   })
   async onSetOwner(
     @Context() [interaction]: SlashCommandContext,
@@ -794,7 +785,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'admin',
     description: 'Give a member admin privileges. Admin only.',
-    dmPermission: false,
   })
   async onSetAdmin(
     @Context() [interaction]: SlashCommandContext,
@@ -847,7 +837,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'add',
     description: 'Add a crew member to a team. Admin only.',
-    dmPermission: false,
   })
   async onAddCrewMember(
     @Context() [interaction]: SlashCommandContext,
@@ -885,7 +874,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'remove',
     description: 'Remove a team member from the team. Admin only.',
-    dmPermission: false,
   })
   async onRemoveCrewMember(
     @Context() [interaction]: SlashCommandContext,
@@ -923,7 +911,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'archive',
     description: 'Archive a crew',
-    dmPermission: false,
   })
   async onArchiveCrew(
     @Context() [interaction]: SlashCommandContext,
@@ -969,7 +956,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'purge',
     description: 'Archives all crews',
-    dmPermission: false,
   })
   async onPurgeCrews(
     @Context() [interaction]: SlashCommandContext,
@@ -1115,7 +1101,7 @@ export class CrewCommand {
   ) {
     const memberRef = interaction.member?.user?.id ?? interaction.user?.id;
     const accessArgs = await this.accessService.getTestArgs(interaction);
-    const update = interaction.fields.fields.reduce((state, current) => {
+    const update = (interaction.fields.fields as Collection<string, TextInputModalData>).reduce((state, current) => {
       const field = current.customId.split('/').pop();
       state[field] = current.value;
       return state;
@@ -1172,7 +1158,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'status',
     description: 'Display the current crew status',
-    dmPermission: false,
   })
   async onCrewStatusRequest(
     @Context() [interaction]: SlashCommandContext,
@@ -1207,7 +1192,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'log',
     description: 'Post a formal update of the crew activities',
-    dmPermission: false,
   })
   async onCrewLogPrompt(
     @Context() [interaction]: SlashCommandContext,
@@ -1278,7 +1262,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'share',
     description: 'Allow other guilds to send tickets to this crew',
-    dmPermission: false,
   })
   async onShareCrew(
     @Context() [interaction]: SlashCommandContext,
@@ -1321,7 +1304,6 @@ export class CrewCommand {
   @Subcommand({
     name: 'prune',
     description: 'Manually trigger check to remove inactive crew members',
-    dmPermission: false,
   })
   async onCrewPrune(
     @Context() [interaction]: SlashCommandContext,

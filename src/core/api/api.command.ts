@@ -9,10 +9,7 @@ import { SuccessEmbed } from 'src/bot/embed';
 import { ApiService } from './api.service';
 
 @Injectable()
-@EchoCommand({
-  name: 'api',
-  description: 'Manage API interaction',
-})
+@EchoCommand({ name: 'api', description: 'Manage API interaction' })
 @UseFilters(DiscordExceptionFilter)
 export class ApiCommand {
   private readonly logger = new Logger(ApiCommand.name);
@@ -22,11 +19,7 @@ export class ApiCommand {
     private readonly apiService: ApiService,
   ) {}
 
-  @Subcommand({
-    name: 'new_key',
-    description: 'Create a new API',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'new_key', description: 'Create a new API' })
   async onNewApiKey(@Context() [interaction]: SlashCommandContext) {
     if (!interaction.memberPermissions.has(PermissionsBitField.Flags.Administrator)) {
       throw new AuthError(

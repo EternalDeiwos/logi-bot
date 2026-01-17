@@ -37,20 +37,12 @@ export class CreateTeamCommandParams {
 }
 
 export class SelectTeamCommandParams {
-  @StringOption({
-    name: 'team',
-    description: 'Select a team',
-    autocomplete: true,
-    required: true,
-  })
+  @StringOption({ name: 'team', description: 'Select a team', autocomplete: true, required: true })
   teamId: string;
 }
 
 @Injectable()
-@EchoCommand({
-  name: 'team',
-  description: 'Manage teams',
-})
+@EchoCommand({ name: 'team', description: 'Manage teams' })
 @UseFilters(DiscordExceptionFilter)
 export class TeamCommand {
   private readonly logger = new Logger(TeamCommand.name);
@@ -64,7 +56,7 @@ export class TeamCommand {
   @Subcommand({
     name: 'add',
     description: 'Register team information. Guild admin only.',
-    dmPermission: false,
+
     defaultMemberPermissions: '0',
   } as SlashCommandMeta)
   async onCreateTeam(
@@ -95,11 +87,7 @@ export class TeamCommand {
   }
 
   @UseInterceptors(TeamSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'delete',
-    description: 'Delete a team. Guild admin only.',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'delete', description: 'Delete a team. Guild admin only.' })
   async onDeleteTeam(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: SelectTeamCommandParams,

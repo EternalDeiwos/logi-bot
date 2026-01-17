@@ -65,12 +65,7 @@ export class SelectStockpileCommandParams {
 }
 
 export class UpdateStockpileCommandParams extends SelectStockpileCommandParams {
-  @StringOption({
-    name: 'code',
-    description: 'New code',
-    autocomplete: false,
-    required: true,
-  })
+  @StringOption({ name: 'code', description: 'New code', autocomplete: false, required: true })
   code: string;
 }
 
@@ -117,19 +112,10 @@ export class StockpileLogCommandParams {
   })
   message: string;
 
-  @AttachmentOption({
-    name: 'report',
-    description: 'Upload a FIR TSV report',
-    required: true,
-  })
+  @AttachmentOption({ name: 'report', description: 'Upload a FIR TSV report', required: true })
   reportAttachment: Attachment;
 
-  @StringOption({
-    name: 'crew',
-    description: 'Select a crew',
-    autocomplete: true,
-    required: false,
-  })
+  @StringOption({ name: 'crew', description: 'Select a crew', autocomplete: true, required: false })
   crew: string;
 }
 
@@ -142,12 +128,7 @@ export class GrantStockpileAccessCommandParams {
   })
   stockpileId: string;
 
-  @StringOption({
-    name: 'rule',
-    description: 'Select a rule',
-    autocomplete: true,
-    required: true,
-  })
+  @StringOption({ name: 'rule', description: 'Select a rule', autocomplete: true, required: true })
   ruleId: string;
 
   @StringOption({
@@ -160,10 +141,7 @@ export class GrantStockpileAccessCommandParams {
 }
 
 @Injectable()
-@DeltaCommand({
-  name: 'stockpile',
-  description: 'Manage stockpiles',
-})
+@DeltaCommand({ name: 'stockpile', description: 'Manage stockpiles' })
 @UseFilters(DiscordExceptionFilter)
 export class StockpileCommand {
   private readonly logger = new Logger(StockpileCommand.name);
@@ -178,11 +156,7 @@ export class StockpileCommand {
   ) {}
 
   @UseInterceptors(PoiSelectAutocompleteInterceptor)
-  @Subcommand({
-    name: 'create',
-    description: 'Create a stockpile',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'create', description: 'Create a stockpile' })
   async onCreateStockpile(
     @Context() [interaction]: SlashCommandContext,
     @Options() data: CreateStockpileCommandParams,
@@ -216,7 +190,6 @@ export class StockpileCommand {
   @Subcommand({
     name: 'update',
     description: 'Update stockpile contents. Alias for "/delta stockpile log"',
-    dmPermission: false,
   })
   async onUpdateStockpile(
     @Context() context: SlashCommandContext,
@@ -229,7 +202,6 @@ export class StockpileCommand {
   @Subcommand({
     name: 'log',
     description: 'Update stockpile contents. Alias for "/delta stockpile update"',
-    dmPermission: false,
   })
   async onLogStockpile(
     @Context() context: SlashCommandContext,
@@ -277,9 +249,7 @@ export class StockpileCommand {
     if (result.identifiers.length) {
       const [{ id }] = result.identifiers as SelectStockpileLogDto[];
 
-      await this.botService.publish(interaction, 'stockpile', 'log.process', {
-        id,
-      });
+      await this.botService.publish(interaction, 'stockpile', 'log.process', { id });
     }
 
     await this.botService.replyOrFollowUp(interaction, {
@@ -288,11 +258,7 @@ export class StockpileCommand {
   }
 
   @UseInterceptors(StockpileSearchAutocompleteInterceptor)
-  @Subcommand({
-    name: 'search',
-    description: 'Search stockpile contents',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'search', description: 'Search stockpile contents' })
   async onSearchStockpile(
     @Context() [interaction]: SlashCommandContext,
     @Options() options: SearchStockpileCommandParams,
@@ -366,11 +332,7 @@ export class StockpileCommand {
   }
 
   @UseInterceptors(StockpileGrantAccessAutocompleteInterceptor)
-  @Subcommand({
-    name: 'grant',
-    description: 'Grant access to stockpile. Guild admin only',
-    dmPermission: false,
-  })
+  @Subcommand({ name: 'grant', description: 'Grant access to stockpile. Guild admin only' })
   async onGrantStockpileAccess(
     @Context() [interaction]: SlashCommandContext,
     @Options() options: GrantStockpileAccessCommandParams,

@@ -8,7 +8,7 @@ import { ErrorTraceConsumer } from './error.consumer';
 
 @Module({
   imports: [
-    RabbitMQModule.forRootAsync(RabbitMQModule, {
+    RabbitMQModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService<Record<ConfigKey, unknown>>) => {
@@ -22,32 +22,19 @@ import { ErrorTraceConsumer } from './error.consumer';
 
         return {
           exchanges: [
-            {
-              name: 'discord',
-            },
+            { name: 'discord' },
             { name: 'crew' },
-            {
-              name: 'stockpile',
-            },
-            {
-              name: 'counter',
-            },
-            {
-              name: 'retry',
-            },
-            {
-              name: 'errors',
-            },
+            { name: 'stockpile' },
+            { name: 'counter' },
+            { name: 'retry' },
+            { name: 'errors' },
           ],
           queues: [
             {
               name: 'error-handling-main',
               exchange: 'errors',
               routingKey: '#',
-              options: {
-                durable: true,
-                maxLength: 1e4,
-              },
+              options: { durable: true, maxLength: 1e4 },
             },
           ],
           uri: `amqp://${user}:${pass}@${host}:${port}`,
